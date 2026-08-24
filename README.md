@@ -1,8 +1,6 @@
 # @sorandomains/sdk
 
-> **Repos:** this is the standalone home of `@sorandomains/sdk`. Development currently
-> happens in the (private) [Soran monorepo](https://github.com/SoranDomains/soran)
-> and is mirrored here per release. Docs: [SoranDomains/docs](https://github.com/SoranDomains/docs).
+
 
 Resolve Soran names (`alice.nova`) on Stellar — **trustlessly, straight from the
 chain**. No Soran servers in the trust path: every call is a read-only Soroban
