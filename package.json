@@ -1,0 +1,43 @@
+{
+  "name": "@sorandomains/sdk",
+  "version": "0.1.0",
+  "description": "Resolve Soran names (alice.nova) on Stellar \u2014 trustlessly, straight from the chain.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "demo": "node --import tsx demo.ts",
+    "prepublishOnly": "tsc"
+  },
+  "peerDependencies": {
+    "@stellar/stellar-sdk": ">=13 <17"
+  },
+  "devDependencies": {
+    "@stellar/stellar-sdk": "^16.2.0",
+    "@types/node": "^22.20.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SoranDomains/sdk.git"
+  },
+  "homepage": "https://github.com/SoranDomains/docs",
+  "bugs": {
+    "url": "https://github.com/SoranDomains/sdk/issues"
+  },
+  "keywords": [
+    "stellar",
+    "soroban",
+    "name-service",
+    "resolver",
+    "wallet",
+    "soran"
+  ]
+}
