@@ -1,6 +1,6 @@
 {
-  "name": "@sorandomains/sdk",
-  "version": "0.1.0",
+  "name": "@sorandomains/lookup",
+  "version": "0.2.0",
   "description": "Resolve Soran names (alice.nova) on Stellar \u2014 trustlessly, straight from the chain.",
   "type": "module",
   "main": "./dist/index.js",
@@ -26,18 +26,19 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/SoranDomains/sdk.git"
+    "url": "git+https://github.com/SoranDomains/sdk.git",
+    "directory": "packages/lookup"
   },
-  "homepage": "https://github.com/SoranDomains/docs",
+  "homepage": "https://github.com/SoranDomains/sdk/tree/main/packages/lookup#readme",
   "bugs": {
     "url": "https://github.com/SoranDomains/sdk/issues"
   },
   "keywords": [
     "stellar",
     "soroban",
+    "soran",
     "name-service",
     "resolver",
-    "wallet",
-    "soran"
+    "reverse-lookup"
   ]
 }

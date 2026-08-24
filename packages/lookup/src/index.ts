@@ -6,7 +6,7 @@
  *   and enforces the live-name + forward-match gates on-chain) and
  *   `name_of(addr) -> Option<String>` returning the FULL PLAINTEXT NAME
  *   ("alice.nova"), already gated on-chain by generation + forward-match
- *   checks. scValToNative decodes the String straight to a JS string — a
+ *   (R2-M5). scValToNative decodes the String straight to a JS string — a
  *   plain string is the only legitimate shape. This SDK does NOT interoperate
  *   with pre-Option-A Resolvers, whose `name_of` returned a 32-byte node hash.
  * - `reverseLookup` is a pure on-chain read: candidate namespaces are probed
@@ -49,13 +49,13 @@
  */
 
 /**
- * @sorandomains/sdk — resolve Soran names on Stellar, trustlessly.
+ * @sorandomains/lookup — resolve Soran names on Stellar, trustlessly.
  *
  * Everything here is a READ against the deployed contracts via Soroban RPC
  * simulation: no signer, no fees, no Soran servers in the trust path. A wallet
  * that integrates this resolves `alice.nova` the same way the chain would.
  *
- *   import { Soran } from "@sorandomains/sdk";
+ *   import { Soran } from "@sorandomains/lookup";
  *   const soran = new Soran({ network: "testnet" });
  *   await soran.resolve("alice.nova");        // → "GDHN…" | null
  *   await soran.verify("alice.nova", "GDHN…"); // → true (pay-to-name safety)
@@ -75,8 +75,8 @@
  * ## Reverse resolution (address → name)
  * Reverse records store the PLAINTEXT name on chain (Option A). The Resolver's
  * `name_of(addr)` answers with the full name only while the name is still live
- * (generation match) AND its forward record resolves back to the address:
- * every reverse answer is self-contained and contract-verified, with
+ * (generation match) AND its forward record resolves back to the address
+ * (R2-M5): every reverse answer is self-contained and contract-verified, with
  * no hint service in the trust path. `reverseVerify(addr, name)` is a pure
  * string comparison against that verified answer. Because reverse records live
  * on per-namespace Resolvers, `reverseLookup(addr)` needs to know which
@@ -96,7 +96,7 @@
  * when the primary read itself fails — see `reverseLookup`). Per-namespace
  * reverse records and `reverseVerify` are unchanged.
  *
- * READ COST: each `primary_of` simulation performs two
+ * READ COST (spec refinement R3): each `primary_of` simulation performs two
  * cross-contract calls (resolver_of + name_of) on chain. Wallets rendering
  * address lists are expected to apply brief CLIENT-side caching (seconds —
  * the same discipline as `resolverCacheTtlMs`) for batch rendering.
@@ -124,12 +124,12 @@ export const DEPLOYMENTS = {
     passphrase: Networks.TESTNET as string,
     // The immutable Registry pins the approved Registrar/Resolver Wasm; the SDK
     // reads resolver_of/owner_of from it, so pointing at the current Registry is
-    // enough. Updated by the platform on every redeploy.
+    // enough. Keep this in lockstep with api/.env REGISTRY_ID on every redeploy.
     registryId: "CAUEHYVLLNNDZ4H5QWCPBDWEONRI44SI3XYSEACB4U3HYILIVQGQAMNI",
     // Platform-deployed PrimaryName (soran-primary), anchored to the Registry
     // above — immutable, unpinned, one instance per network. Integrators get the
     // primary-name step by default; omit/override via SoranOptions.primaryId.
-    // Updated by the platform on every redeploy.
+    // Keep in lockstep with api/.env PRIMARY_ID on every redeploy.
     primaryId: "CAZMXB6UBXKL4DGC2GUC5VKHIZMF47CIZXZFAZPYLM2RP6ZJZNSIIYS2",
   },
   // mainnet: populated at mainnet launch
@@ -197,7 +197,7 @@ export type SoranOptions = {
    */
   reverseNamespaces?: string[];
   /**
-   * How long a namespace→resolver lookup is cached, in ms. The pointer
+   * (SDK-02) How long a namespace→resolver lookup is cached, in ms. The pointer
    * CAN change for a reclaimable namespace (the owner repoints), so a long-lived
    * instance must not cache it forever or it will resolve to a stale resolver.
    * Default 30_000. Set 0 to disable caching (always read the live pointer).
@@ -213,7 +213,7 @@ export type NameRecord = {
 };
 
 /**
- * The trust verdict on a name's resolution. `resolve()` returns the
+ * (SDK-01) The trust verdict on a name's resolution. `resolve()` returns the
  * address the OWNER's current resolver points at — which, for a reclaimable
  * namespace, the owner can repoint at will (that is holder sovereignty, not a
  * bug). Before a high-value pay-to-name, also check `assurance()`: `trustworthy`
@@ -247,12 +247,12 @@ const LABEL_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
 // reads — any well-formed address with a zero sequence works.
 const SIM_SOURCE = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
 
-// Upper bound on the namespace-list hint fetch: the hint is
+// Upper bound on the namespace-list hint fetch (feedback #3b): the hint is
 // liveness-only, so a slow/offline hint service must degrade reverseLookup to
 // null quickly rather than hang the caller.
 const HINT_TIMEOUT_MS = 5_000;
 const HINT_MAX_BODY_BYTES = 4_096; // the namespace list is tiny; anything bigger is not a hint
-/** Client-side cap on hint-supplied namespace lists — the
+/** (delta-review Low) Client-side cap on hint-supplied namespace lists — the
  * server endpoint caps at 12, but the hint is untrusted; never fan out more
  * probes than the designed bound. */
 const HINT_MAX_NAMESPACES = 12;
@@ -266,11 +266,12 @@ export class Soran {
   private hintUrl?: string;
   private reverseNamespaces: string[];
   private resolverCache = new Map<string, { value: string | null; at: number }>();
+  private registrarCache = new Map<string, { value: string | null; at: number }>();
   private cacheTtlMs: number;
 
   constructor(opts: SoranOptions = {}) {
     const base: DeploymentPreset = DEPLOYMENTS[opts.network ?? "testnet"];
-    // Plain HTTP only for a local node — a production consumer
+    // (indexer NEW-4) Plain HTTP only for a local node — a production consumer
     // over http:// would let an on-path attacker forge every read this SDK makes.
     const rpcUrl = opts.rpcUrl ?? base.rpcUrl;
     this.server = new rpc.Server(rpcUrl, { allowHttp: /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?(\/|$)/i.test(rpcUrl) });
@@ -331,10 +332,24 @@ export class Soran {
     const resolverId = await this.resolverOf(namespace);
     if (resolverId) {
       const addr = (await this.read(resolverId, "addr", [bytes(nameNode)])) as string | null;
-      return { name, address: addr ?? null, node: hex(nameNode), resolver: resolverId };
+      if (addr) return { name, address: addr, node: hex(nameNode), resolver: resolverId };
+      // No explicit resolver record (records are holder-set and optional):
+      // fall back to the Registrar's BUILT-IN resolution target — `issue`
+      // initializes it to the holder, so freshly issued names resolve before
+      // their holder ever touches the resolver. Same trust base: the Registrar
+      // consulted is the one the immutable Registry itself attests for the
+      // namespace, and its `resolve` is expiry-gated on chain.
+      const attested = await this.attestedRegistrarOf(namespace);
+      if (attested) {
+        const builtIn = (await this.read(attested, "resolve", [
+          nativeToScVal(Buffer.from(label, "utf8"), { type: "bytes" }),
+        ])) as string | null;
+        return { name, address: builtIn ?? null, node: hex(nameNode), resolver: builtIn ? null : resolverId };
+      }
+      return { name, address: null, node: hex(nameNode), resolver: resolverId };
     }
     // Closed resolution via a known Registrar (owner opt-out of public resolver).
-    const registrarId = this.registrars[namespace];
+    const registrarId = this.registrars[namespace] ?? (await this.attestedRegistrarOf(namespace));
     if (registrarId) {
       const addr = (await this.read(registrarId, "resolve", [
         nativeToScVal(Buffer.from(label, "utf8"), { type: "bytes" }),
@@ -362,7 +377,7 @@ export class Soran {
   }
 
   /**
-   * The trust verdict on a name's resolver. `resolve()` reflects the
+   * (SDK-01) The trust verdict on a name's resolver. `resolve()` reflects the
    * owner's CURRENT pointer, which for a reclaimable namespace the owner may
    * repoint. For a high-value pay-to-name, gate on `trustworthy` here: it is
    * true only when the resolver pointer is locked to the Registry-attested,
@@ -394,7 +409,7 @@ export class Soran {
   /**
    * Trustlessly verify that `address`'s on-chain reverse record IS `name`.
    * The Resolver's `name_of` already enforces the generation gate and the
-   * forward-match proof on chain, so a matching plaintext answer is
+   * forward-match proof (R2-M5) on chain, so a matching plaintext answer is
    * fully verified — no client-side node hashing or forward re-check needed.
    * This is what a wallet shows a checkmark on.
    */
@@ -411,7 +426,7 @@ export class Soran {
   /**
    * Pure on-chain reverse read: ask each candidate namespace's Resolver for
    * `name_of(address)` and return the winning answer, or null. The contract
-   * enforces the generation + forward-match gates, so any non-null
+   * enforces the generation + forward-match gates (R2-M5), so any non-null
    * answer is already verified — a stale or spoofed record returns null from
    * the contract itself, never a wrong name from a hint service.
    *
@@ -438,7 +453,7 @@ export class Soran {
    *      step above still runs — scoping controls namespaces, not the
    *      cross-namespace pointer).
    *   2. the `reverseNamespaces` constructor option.
-   *   3. a namespace-LIST hint fetched over `hintUrl` — see
+   *   3. a namespace-LIST hint fetched over `hintUrl` (feedback #3b) — see
    *      `namespaceHint` for why this cannot forge an answer.
    *
    * All candidates are probed IN PARALLEL, but the result is DETERMINISTIC:
@@ -512,7 +527,7 @@ export class Soran {
    * masquerades as "no primary". A non-string return is likewise a typed ABI
    * mismatch, matching nameOf's discipline.
    *
-   * COST NOTE: every call costs two cross-contract calls
+   * COST NOTE (spec refinement R3): every call costs two cross-contract calls
    * in simulation (resolver_of + name_of inside the contract). For batch
    * rendering, callers are expected to cache briefly client-side (seconds —
    * the same discipline as `resolverCacheTtlMs`). Correctness never depends
@@ -575,14 +590,14 @@ export class Soran {
   }
 
   /**
-   * Namespace-LIST hint, used only when `reverseLookup` was
+   * (feedback #3b) Namespace-LIST hint, used only when `reverseLookup` was
    * given no candidate namespaces at all. Fetches the hint service's namespace
    * list and returns the labels to probe ON CHAIN.
    *
    * TRUST NOTE — a list hint cannot forge anything. It never carries an
    * answer; it only says WHICH namespaces to ask. Every candidate answer still
    * comes from the Resolver's `name_of`, which enforces the generation +
-   * forward-match gates on chain. The hint therefore fixes LIVENESS
+   * forward-match gates (R2-M5) on chain. The hint therefore fixes LIVENESS
    * only: the worst a lying hint can do is omit a namespace (hiding a name →
    * null) or list junk labels (filtered below) — never produce a wrong name.
    * A hint outage likewise degrades the lookup to null, never to a misread.
@@ -601,7 +616,7 @@ export class Soran {
       const ctl = new AbortController();
       const timer = setTimeout(() => ctl.abort(), HINT_TIMEOUT_MS);
       try {
-        // The hint
+        // (round-3 #11, restored after the Option A merge dropped it) The hint
         // host is UNTRUSTED: refuse redirects (it must not steer us to another
         // origin) and cap the body BEFORE buffering so an oversized response can
         // never be read into memory.
@@ -644,7 +659,7 @@ export class Soran {
       if (!LABEL_RE.test(l) || l.length > 63 || seen.has(l)) continue;
       seen.add(l);
       out.push(l);
-      // Client-side cap: the "12 most-active" bound lives
+      // (delta-review Low) Client-side cap: the "12 most-active" bound lives
       // only on the server endpoint — a hostile/buggy hint could otherwise
       // make us fire thousands of parallel RPC probes. Liveness-only either
       // way; every candidate answer is still contract-verified on chain.
@@ -653,8 +668,30 @@ export class Soran {
     return out;
   }
 
+  /** The Registry-attested Registrar for a namespace — the built-in
+   *  resolution authority. Cached with the same TTL discipline as resolver
+   *  pointers (the Registry deploys exactly one attested Registrar per node,
+   *  but a cheap TTL keeps the two caches uniform). */
+  private async attestedRegistrarOf(namespace: string): Promise<string | null> {
+    if (this.cacheTtlMs > 0) {
+      const hit = this.registrarCache.get(namespace);
+      if (hit && Date.now() - hit.at < this.cacheTtlMs) return hit.value;
+    }
+    const nsNode = await this.namehash(namespace);
+    const registrar = ((await this.read(this.registryId, "registrar_of", [bytes(nsNode)])) ??
+      null) as string | null;
+    if (this.cacheTtlMs > 0) {
+      if (this.registrarCache.size >= 1024) {
+        const oldest = this.registrarCache.keys().next().value;
+        if (oldest !== undefined) this.registrarCache.delete(oldest);
+      }
+      this.registrarCache.set(namespace, { value: registrar, at: Date.now() });
+    }
+    return registrar;
+  }
+
   private async resolverOf(namespace: string): Promise<string | null> {
-    // Honour the TTL: a cached resolver pointer past its TTL must be
+    // (SDK-02) Honour the TTL: a cached resolver pointer past its TTL must be
     // re-read, because the owner of a reclaimable namespace can repoint it.
     if (this.cacheTtlMs > 0) {
       const hit = this.resolverCache.get(namespace);
@@ -664,7 +701,7 @@ export class Soran {
     const resolver = ((await this.read(this.registryId, "resolver_of", [bytes(nsNode)])) ??
       null) as string | null;
     if (this.cacheTtlMs > 0) {
-      // Bound the cache so a long-lived instance resolving many
+      // (SDK-02) Bound the cache so a long-lived instance resolving many
       // namespaces can't grow it without limit (TTL gates freshness, not size).
       if (this.resolverCache.size >= 1024) {
         const oldest = this.resolverCache.keys().next().value;
@@ -678,7 +715,7 @@ export class Soran {
   /**
    * Read-only contract call via RPC simulation — no signer, no fee, no state.
    *
-   * Distinguish a successful None from a FAILURE. A simulation that
+   * (SDK-03) Distinguish a successful None from a FAILURE. A simulation that
    * cannot be completed (RPC down, contract missing, host error) THROWS a
    * SoranError — it must never be silently returned as null, which a caller
    * would read as "the name doesn't resolve" and, in a pay-to-name flow, act on.
@@ -703,6 +740,14 @@ export class Soran {
     if (!rpc.Api.isSimulationSuccess(sim)) {
       const detail = (sim as { error?: unknown }).error ?? "unknown";
       throw new SoranError(`simulate ${fn} on ${contractId} failed: ${String(detail)}`);
+    }
+    // An entry needing restore is ARCHIVED (rent lapsed), not absent — "null"
+    // here would tell a wallet a dormant-but-owned name doesn't resolve. A
+    // failure to read must stay distinguishable from a successful None.
+    if (rpc.Api.isSimulationRestore(sim)) {
+      throw new SoranError(
+        `read ${fn} on ${contractId}: the on-chain entry is archived (rent lapsed) — it exists but needs restoring before it can be read`,
+      );
     }
     if (!sim.result?.retval) return null; // genuine None
     return scValToNative(sim.result.retval);

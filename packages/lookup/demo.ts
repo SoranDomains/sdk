@@ -3,7 +3,7 @@ import { Soran } from "./src/index.js";
 
 const soran = new Soran({ network: "testnet" });
 
-console.log("— @sorandomains/sdk live demo (public testnet, pure chain reads) —");
+console.log("— @sorandomains/lookup live demo (public testnet, pure chain reads) —");
 
 const addr = await soran.resolve("alice.nova");
 console.log(`resolve("alice.nova")            → ${addr}`);

@@ -1,0 +1,43 @@
+{
+  "name": "@sorandomains/owner",
+  "version": "0.2.0",
+  "description": "Run your Soran namespace on Stellar — issue names, manage lifecycle, transfer, and walk the one-way permanence door.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "tsc"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SoranDomains/sdk.git",
+    "directory": "packages/owner"
+  },
+  "homepage": "https://github.com/SoranDomains/sdk/tree/main/packages/owner#readme",
+  "bugs": {
+    "url": "https://github.com/SoranDomains/sdk/issues"
+  },
+  "keywords": [
+    "stellar",
+    "soroban",
+    "soran",
+    "name-service",
+    "namespace",
+    "issuance"
+  ],
+  "peerDependencies": {
+    "@stellar/stellar-sdk": ">=13 <17"
+  },
+  "devDependencies": {
+    "@stellar/stellar-sdk": "^16.2.0",
+    "@types/node": "^22.20.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}
