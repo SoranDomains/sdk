@@ -54,8 +54,9 @@ npx wrangler kv key put --binding HINT_KV seed \
   '[{"name":"alice.acme","holder":"G..."}]'
 ```
 
-It merges on the next cron run. Stale entries are harmless — the SDK's
-on-chain verification drops anything that no longer holds.
+The seed is re-merged on every cron run (chain events always win), so it
+works whenever you add it. Stale entries are harmless — the SDK's on-chain
+verification drops anything that no longer holds.
 
 ## Notes
 
@@ -65,9 +66,22 @@ on-chain verification drops anything that no longer holds.
   reachable RPC (or a tiny local forwarder) for testing — deployed Workers
   fetch from Cloudflare's edge and are unaffected.
 
+- **Free-tier friendly by design:** KV writes happen only when state
+  actually changed (an idle namespace writes ~0/day, so a 1-minute cron
+  stays inside the 1,000-writes/day free quota), and public reads are
+  edge-cached for 30s, so request floods hit the cache instead of billing
+  KV reads and CPU. A very busy namespace (thousands of event batches/day)
+  should move to the paid tier or a slower cron.
+- **Self-healing poller:** a cursor that falls out of the RPC's event
+  retention (after long downtime) re-anchors at the current ledger and
+  counts the gap — check `gaps` and `lastError` on `/healthz`, and reseed
+  if the gap matters. `/healthz` reports `ok: false` while polling fails.
+- **Bounded state:** the index refuses growth past 50k names (`full: true`
+  on `/healthz`) and clamps every RPC-supplied field, so neither time nor a
+  hostile RPC can push the KV value toward its 25 MiB cap.
 - KV is eventually consistent at the edge (~seconds): a just-issued name may
   take a poll cycle plus propagation to appear. Discovery-grade, by design.
-- Event application is idempotent (per-event dedupe), so cron overlap or a
-  cursor replay never double-counts history.
+- Event application is idempotent and kept in ledger order, so cron overlap
+  or a cursor replay never double-counts or disorders history.
 - The per-run page cap keeps each invocation well under Workers' subrequest
   limit; a large backfill simply spans a few cron runs.

@@ -161,10 +161,15 @@ function applyEvent(kind, data, ledger, txHash, at) {
   const holder = String(data[1]);
   if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(label)) return;
   if (!StrKey.isValidEd25519PublicKey(holder) && !StrKey.isValidContract(holder)) return;
+  if (!Number.isSafeInteger(ledger) || ledger < 0) return;
+  const hash = String(txHash ?? "").slice(0, 64);
+  const when = String(at ?? "").slice(0, 40);
   const name = `${label}.${NAMESPACE}`;
   state.holders[name] = holder;
   const log = (state.log[name] ??= []);
-  log.push({ action, ledger, txHash, at });
+  if (log.some((e) => e.txHash === hash && e.action === action && e.ledger === ledger)) return;
+  log.push({ action, ledger, txHash: hash, at: when });
+  log.sort((a, b) => a.ledger - b.ledger);
   if (log.length > MAX_EVENTS_PER_NAME) log.splice(0, log.length - MAX_EVENTS_PER_NAME);
 }
 
@@ -200,7 +205,17 @@ async function pollLoop() {
     try {
       await pollOnce();
     } catch (e) {
-      console.error(`poll failed (will retry): ${e?.message ?? e}`);
+      // SELF-HEAL: a cursor that fell out of the RPC's event-retention
+      // window would fail every future poll. Re-anchor at the current
+      // ledger and continue — events in the gap are missed (reseed if that
+      // matters).
+      if (state.cursor) {
+        console.error(`poll failed with a cursor (${e?.message ?? e}) — re-anchoring at the current ledger; events in the gap are missed`);
+        state.cursor = null;
+        persist();
+      } else {
+        console.error(`poll failed (will retry): ${e?.message ?? e}`);
+      }
     }
     await new Promise((r) => setTimeout(r, POLL_MS));
   }
@@ -209,7 +224,14 @@ async function pollLoop() {
 // ---------- http ----------
 function json(res, code, body) {
   const buf = JSON.stringify(body);
-  res.writeHead(code, { "content-type": "application/json", "content-length": Buffer.byteLength(buf) });
+  res.writeHead(code, {
+    "content-type": "application/json",
+    "content-length": Buffer.byteLength(buf),
+    // Browser wallets are the primary consumers — CORS is part of the hint
+    // contract (simple GETs only, so no preflight handling is needed).
+    "access-control-allow-origin": "*",
+    "x-content-type-options": "nosniff",
+  });
   res.end(buf);
 }
 const http = createServer((req, res) => {
