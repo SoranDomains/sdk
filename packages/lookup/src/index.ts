@@ -841,7 +841,10 @@ export class Soran {
     const out: SoranProfile = {};
     PROFILE_KEYS.forEach((k, i) => {
       const v = values[i];
-      if (v !== null) out[k] = v;
+      // Empty string = retracted: text records are overwrite-only on chain
+      // (no delete), so holders clear a record by writing "" — treat it as
+      // unset rather than surfacing a present-but-empty key.
+      if (v !== null && v !== "") out[k] = v;
     });
     return out;
   }

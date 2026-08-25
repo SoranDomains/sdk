@@ -8,7 +8,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        pkg: [lookup, owner]
+        pkg: [lookup, owner, holder]
     defaults:
       run:
         working-directory: packages/${{ matrix.pkg }}

@@ -1,37 +1,32 @@
 {
-  "name": "@sorandomains/lookup",
-  "version": "0.4.2",
-  "description": "Resolve Soran names (alice.nova) on Stellar \u2014 trustlessly, straight from the chain.",
+  "name": "@sorandomains/holder",
+  "version": "0.1.0",
+  "description": "Manage your own Soran name on Stellar — records, profile, reverse, primary, and transfers, signed by your key.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
   "files": [
     "dist"
   ],
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "demo": "node --import tsx demo.ts",
     "prepublishOnly": "tsc",
     "check:browser": "esbuild dist/index.js --bundle --platform=browser --external:@stellar/stellar-sdk --outfile=browser-check.js --legal-comments=none --log-level=error && node -e \"const fs=require('fs');const s=fs.readFileSync('browser-check.js','utf8');fs.unlinkSync('browser-check.js');if(/\\bBuffer\\b/.test(s)){console.error('FAIL: bare Buffer reference in browser bundle');process.exit(1)}console.log('browser bundle clean')\""
-  },
-  "peerDependencies": {
-    "@stellar/stellar-sdk": ">=13 <17"
-  },
-  "devDependencies": {
-    "@stellar/stellar-sdk": "^16.2.0",
-    "@types/node": "^22.20.1",
-    "tsx": "^4.19.2",
-    "typescript": "^5.7.3",
-    "esbuild": "^0.25.0"
   },
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/SoranDomains/sdk.git",
-    "directory": "packages/lookup"
+    "directory": "packages/holder"
   },
-  "homepage": "https://github.com/SoranDomains/sdk/tree/main/packages/lookup#readme",
+  "homepage": "https://github.com/SoranDomains/sdk/tree/main/packages/holder#readme",
   "bugs": {
     "url": "https://github.com/SoranDomains/sdk/issues"
   },
@@ -40,13 +35,17 @@
     "soroban",
     "soran",
     "name-service",
-    "resolver",
+    "profile",
     "reverse-lookup"
   ],
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
-    }
+  "peerDependencies": {
+    "@stellar/stellar-sdk": ">=13 <17"
+  },
+  "devDependencies": {
+    "@stellar/stellar-sdk": "^16.2.0",
+    "@types/node": "^22.20.1",
+    "esbuild": "^0.25.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
   }
 }
