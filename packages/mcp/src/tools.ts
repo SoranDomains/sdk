@@ -30,18 +30,41 @@ const text = (value: unknown) => ({
   content: [{ type: "text" as const, text: typeof value === "string" ? value : JSON.stringify(value, bigintSafe, 2) }],
 });
 const bigintSafe = (_k: string, v: unknown) => (typeof v === "bigint" ? v.toString() : v);
-/** Bounded fetch for API tools: 5s abort, ok-check, 128KB cap, no redirects. */
-async function boundedJson(url: string): Promise<unknown> {
+/** Bounded fetch for API tools: 10s abort, ok-check, 128KB cap, no redirects.
+ *  GET by default; pass `body` for a POST, `token` for a Bearer header. */
+async function boundedJson(
+  url: string,
+  body?: unknown,
+  token?: string,
+): Promise<unknown> {
   const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), 5_000);
+  const timer = setTimeout(() => ctl.abort(), 10_000);
   try {
+    const headers: Record<string, string> = {};
+    if (body !== undefined) headers["content-type"] = "application/json";
+    if (token) headers.authorization = `Bearer ${token}`;
     // redirect "manual" + status check: workerd doesn't implement "error",
     // and a redirect from the API host is treated as failure either way.
-    const res = await fetch(url, { signal: ctl.signal, redirect: "manual" });
-    if (res.status >= 300) throw new Error(`${url}: HTTP ${res.status}`);
-    const body = await res.text();
-    if (body.length > 131_072) throw new Error(`${url}: response too large`);
-    return JSON.parse(body);
+    const res = await fetch(url, {
+      method: body !== undefined ? "POST" : "GET",
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal: ctl.signal,
+      redirect: "manual",
+    });
+    const raw = await res.text();
+    if (raw.length > 131_072) throw new Error(`${url}: response too large`);
+    if (res.status >= 300) {
+      let detail = raw.slice(0, 200);
+      try {
+        const j = JSON.parse(raw);
+        detail = j.detail ?? j.error ?? detail;
+      } catch {
+        /* keep raw slice */
+      }
+      throw new Error(`${url.split("__")[0].replace(/https?:\/\/[^/]+/, "")}: HTTP ${res.status} — ${detail}`);
+    }
+    return JSON.parse(raw);
   } finally {
     clearTimeout(timer);
   }
@@ -246,7 +269,7 @@ export async function registerWriteTools(server: McpServer, opts: WriteToolOptio
 
   const [{ SoranHolder, keypairSigner, HolderError }, { SoranOwner, keypairSigner: ownerSigner }] =
     await Promise.all([import("@sorandomains/holder"), import("@sorandomains/owner")]);
-  let kp;
+  let kp: import("@stellar/stellar-sdk").Keypair;
   try {
     kp = Keypair.fromSecret(secret);
   } catch {
@@ -259,6 +282,30 @@ export async function registerWriteTools(server: McpServer, opts: WriteToolOptio
   const holder = new SoranHolder({ signer: keypairSigner(secret), ...rpc });
   const owner = new SoranOwner({ signer: ownerSigner(secret), ...rpc });
   const soran = new Soran({ hintUrl, ...rpc });
+  const { TransactionBuilder } = await import("@stellar/stellar-sdk");
+
+  // --- programmatic console session (SEP-10 wallet sign-in with the agent
+  // key) — needed for the self-custody claim flow, whose prepare/submit
+  // endpoints are auth-gated. The token is short-lived and cached per run.
+  let sessionToken: string | null = null;
+  async function session(): Promise<string> {
+    if (sessionToken) return sessionToken;
+    const ch = (await boundedJson(`${hintUrl}/auth/wallet/challenge`, {
+      account: me,
+    })) as { challengeId: string; xdr: string; network: string };
+    const tx = TransactionBuilder.fromXDR(ch.xdr, ch.network);
+    tx.sign(kp);
+    const v = (await boundedJson(`${hintUrl}/auth/wallet/verify`, {
+      challengeId: ch.challengeId,
+      signedXdr: tx.toXDR(),
+    })) as { token?: string };
+    if (!v.token) throw new Error("console sign-in failed");
+    sessionToken = v.token;
+    return sessionToken;
+  }
+  async function authPost(path: string, body: unknown): Promise<unknown> {
+    return boundedJson(`${hintUrl}${path}`, body, await session());
+  }
 
   server.tool(
     "my_wallet",
@@ -274,6 +321,95 @@ export async function registerWriteTools(server: McpServer, opts: WriteToolOptio
             .catch(() => null),
         ]);
         return text({ publicKey: me, xlmBalance: bal, ...profile });
+      } catch (e) {
+        return errText(e);
+      }
+    },
+  );
+
+  server.tool(
+    "claim_namespace",
+    "CLAIM a top-level namespace (yourbrand) FOR THIS AGENT'S WALLET. This ANNOUNCES a public, timelocked claim on chain — it does NOT grant the namespace immediately: a fixed objection window opens (one day on testnet) during which anyone may object with a bond and a competing basis; if it elapses unopposed the platform auto-executes and the namespace lands in this wallet. Attach evidence in `basis` (trademark number, DNS control, commercial use) — stronger evidence wins an objection. Free to announce (only network fees). Check progress with claim_status. Reserved labels can't be claimed this way; check_availability and list_allocations first.",
+    {
+      label: z.string().describe("The namespace label to claim, e.g. yourbrand"),
+      basis: z
+        .array(z.string().max(120))
+        .max(16)
+        .optional()
+        .describe("Evidence strings supporting the claim (e.g. 'trademark: US 1234567', 'dns: yourbrand.com')"),
+    },
+    async ({ label, basis }) => {
+      try {
+        const prep = (await authPost("/console/register/announce/prepare", {
+          label,
+          basis: basis ?? [],
+        })) as { xdr?: string; error?: string; detail?: string };
+        if (!prep.xdr) return errText(new Error(prep.detail ?? prep.error ?? "prepare returned no transaction"));
+        const tx = TransactionBuilder.fromXDR(prep.xdr, (await import("@stellar/stellar-sdk")).Networks.TESTNET);
+        tx.sign(kp);
+        const sub = (await authPost("/console/tx/submit", { xdr: tx.toXDR() })) as {
+          ok?: boolean;
+          txHash?: string;
+          pending?: boolean;
+          detail?: string;
+        };
+        return text({
+          announced: true,
+          namespace: label,
+          claimant: me,
+          txHash: sub.txHash,
+          objectionWindow: "one day on testnet — anyone may object during it",
+          nextStep:
+            "Wait out the window; the platform auto-executes an unopposed claim and the namespace lands in this wallet. Poll claim_status(label) to watch it.",
+          ...(sub.pending ? { pending: true, detail: sub.detail } : {}),
+        });
+      } catch (e) {
+        return errText(e);
+      }
+    },
+  );
+
+  server.tool(
+    "claim_status",
+    "The status of a namespace claim this (or any) wallet announced: state (announced/awarded/objected), the objection-window countdown, and any objections. Use after claim_namespace to know when the namespace is yours.",
+    { label: z.string() },
+    async ({ label }) => {
+      try {
+        const all = (await boundedJson(`${hintUrl}/v1/allocations`)) as {
+          pending?: Array<Record<string, unknown>>;
+        };
+        const claim = (all.pending ?? []).find((a) => a.namespace === label || a.label === label);
+        if (!claim) {
+          const owned = await soran.namespace(label);
+          return text(
+            owned
+              ? { label, state: "awarded", owner: owned.owner, note: owned.owner === me ? "this wallet owns it" : undefined }
+              : { label, state: "not_found", note: "no pending claim and not allocated — announce with claim_namespace" },
+          );
+        }
+        return text({ ...claim, _note: UNTRUSTED_NOTE });
+      } catch (e) {
+        return errText(e);
+      }
+    },
+  );
+
+  server.tool(
+    "withdraw_claim",
+    "Withdraw a namespace claim THIS wallet announced, before the objection window elapses — cancels the pending claim so the label is free again. Only the claimant can withdraw.",
+    { label: z.string() },
+    async ({ label }) => {
+      try {
+        const prep = (await authPost(`/console/allocations/${encodeURIComponent(label)}/withdraw/prepare`, {})) as {
+          xdr?: string;
+          error?: string;
+          detail?: string;
+        };
+        if (!prep.xdr) return errText(new Error(prep.detail ?? prep.error ?? "prepare returned no transaction"));
+        const tx = TransactionBuilder.fromXDR(prep.xdr, (await import("@stellar/stellar-sdk")).Networks.TESTNET);
+        tx.sign(kp);
+        const sub = (await authPost("/console/tx/submit", { xdr: tx.toXDR() })) as { txHash?: string; detail?: string };
+        return text({ withdrawn: true, namespace: label, txHash: sub.txHash });
       } catch (e) {
         return errText(e);
       }
