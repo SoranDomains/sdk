@@ -43,9 +43,21 @@ const ok = await soran.reverseVerify(sender, "alice.nova");
 | `reverseLookup(addr, namespaces?)` | `string \| null` | Primary name first (if `primaryId` set), then a pure on-chain read across candidate namespaces, probed in parallel with deterministic priority; `hintUrl` may supply only the namespace LIST — a lying hint can hide a name, never forge one |
 | `primaryOf(addr)` | `string \| null` | Cross-namespace primary display name (requires `primaryId`); already contract-verified — the PrimaryName contract re-checks the namespace Resolver's live `name_of` on every read. Read failures throw, never masquerade as "no primary" |
 | `assurance(name)` | `{ resolverAttested, resolverTainted, resolverLocked, trustworthy }` | Opt-in trust check on the namespace's resolver (attested by the Registry, never upgraded, locked by permanence). `resolve()` follows the owner's pointer regardless — use this before trusting a resolution for high-value display/payment |
+| `details(name)` | `NameDetails` | The full live picture in one call: resolution, holder, expiry, generation, namespace owner/registrar/resolver, policy, permanence, assurance. Registration *date* is deliberately absent — the chain stores no timestamps (see `history`) |
 | `namespace(ns)` | `{ owner, resolver } \| null` | Namespace-level record |
 | `isAvailable(ns)` | `boolean` | Unregistered → claimable via the public window |
 | `namehash(ns)` / `node(name)` | `Uint8Array` | The exact on-chain hashing, exposed |
+
+### Identity & enumeration
+
+| Call | Returns | Trust |
+|---|---|---|
+| `namesOf(addr)` | `NameSummary[]` | Every name a wallet holds — candidates discovered via `hintUrl`'s indexer, then EACH verified on chain (`holder_of_node`, contract expiry-gated). The hint can omit, never forge. Best-effort: failing/archived candidates are skipped |
+| `reverseNames(addr, namespaces?)` | `ReverseName[]` | ALL contract-verified reverse names, with the cross-namespace primary flagged |
+| `profile(name)` | `SoranProfile` | The standard `PROFILE_KEYS` text records (`org`, `url`, `email`, `description`, `avatar`, `location`, `twitter`, `github`) — generation-gated on chain; values are holder-authored free text, render as untrusted |
+| `identity(name)` | `NameIdentity` | One-call name page: `details` + `profile` + holder primary + verified display name + the namespace owner's primary name |
+| `walletProfile(addr)` | `WalletProfile` | One-call wallet page: primary + reverse names + verified holdings + the primary's profile |
+| `history(name)` | `NameHistory` | Issued/transferred/reclaimed timeline — **indexed, informational** (the chain stores no timestamps); every entry carries `ledger` + `txHash` for independent verification. Needs `hintUrl` |
 
 ## Options
 
@@ -54,17 +66,27 @@ new Soran({
   network: "testnet",              // deployment preset (mainnet at launch)
   rpcUrl: "https://your-rpc",      // bring your own RPC
   registryId: "C…",                // override the immutable Registry
-  primaryId: "C…",                 // PrimaryName contract id (cross-namespace primary; the
-                                   // namespace display name; preset TODO until
-                                   // testnet preset ships one — pass `null` to DISABLE it)
+  primaryId: "C…",                 // PrimaryName contract id (the testnet preset
+                                   // supplies one — pass `null` to DISABLE the feature)
   registrars: { nova: "C…" },      // closed (registrar-side) resolution opt-in
   reverseNamespaces: ["nova"],     // which Resolvers reverseLookup probes (in order)
   resolverCacheTtlMs: 30_000,      // how long a namespace→resolver pointer is cached (0 = off)
-  hintUrl: "https://api.soran.domains", // OPTIONAL namespace-list hint for
-                                   // reverseLookup — liveness only; every answer
-                                   // is still contract-verified on chain
+  hintUrl: "https://your-deployment-api", // OPTIONAL discovery/indexer source: the
+                                   // namespace-list hint for reverseLookup, the
+                                   // candidate list for namesOf (each candidate
+                                   // chain-verified), and the history() timeline.
+                                   // It can omit; it can never forge
+  timeoutMs: 10_000,               // per-chain-read wait bound → SoranError "TIMEOUT"
+                                   // (unset = no SDK-imposed bound)
 });
 ```
+
+## Errors
+
+Every failure is a `SoranError` with a machine-readable `code` — branch on it,
+not on message text: `INVALID_INPUT`, `CONFIG`, `RPC`, `SIMULATION`,
+`ARCHIVED` (the entry exists but its rent lapsed), `ABI`, `TIMEOUT`. A `null`
+return always means a *successful* read that found nothing.
 
 ## Primary name (optional, cross-namespace)
 
@@ -105,5 +127,6 @@ transactions built and signed by wallets; the SDK only reads.
 - The only trusted inputs are the RPC endpoint you choose and the immutable
   Registry id (published, verifiable on-network).
 
-Works in browsers (WebCrypto) and Node (`node:crypto`) with
+Works in browsers, Node, and workers out of the box — this package ships zero
+Node built-ins of its own (enforced in CI by a browser-bundle check), with
 `@stellar/stellar-sdk` as the only peer dependency.
