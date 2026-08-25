@@ -59,7 +59,10 @@ https://mcp.soran.domains/mcp
 | `my_wallet` | own address, balance, names, primary |
 | `claim_namespace` | **announce a claim** on a top-level namespace for this wallet (opens the timelocked objection window; auto-executes if unopposed) |
 | `claim_status` · `withdraw_claim` | watch a claim's window · cancel it before it elapses |
-| `issue_name` · `reclaim_name` | issue/reclaim names in a namespace this wallet OWNS |
+| `activate_namespace` | deploy the Registrar for a claimed namespace (one-time; required before issuing) — pick reclaimable/permanent policy |
+| `issue_name` · `issue_batch` · `reclaim_name` · `renew_name` | issue (single/bulk ≤23), reclaim, and renew names in a namespace this wallet OWNS |
+| `set_treasury` · `set_resolver` · `make_permanent` | route reclaim custody · point at a resolver · **the irreversible one-way door** (guarded) |
+| `transfer_namespace` · `accept_namespace_transfer` · `cancel_namespace_transfer` · `namespace_status` | hand the whole namespace to another wallet (two-step) · read owner/policy/permanence |
 | `claim_display_name` | make a held name this wallet's verified display name (forward + reverse + primary in one call) |
 | `set_profile` · `set_record` | publish profile records · point a name at an address |
 | `transfer_name` · `accept_name_transfer` · `cancel_name_transfer` · `pending_name_transfer` | move names between wallets (two-step) |

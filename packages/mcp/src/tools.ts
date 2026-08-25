@@ -306,6 +306,11 @@ export async function registerWriteTools(server: McpServer, opts: WriteToolOptio
   async function authPost(path: string, body: unknown): Promise<unknown> {
     return boundedJson(`${hintUrl}${path}`, body, await session());
   }
+  /** Drop the cached session so the next authPost reflects current on-chain
+   *  ownership (a namespace claimed after startup changes the session scope). */
+  function refreshSession() {
+    sessionToken = null;
+  }
 
   server.tool(
     "my_wallet",
@@ -440,6 +445,193 @@ export async function registerWriteTools(server: McpServer, opts: WriteToolOptio
     async ({ namespace, label }) => {
       try {
         return text(await owner.reclaim(namespace, label));
+      } catch (e) {
+        return errText(e);
+      }
+    },
+  );
+
+  server.tool(
+    "activate_namespace",
+    "OWNER power: ACTIVATE this wallet's namespace by deploying its Registrar — the one-time step required before you can issue names. Targets the wallet's PRIMARY namespace (the one it owns; run namespace_status to confirm which). Choose the issuance policy: 'reclaimable' (you can take names back) or 'permanent' (names are the holder's forever, and the namespace can later go fully permanent) — this is IMMUTABLE once deployed. Do this once after claim_namespace executes.",
+    {
+      policy: z
+        .enum(["reclaimable", "permanent"])
+        .default("reclaimable")
+        .describe("Issuance policy for every name in this namespace — immutable once deployed"),
+    },
+    async ({ policy }) => {
+      try {
+        refreshSession(); // reflect ownership as of now, not server start
+        const prep = (await authPost("/console/registrar/deploy/prepare", { policy })) as {
+          xdr?: string;
+          predictedId?: string;
+          error?: string;
+          detail?: string;
+        };
+        if (!prep.xdr || !prep.predictedId)
+          return errText(new Error(prep.detail ?? prep.error ?? "prepare failed — does this wallet own a namespace? (claim_namespace + wait for the window)"));
+        const tx = TransactionBuilder.fromXDR(prep.xdr, (await import("@stellar/stellar-sdk")).Networks.TESTNET);
+        tx.sign(kp);
+        const sub = (await authPost("/console/registrar/deploy/submit", {
+          signedXdr: tx.toXDR(),
+          predictedId: prep.predictedId,
+        })) as { ok?: boolean; registrarId?: string; txHash?: string; detail?: string };
+        if (sub.ok !== true || !sub.registrarId) {
+          // A 202 (pending/unattested) is NOT success — commonly the namespace
+          // is already active (the deploy reverted), or attestation isn't
+          // readable yet. Report honestly rather than claiming activation.
+          return errText(
+            new Error(
+              `activation not confirmed: ${sub.detail ?? "the registrar was not attested for this namespace — it may already be active (namespace_status), or the deploy reverted"}${sub.txHash ? ` (tx ${sub.txHash})` : ""}`,
+            ),
+          );
+        }
+        return text({
+          activated: true,
+          registrar: sub.registrarId,
+          policy,
+          txHash: sub.txHash,
+          nextStep: "You can now issue_name / issue_batch in this namespace.",
+        });
+      } catch (e) {
+        return errText(e);
+      }
+    },
+  );
+
+  server.tool(
+    "issue_batch",
+    "OWNER power: issue up to 23 names in ONE transaction. Returns a per-label outcome (issued, or skipped/taken). Requires this wallet to own the namespace.",
+    {
+      namespace: z.string(),
+      entries: z
+        .array(z.object({ label: z.string(), holder: z.string() }))
+        .min(1)
+        .max(23)
+        .describe("Up to 23 { label, holder } pairs"),
+    },
+    async ({ namespace, entries }) => {
+      try {
+        return text(await owner.issueBatch(namespace, entries));
+      } catch (e) {
+        return errText(e);
+      }
+    },
+  );
+
+  server.tool(
+    "renew_name",
+    "OWNER power: extend a finite-term name's ownership clock by extendSecs seconds. Returns the new expiry. (No effect on permanent-term namespaces.)",
+    { namespace: z.string(), label: z.string(), extendSecs: z.number().int().positive() },
+    async ({ namespace, label, extendSecs }) => {
+      try {
+        return text(await owner.renew(namespace, label, extendSecs));
+      } catch (e) {
+        return errText(e);
+      }
+    },
+  );
+
+  server.tool(
+    "set_treasury",
+    "OWNER power: route the custody of future reclaims for this namespace to a treasury address (or back to the owner wallet).",
+    { namespace: z.string(), treasury: z.string().describe("G… or C… address to receive reclaimed names") },
+    async ({ namespace, treasury }) => {
+      try {
+        return text(await owner.setTreasury(namespace, treasury));
+      } catch (e) {
+        return errText(e);
+      }
+    },
+  );
+
+  server.tool(
+    "set_resolver",
+    "OWNER power: point the namespace at a resolver contract (enables explicit records/profiles/reverse), or clear it. Frozen once the namespace is permanent.",
+    { namespace: z.string(), resolver: z.string().nullable().describe("Resolver contract id (C…), or null to clear") },
+    async ({ namespace, resolver }) => {
+      try {
+        return text(await owner.setResolver(namespace, resolver));
+      } catch (e) {
+        return errText(e);
+      }
+    },
+  );
+
+  server.tool(
+    "make_permanent",
+    "OWNER power — THE ONE-WAY DOOR, IRREVERSIBLE. Locks reclaim off forever and freezes the namespace's code: every issued name becomes permanently its holder's, and there is no path back for anyone including this agent. The contract also requires the policy to have always issued permanent terms. You MUST pass confirm:'IRREVERSIBLE' to proceed.",
+    {
+      namespace: z.string(),
+      confirm: z.string().describe("Must be exactly 'IRREVERSIBLE' to proceed"),
+    },
+    async ({ namespace, confirm }) => {
+      try {
+        if (confirm !== "IRREVERSIBLE") {
+          return errText(
+            new Error("refusing: make_permanent is IRREVERSIBLE — pass confirm:'IRREVERSIBLE' only if you are certain"),
+          );
+        }
+        return text(await owner.makePermanent(namespace, { confirmIrreversible: true }));
+      } catch (e) {
+        return errText(e);
+      }
+    },
+  );
+
+  server.tool(
+    "transfer_namespace",
+    "OWNER power: offer the WHOLE namespace to another wallet. Two-step — nothing moves until the recipient accepts (accept_namespace_transfer). This hands over ownership of every name in it; use with care.",
+    { namespace: z.string(), to: z.string().describe("Recipient wallet (G… or C…)") },
+    async ({ namespace, to }) => {
+      try {
+        return text(await owner.proposeNamespaceTransfer(namespace, to));
+      } catch (e) {
+        return errText(e);
+      }
+    },
+  );
+
+  server.tool(
+    "accept_namespace_transfer",
+    "OWNER power: accept a WHOLE namespace offered to this wallet. After this the wallet owns the namespace and all its names.",
+    { namespace: z.string() },
+    async ({ namespace }) => {
+      try {
+        return text(await owner.acceptNamespaceTransfer(namespace));
+      } catch (e) {
+        return errText(e);
+      }
+    },
+  );
+
+  server.tool(
+    "cancel_namespace_transfer",
+    "OWNER power: withdraw a pending namespace transfer this wallet proposed, before the recipient accepts.",
+    { namespace: z.string() },
+    async ({ namespace }) => {
+      try {
+        return text(await owner.cancelNamespaceTransfer(namespace));
+      } catch (e) {
+        return errText(e);
+      }
+    },
+  );
+
+  server.tool(
+    "namespace_status",
+    "OWNER read: a namespace's owner, resolver, immutable policy, permanence, and any pending namespace transfer — the state behind the owner powers.",
+    { namespace: z.string() },
+    async ({ namespace }) => {
+      try {
+        const [ns, policy, permanent, pending] = await Promise.all([
+          owner.namespaceOwner(namespace),
+          owner.policy(namespace).catch(() => null),
+          owner.isPermanent(namespace).catch(() => null),
+          owner.pendingNamespaceTransfer(namespace).catch(() => null),
+        ]);
+        return text({ namespace, owner: ns, isThisWallet: ns === me, policy, permanent, pendingTransfer: pending ?? null });
       } catch (e) {
         return errText(e);
       }

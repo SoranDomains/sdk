@@ -1,6 +1,6 @@
 {
   "name": "@sorandomains/mcp",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "MCP server for Soran \u2014 AI agents resolve, verify, own, and manage names on Stellar.",
   "type": "module",
   "bin": {
