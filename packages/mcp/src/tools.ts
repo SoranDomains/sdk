@@ -12,7 +12,14 @@
  * (hint-discovered candidates are chain-verified; `history` is the one
  * indexed/informational tool and says so). Write tools sign with the AGENT'S
  * OWN key, locally — the key never leaves the process, and no Soran server
- * ever sees it.
+ * ever sees it. The name/profile writes (issue/reclaim/holder ops) build and
+ * simulate their own transactions locally — fully trustless. The claim/
+ * activate flows PREPARE their transaction at the hintUrl API (they need the
+ * reserved-tree witness / registrar salt the API holds); the signer DECODES
+ * and validates every prepared transaction — right source, single op, exact
+ * contract function — before the key touches it, and pins the network
+ * passphrase locally, so a hostile hintUrl cannot get an unintended
+ * transaction signed. Still: point SORAN_HINT_URL only at an API you trust.
  */
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -223,6 +230,9 @@ export function registerReadTools(server: McpServer, opts: ReadToolOptions = {})
 export type WriteToolOptions = ReadToolOptions & {
   /** The agent's own Stellar secret key (S…). Never transmitted anywhere. */
   secret?: string;
+  /** Network passphrase, PINNED locally for signing (default testnet).
+   *  Never taken from a server response. */
+  passphrase?: string;
 };
 
 /**
@@ -282,29 +292,96 @@ export async function registerWriteTools(server: McpServer, opts: WriteToolOptio
   const holder = new SoranHolder({ signer: keypairSigner(secret), ...rpc });
   const owner = new SoranOwner({ signer: ownerSigner(secret), ...rpc });
   const soran = new Soran({ hintUrl, ...rpc });
-  const { TransactionBuilder } = await import("@stellar/stellar-sdk");
+  const stellar = await import("@stellar/stellar-sdk");
+  const { TransactionBuilder, Address, scValToNative, Operation } = stellar;
+  // The network passphrase is PINNED locally — never taken from a server
+  // response — so a hostile hintUrl cannot make us hash+sign for the wrong
+  // network, and a mainnet deployment just sets SORAN_PASSPHRASE.
+  const PASSPHRASE = opts.passphrase ?? stellar.Networks.TESTNET;
+
+  /**
+   * Decode a server-prepared transaction and REFUSE to sign it unless it is
+   * exactly the intended contract call. Turns the auth'd claim/activate flows
+   * from BLIND-signing (trust the API completely) into checked-signing: a
+   * compromised/hostile hintUrl returning a payment, account-merge, signer
+   * change, or a different contract invoke is rejected before the key touches
+   * it. Returns the signed XDR.
+   */
+  function checkedSign(xdr: string, expect: { fn: string; contractId?: string }): string {
+    let tx;
+    try {
+      tx = TransactionBuilder.fromXDR(xdr, PASSPHRASE) as unknown as {
+        source: string;
+        operations: Array<{ type: string; func?: { switch: () => { name: string }; invokeContract: () => unknown } }>;
+        sign: (k: typeof kp) => void;
+        toXDR: () => string;
+      };
+    } catch {
+      throw new Error("prepared transaction is unparseable (wrong network passphrase, or not a transaction)");
+    }
+    if (tx.source !== me) throw new Error(`refusing to sign: transaction source is ${tx.source}, not this wallet`);
+    if (tx.operations.length !== 1) throw new Error(`refusing to sign: expected 1 operation, got ${tx.operations.length}`);
+    const op = tx.operations[0];
+    if (op.type !== "invokeHostFunction" || !op.func || op.func.switch().name !== "hostFunctionTypeInvokeContract") {
+      throw new Error(`refusing to sign: operation is '${op.type}', not the expected contract call — a payment/signer-change/asset-transfer would look like this`);
+    }
+    const inv = op.func.invokeContract() as { contractAddress: () => unknown; functionName: () => { toString: () => string } };
+    const fn = inv.functionName().toString();
+    if (fn !== expect.fn) throw new Error(`refusing to sign: contract function is '${fn}', expected '${expect.fn}'`);
+    if (expect.contractId) {
+      const cid = Address.fromScAddress(inv.contractAddress() as never).toString();
+      if (cid !== expect.contractId) throw new Error(`refusing to sign: call targets ${cid}, not the expected ${expect.contractId}`);
+    }
+    tx.sign(kp);
+    return tx.toXDR();
+  }
+  void scValToNative;
+  void Operation;
 
   // --- programmatic console session (SEP-10 wallet sign-in with the agent
   // key) — needed for the self-custody claim flow, whose prepare/submit
-  // endpoints are auth-gated. The token is short-lived and cached per run.
+  // endpoints are auth-gated.
   let sessionToken: string | null = null;
   async function session(): Promise<string> {
     if (sessionToken) return sessionToken;
-    const ch = (await boundedJson(`${hintUrl}/auth/wallet/challenge`, {
-      account: me,
-    })) as { challengeId: string; xdr: string; network: string };
-    const tx = TransactionBuilder.fromXDR(ch.xdr, ch.network);
-    tx.sign(kp);
+    const ch = (await boundedJson(`${hintUrl}/auth/wallet/challenge`, { account: me })) as {
+      challengeId: string;
+      xdr: string;
+      network: string;
+    };
+    // The challenge is also blind-sign bait: validate it is the SEP-10
+    // manageData challenge (source=self, sequence 0/'1', one manageData op)
+    // and NOT a real transaction, using the LOCALLY-PINNED passphrase.
+    const ctx = TransactionBuilder.fromXDR(ch.xdr, PASSPHRASE) as unknown as {
+      source: string;
+      sequence: string;
+      operations: Array<{ type: string }>;
+    };
+    if (ctx.source !== me) throw new Error("refusing sign-in: challenge source is not this wallet");
+    if (ctx.operations.length !== 1 || ctx.operations[0].type !== "manageData") {
+      throw new Error("refusing sign-in: challenge is not a single manageData op — a hostile server may be trying to get a real transaction signed");
+    }
+    const stx = TransactionBuilder.fromXDR(ch.xdr, PASSPHRASE) as unknown as { sign: (k: typeof kp) => void; toXDR: () => string };
+    stx.sign(kp);
     const v = (await boundedJson(`${hintUrl}/auth/wallet/verify`, {
       challengeId: ch.challengeId,
-      signedXdr: tx.toXDR(),
+      signedXdr: stx.toXDR(),
     })) as { token?: string };
     if (!v.token) throw new Error("console sign-in failed");
     sessionToken = v.token;
     return sessionToken;
   }
+  /** Auth'd POST with automatic re-sign-in on an expired session (401). */
   async function authPost(path: string, body: unknown): Promise<unknown> {
-    return boundedJson(`${hintUrl}${path}`, body, await session());
+    try {
+      return await boundedJson(`${hintUrl}${path}`, body, await session());
+    } catch (e) {
+      if (/HTTP 401/.test(String(e))) {
+        sessionToken = null; // token expired — re-mint once and retry
+        return boundedJson(`${hintUrl}${path}`, body, await session());
+      }
+      throw e;
+    }
   }
   /** Drop the cached session so the next authPost reflects current on-chain
    *  ownership (a namespace claimed after startup changes the session scope). */
@@ -348,11 +425,12 @@ export async function registerWriteTools(server: McpServer, opts: WriteToolOptio
         const prep = (await authPost("/console/register/announce/prepare", {
           label,
           basis: basis ?? [],
-        })) as { xdr?: string; error?: string; detail?: string };
+        })) as { xdr?: string; network?: string; error?: string; detail?: string };
         if (!prep.xdr) return errText(new Error(prep.detail ?? prep.error ?? "prepare returned no transaction"));
-        const tx = TransactionBuilder.fromXDR(prep.xdr, (await import("@stellar/stellar-sdk")).Networks.TESTNET);
-        tx.sign(kp);
-        const sub = (await authPost("/console/tx/submit", { xdr: tx.toXDR() })) as {
+        if (prep.network && prep.network !== PASSPHRASE)
+          return errText(new Error(`network mismatch: server prepared for ${prep.network}, this server is pinned to ${PASSPHRASE}`));
+        const signed = checkedSign(prep.xdr, { fn: "announce" });
+        const sub = (await authPost("/console/tx/submit", { xdr: signed })) as {
           ok?: boolean;
           txHash?: string;
           pending?: boolean;
@@ -407,14 +485,21 @@ export async function registerWriteTools(server: McpServer, opts: WriteToolOptio
       try {
         const prep = (await authPost(`/console/allocations/${encodeURIComponent(label)}/withdraw/prepare`, {})) as {
           xdr?: string;
+          network?: string;
           error?: string;
           detail?: string;
         };
         if (!prep.xdr) return errText(new Error(prep.detail ?? prep.error ?? "prepare returned no transaction"));
-        const tx = TransactionBuilder.fromXDR(prep.xdr, (await import("@stellar/stellar-sdk")).Networks.TESTNET);
-        tx.sign(kp);
-        const sub = (await authPost("/console/tx/submit", { xdr: tx.toXDR() })) as { txHash?: string; detail?: string };
-        return text({ withdrawn: true, namespace: label, txHash: sub.txHash });
+        if (prep.network && prep.network !== PASSPHRASE)
+          return errText(new Error(`network mismatch: server prepared for ${prep.network}, pinned to ${PASSPHRASE}`));
+        const signed = checkedSign(prep.xdr, { fn: "withdraw" });
+        const sub = (await authPost("/console/tx/submit", { xdr: signed })) as {
+          ok?: boolean;
+          txHash?: string;
+          pending?: boolean;
+          detail?: string;
+        };
+        return text({ withdrawn: sub.ok !== false, namespace: label, txHash: sub.txHash, ...(sub.pending ? { pending: true, detail: sub.detail } : {}) });
       } catch (e) {
         return errText(e);
       }
@@ -466,15 +551,17 @@ export async function registerWriteTools(server: McpServer, opts: WriteToolOptio
         const prep = (await authPost("/console/registrar/deploy/prepare", { policy })) as {
           xdr?: string;
           predictedId?: string;
+          network?: string;
           error?: string;
           detail?: string;
         };
         if (!prep.xdr || !prep.predictedId)
           return errText(new Error(prep.detail ?? prep.error ?? "prepare failed — does this wallet own a namespace? (claim_namespace + wait for the window)"));
-        const tx = TransactionBuilder.fromXDR(prep.xdr, (await import("@stellar/stellar-sdk")).Networks.TESTNET);
-        tx.sign(kp);
+        if (prep.network && prep.network !== PASSPHRASE)
+          return errText(new Error(`network mismatch: server prepared for ${prep.network}, pinned to ${PASSPHRASE}`));
+        const signed = checkedSign(prep.xdr, { fn: "deploy_registrar" });
         const sub = (await authPost("/console/registrar/deploy/submit", {
-          signedXdr: tx.toXDR(),
+          signedXdr: signed,
           predictedId: prep.predictedId,
         })) as { ok?: boolean; registrarId?: string; txHash?: string; detail?: string };
         if (sub.ok !== true || !sub.registrarId) {
@@ -641,7 +728,7 @@ export async function registerWriteTools(server: McpServer, opts: WriteToolOptio
   server.tool(
     "set_profile",
     "HOLDER power: publish profile records on a name this wallet holds (standard keys: org, url, email, description, avatar, location, twitter, github). One transaction per key. Retract a key by setting it to the empty string.",
-    { name: z.string(), profile: z.record(z.string(), z.string()).describe("key→value; empty value retracts") },
+    { name: z.string(), profile: z.record(z.string().max(32), z.string().max(200)).describe("key→value (≤16 keys); empty value retracts").refine((r) => Object.keys(r).length <= 16, "at most 16 keys") },
     async ({ name, profile }) => {
       try {
         return text(await holder.setProfile(name, profile));
