@@ -1,0 +1,13 @@
+{
+  "name": "soran-hint-server-example",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Self-hostable hint server for one Soran namespace — discovery for @sorandomains/lookup, verified on chain by the SDK.",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "@stellar/stellar-sdk": "^16.2.0"
+  }
+}

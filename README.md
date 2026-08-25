@@ -18,4 +18,6 @@ npm install @sorandomains/lookup     # read: resolve + verify names
 npm install @sorandomains/owner      # write: run your namespace
 ```
 
+Want to run your own discovery source? [`examples/hint-server`](examples/hint-server/) is a complete, self-hostable hint server in one file — the SDK verifies everything it serves on chain, so it needs no database and no auth.
+
 Docs: <https://github.com/SoranDomains/docs> · License: MIT
