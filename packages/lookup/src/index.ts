@@ -290,6 +290,83 @@ export type NameDetails = {
   assurance: NameAssurance;
 };
 
+/** One chain-verified name held by a wallet (from `namesOf`). */
+export type NameSummary = {
+  name: string;
+  namespace: string;
+  label: string;
+  /** Hex-encoded node hash. */
+  node: string;
+  /** Chain-verified holder (always the queried address). */
+  holder: string;
+  /** Unix seconds; 0n = never expires. */
+  expiresAt: bigint;
+};
+
+/** The standard, discoverable profile schema: the text-record keys every
+ *  Soran client agrees to look for. Values are holder-published text records
+ *  on the namespace resolver — free-form strings, verified to come from the
+ *  name's current holder by the contract's generation gating, but NOT
+ *  validated as URLs/emails/handles: render them as untrusted user content. */
+export const PROFILE_KEYS = [
+  "org",
+  "url",
+  "email",
+  "description",
+  "avatar",
+  "location",
+  "twitter",
+  "github",
+] as const;
+export type ProfileKey = (typeof PROFILE_KEYS)[number];
+export type SoranProfile = Partial<Record<ProfileKey, string>>;
+
+/** One contract-verified reverse name (from `reverseNames`). */
+export type ReverseName = {
+  name: string;
+  namespace: string;
+  /** Is this the address's declared cross-namespace primary? */
+  primary: boolean;
+};
+
+/** The `identity()` aggregate: everything a profile page renders about a
+ *  NAME. `details` and `profile` are fail-closed; the three display-name
+ *  enrichments degrade to null on read failure (documented on the method). */
+export type NameIdentity = {
+  details: NameDetails;
+  profile: SoranProfile;
+  /** The holder's cross-namespace primary name, or null. */
+  holderPrimary: string | null;
+  /** The pay-to address's contract-verified display name on this
+   *  namespace's resolver, or null. */
+  addressDisplayName: string | null;
+  /** The namespace OWNER's primary name — who runs this namespace, as a
+   *  human-readable identity, or null when they haven't declared one. */
+  namespaceOwnerPrimary: string | null;
+};
+
+/** The `walletProfile()` aggregate: everything a wallet renders about an
+ *  ADDRESS. `names` is null (not []) when no `hintUrl` is configured —
+ *  enumeration needs a discovery source. */
+export type WalletProfile = {
+  address: string;
+  primary: string | null;
+  reverseNames: ReverseName[];
+  names: NameSummary[] | null;
+  /** Profile records of the primary name; {} when there is no primary. */
+  profile: SoranProfile;
+};
+
+/** Indexed lifecycle history (from `history()`): INFORMATIONAL, not
+ *  consensus — served by the hint host's indexer, not read from chain. Every
+ *  entry carries its ledger and txHash for independent verification. */
+export type NameHistory = {
+  name: string;
+  issuedAt: string;
+  issuedLedger: number;
+  events: Array<{ action: string; ledger: number; txHash: string; at: string }>;
+};
+
 /** Machine-readable failure category, so UIs can branch without parsing
  *  message strings: INVALID_INPUT (bad name/label/address from the caller),
  *  CONFIG (bad or missing constructor options), RPC (network/transport),
@@ -330,6 +407,11 @@ const HINT_MAX_BODY_BYTES = 4_096; // the namespace list is tiny; anything bigge
  * server endpoint caps at 12, but the hint is untrusted; never fan out more
  * probes than the designed bound. */
 const HINT_MAX_NAMESPACES = 12;
+// namesOf: candidate-list hint cap (100 names ≈ 20KB JSON) and how many
+// candidates are chain-verified per call (2 simulations each).
+const NAMES_HINT_MAX_BODY_BYTES = 65_536;
+const NAMES_VERIFY_CAP = 40;
+const HISTORY_MAX_BODY_BYTES = 32_768;
 
 export class Soran {
   private server: rpc.Server;
@@ -738,6 +820,292 @@ export class Soran {
     };
   }
 
+  // ---- identity & enumeration (0.4.0) ----
+
+  /**
+   * The name's standard profile — the {@link PROFILE_KEYS} text records its
+   * holder has published, read from the namespace resolver and generation-
+   * gated on chain (records from a prior holder never surface). Keys with no
+   * record are simply absent. About one simulation per key (the resolver
+   * pointer is fetched once up front and cached); fail-closed — a transient
+   * read failure throws rather than answering "no profile".
+   *
+   * Values are holder-authored free text: treat them as untrusted content
+   * (escape them; don't auto-link without scheme checks).
+   */
+  async profile(name: string): Promise<SoranProfile> {
+    // One resolver_of read up front — the parallel text() calls below would
+    // otherwise each fire their own before the cache is populated.
+    await this.resolverOf(parseName(name).namespace);
+    const values = await Promise.all(PROFILE_KEYS.map((k) => this.text(name, k)));
+    const out: SoranProfile = {};
+    PROFILE_KEYS.forEach((k, i) => {
+      const v = values[i];
+      if (v !== null) out[k] = v;
+    });
+    return out;
+  }
+
+  /**
+   * ALL of an address's contract-verified reverse names — one per namespace
+   * that has one — with the cross-namespace primary flagged (and included
+   * even when its namespace wasn't in the probe list). Same candidate
+   * sources, fail-closed probe semantics, and CONFIG guard as `reverseLookup`;
+   * a failed PRIMARY read degrades (the probes still answer), matching
+   * `reverseLookup`'s documented primary-step behavior. Invalid addresses
+   * return [].
+   */
+  async reverseNames(address: string, namespaces?: string[]): Promise<ReverseName[]> {
+    if (!StrKey.isValidEd25519PublicKey(address) && !StrKey.isValidContract(address)) return [];
+    if (
+      namespaces === undefined &&
+      this.reverseNamespaces.length === 0 &&
+      !this.hintUrl &&
+      !this.primaryId
+    ) {
+      throw new SoranError(
+        "reverseNames has no way to answer: configure primaryId, reverseNamespaces, or hintUrl — or pass `namespaces` per call",
+        "CONFIG",
+      );
+    }
+    let primary: string | null = null;
+    try {
+      primary = await this.primaryOf(address);
+    } catch {
+      /* degrade to probes-only, like reverseLookup's primary step */
+    }
+    let candidates: string[];
+    if (namespaces !== undefined) candidates = namespaces;
+    else if (this.reverseNamespaces.length > 0) candidates = this.reverseNamespaces;
+    else candidates = await this.namespaceHint();
+    const labels = candidates.map((ns) => {
+      const l = ns.toLowerCase();
+      assertLabel(l);
+      return l;
+    });
+    const settled = await Promise.allSettled(
+      labels.map(async (ns) => {
+        const resolverId = await this.resolverOf(ns);
+        if (!resolverId) return null;
+        return this.nameOf(resolverId, address);
+      }),
+    );
+    const out: ReverseName[] = [];
+    const seen = new Set<string>();
+    settled.forEach((res, i) => {
+      if (res.status === "rejected") throw res.reason; // fail-closed, like reverseLookup
+      if (!res.value || seen.has(res.value)) return;
+      seen.add(res.value);
+      // The answer's own namespace, not the probed label — an owner may point
+      // several namespaces at one shared resolver instance.
+      out.push({
+        name: res.value,
+        namespace: parseName(res.value).namespace,
+        primary: res.value === primary,
+      });
+    });
+    if (primary && !seen.has(primary)) {
+      // The primary lives on a namespace outside the probe list — it is still
+      // a contract-verified answer, so include it rather than hide it.
+      out.unshift({ name: primary, namespace: parseName(primary).namespace, primary: true });
+    }
+    return out;
+  }
+
+  /**
+   * Every name a wallet holds — DISCOVERED via the hint host's indexer, then
+   * every candidate VERIFIED on chain (`holder_of_node`, which the contract
+   * expiry-gates itself): the hint can omit names, but it can never forge
+   * one into the result. Requires `hintUrl` (on-chain storage is not
+   * enumerable — a CONFIG error explains this); throws INVALID_INPUT for a
+   * malformed address. At most 40 candidates are verified per call (~2
+   * simulations each); `truncated` in the hint payload is not surfaced —
+   * treat a 40-name result as possibly partial.
+   *
+   * Enumeration is BEST-EFFORT by construction: a candidate whose chain
+   * reads fail (transient RPC trouble, or a dormant namespace whose entries
+   * are archived) is SKIPPED, not fatal — one cold name must not blank a
+   * wallet's whole holdings view, and a hostile hint must not be able to
+   * inject a failing candidate as a denial of service. Per-name reads
+   * (`details`, `nameState`) give the precise per-name error instead.
+   */
+  async namesOf(address: string): Promise<NameSummary[]> {
+    if (!StrKey.isValidEd25519PublicKey(address) && !StrKey.isValidContract(address)) {
+      throw new SoranError(`invalid address "${address}"`, "INVALID_INPUT");
+    }
+    if (!this.hintUrl) {
+      throw new SoranError(
+        "namesOf needs a discovery source: set hintUrl — chain storage is not enumerable; every candidate is still verified on chain",
+        "CONFIG",
+      );
+    }
+    const payload = await this.hintFetch(
+      `/v1/names/by-holder/${address}`,
+      NAMES_HINT_MAX_BODY_BYTES,
+    );
+    if (payload === null) {
+      throw new SoranError("names-by-holder hint unavailable — retry, or query the chain per name", "RPC");
+    }
+    const list = (payload as { names?: unknown } | null)?.names;
+    if (!Array.isArray(list)) return [];
+    // Untrusted candidates: keep only well-formed name ids, dedupe, cap.
+    const seen = new Set<string>();
+    const candidates: Array<{ name: string; label: string; namespace: string }> = [];
+    for (const entry of list) {
+      const raw = (entry as { name?: unknown } | null)?.name;
+      if (typeof raw !== "string") continue;
+      const nm = raw.toLowerCase();
+      if (seen.has(nm)) continue;
+      const parts = nm.split(".");
+      if (parts.length !== 2) continue;
+      const [label, namespace] = parts;
+      if (!LABEL_RE.test(label) || label.length > 63) continue;
+      if (!LABEL_RE.test(namespace) || namespace.length > 63) continue;
+      seen.add(nm);
+      candidates.push({ name: nm, label, namespace });
+      if (candidates.length >= NAMES_VERIFY_CAP) break;
+    }
+    const verified = await Promise.allSettled(
+      candidates.map(async (c) => {
+        const registrarId = await this.attestedRegistrarOf(c.namespace);
+        if (!registrarId) return null;
+        const nameNode = await this.node(c.name);
+        const [holder, rec] = await Promise.all([
+          this.read(registrarId, "holder_of_node", [bytes(nameNode)]) as Promise<string | null>,
+          this.read(registrarId, "record_of", [
+            nativeToScVal(utf8(c.label), { type: "bytes" }),
+          ]) as Promise<{ holder: string; expires_at: bigint } | null>,
+        ]);
+        // Both reads must agree the queried address holds the name — the
+        // holder check on record_of ties the expiry to the SAME incarnation
+        // (a reissue between the two simulations shows a different holder and
+        // drops the candidate; a renew-only race is benign). Never fabricate
+        // an expiry from a missing record.
+        if (holder !== address || !rec || String(rec.holder) !== address) return null;
+        return {
+          name: c.name,
+          namespace: c.namespace,
+          label: c.label,
+          node: hex(nameNode),
+          holder: address,
+          expiresAt: BigInt(rec.expires_at),
+        } satisfies NameSummary;
+      }),
+    );
+    // Rejections (archived entries, transient RPC failures) skip the
+    // candidate — see the doc above. The hint cannot forge; failures cannot
+    // amplify.
+    return verified.flatMap((r) => (r.status === "fulfilled" && r.value ? [r.value] : []));
+  }
+
+  /**
+   * Indexed lifecycle history of a name — issued / transferred / reclaimed,
+   * with ledger + txHash per entry. INFORMATIONAL, NOT CONSENSUS: this is
+   * the one method that answers from the hint host's indexer rather than the
+   * chain (the contracts store no timestamps). Verify entries independently
+   * by their txHash when it matters. Requires `hintUrl`; a hint outage
+   * throws RPC rather than pretending the name has no history.
+   */
+  async history(name: string): Promise<NameHistory> {
+    const { label, namespace } = parseName(name);
+    if (!this.hintUrl) {
+      throw new SoranError(
+        "history needs an indexer source: set hintUrl — the chain stores no timestamps",
+        "CONFIG",
+      );
+    }
+    const payload = await this.hintFetch(
+      `/v1/names/${namespace}/${label}/history`,
+      HISTORY_MAX_BODY_BYTES,
+    );
+    if (payload === null) {
+      throw new SoranError("history unavailable from the hint service (outage, or name unknown to the indexer)", "RPC");
+    }
+    const raw = payload as {
+      name?: unknown; issuedAt?: unknown; issuedLedger?: unknown; events?: unknown;
+    };
+    // Hostile-hint bounds: cap the list, clamp numbers to sane ledgers, and
+    // bound string lengths — this is untrusted UI input by definition.
+    const events = Array.isArray(raw.events)
+      ? raw.events.slice(0, 100).flatMap((e) => {
+          const ev = e as { action?: unknown; ledger?: unknown; txHash?: unknown; at?: unknown };
+          if (typeof ev.action !== "string" || typeof ev.txHash !== "string") return [];
+          const ledger = Number(ev.ledger ?? 0);
+          return [{
+            action: ev.action.slice(0, 64),
+            ledger: Number.isSafeInteger(ledger) && ledger >= 0 ? ledger : 0,
+            txHash: ev.txHash.slice(0, 64),
+            at: String(ev.at ?? "").slice(0, 40),
+          }];
+        })
+      : [];
+    return {
+      name: `${label}.${namespace}`,
+      issuedAt: String(raw.issuedAt ?? ""),
+      issuedLedger: Number(raw.issuedLedger ?? 0),
+      events,
+    };
+  }
+
+  /**
+   * Everything a profile page shows about a NAME, in one call: the
+   * {@link details} aggregate, the holder's published {@link profile}, and
+   * three identity enrichments — the holder's primary name, the pay-to
+   * address's contract-verified display name, and the namespace OWNER's
+   * primary name (who runs this namespace, as a name instead of a G-address).
+   *
+   * Trust boundaries: `details` and `profile` are fail-closed (they throw on
+   * read failure); the three enrichments DEGRADE to null on failure — they
+   * decorate the page, and a transient failure should not blank it. Cost:
+   * roughly twenty parallel simulations; cache briefly.
+   */
+  async identity(name: string): Promise<NameIdentity> {
+    const { namespace } = parseName(name);
+    const details = await this.details(name); // also warms the pointer caches
+    const [profile, holderPrimary, addressDisplayName, namespaceOwnerPrimary] =
+      await Promise.all([
+        this.profile(name),
+        details.holder ? this.primaryOf(details.holder).catch(() => null) : Promise.resolve(null),
+        (async () => {
+          if (!details.address) return null;
+          const resolverId = await this.resolverOf(namespace);
+          if (!resolverId) return null;
+          return this.nameOf(resolverId, details.address);
+        })().catch(() => null),
+        details.namespace.owner
+          ? this.primaryOf(details.namespace.owner).catch(() => null)
+          : Promise.resolve(null),
+      ]);
+    return { details, profile, holderPrimary, addressDisplayName, namespaceOwnerPrimary };
+  }
+
+  /**
+   * Everything a wallet shows about an ADDRESS, in one call: its primary
+   * name, all its contract-verified reverse names, the names it holds
+   * (hint-discovered + chain-verified; null without `hintUrl`), and the
+   * profile records of its primary name.
+   *
+   * Degrade semantics: `reverseNames`' CONFIG case (no probe sources) and
+   * `namesOf`'s CONFIG case degrade to []/null here rather than failing the
+   * whole profile — a wallet with only `primaryId` configured still gets the
+   * primary + its profile. Probe/read failures still throw (fail-closed).
+   */
+  async walletProfile(address: string): Promise<WalletProfile> {
+    if (!StrKey.isValidEd25519PublicKey(address) && !StrKey.isValidContract(address)) {
+      throw new SoranError(`invalid address "${address}"`, "INVALID_INPUT");
+    }
+    const [primary, reverseNames, names] = await Promise.all([
+      this.primaryOf(address),
+      this.reverseNames(address).catch((e) => {
+        if (e instanceof SoranError && e.code === "CONFIG") return [] as ReverseName[];
+        throw e;
+      }),
+      this.hintUrl ? this.namesOf(address) : Promise.resolve(null),
+    ]);
+    const profile = primary ? await this.profile(primary) : {};
+    return { address, primary, reverseNames, names, profile };
+  }
+
   async isAvailable(ns: string): Promise<boolean> {
     return (await this.namespace(ns)) === null;
   }
@@ -785,42 +1153,45 @@ export class Soran {
    * consistent; acceptable for a liveness hint, and why explicit
    * `reverseNamespaces` remains the precise option.
    */
-  private async namespaceHint(): Promise<string[]> {
-    if (!this.hintUrl) return [];
-    let payload: unknown;
+  /** Fetch JSON from the UNTRUSTED hint host: refuse redirects (it must not
+   *  steer us to another origin), bound the wait, and cap the body BEFORE
+   *  buffering so an oversized response can never be read into memory.
+   *  Returns null on ANY failure — callers decide whether that degrades
+   *  (liveness-only hints) or throws (explicit indexed queries). */
+  private async hintFetch(path: string, maxBytes: number): Promise<unknown | null> {
+    if (!this.hintUrl) return null;
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), HINT_TIMEOUT_MS);
     try {
-      // Bound the wait: a hung hint must not hang a wallet's history render.
-      const ctl = new AbortController();
-      const timer = setTimeout(() => ctl.abort(), HINT_TIMEOUT_MS);
-      try {
-        // The hint
-        // host is UNTRUSTED: refuse redirects (it must not steer us to another
-        // origin) and cap the body BEFORE buffering so an oversized response can
-        // never be read into memory.
-        const res = await fetch(`${this.hintUrl}/v1/showcase`, { signal: ctl.signal, redirect: "error" });
-        if (!res.ok) return [];
-        if (Number(res.headers.get("content-length") ?? 0) > HINT_MAX_BODY_BYTES) return [];
-        const reader = res.body?.getReader();
-        if (!reader) return [];
-        const chunks: Uint8Array[] = [];
-        let total = 0;
-        for (;;) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          total += value.byteLength;
-          if (total > HINT_MAX_BODY_BYTES) {
-            await reader.cancel();
-            return [];
-          }
-          chunks.push(value);
+      const res = await fetch(`${this.hintUrl}${path}`, { signal: ctl.signal, redirect: "error" });
+      if (!res.ok) return null;
+      if (Number(res.headers.get("content-length") ?? 0) > maxBytes) return null;
+      const reader = res.body?.getReader();
+      if (!reader) return null;
+      const chunks: Uint8Array[] = [];
+      let total = 0;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        total += value.byteLength;
+        if (total > maxBytes) {
+          await reader.cancel();
+          return null;
         }
-        payload = JSON.parse(new TextDecoder().decode(concat(...chunks)));
-      } finally {
-        clearTimeout(timer);
+        chunks.push(value);
       }
+      return JSON.parse(new TextDecoder().decode(concat(...chunks)));
     } catch {
-      return []; // hint outage → liveness degradation to null, never a wrong answer
+      return null;
+    } finally {
+      clearTimeout(timer);
     }
+  }
+
+  private async namespaceHint(): Promise<string[]> {
+    // Hint outage → liveness degradation (empty candidates), never a wrong answer.
+    const payload = await this.hintFetch("/v1/showcase", HINT_MAX_BODY_BYTES);
+    if (payload === null) return [];
     // Untrusted input: keep only well-formed labels. A hostile hint injecting
     // junk must not abort the lookup (a throwing assertLabel here would be a
     // DoS), so malformed entries are dropped — again, liveness-only damage.

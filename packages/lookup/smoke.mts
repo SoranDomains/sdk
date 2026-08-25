@@ -57,5 +57,41 @@ try {
   check("timeout code", e instanceof SoranError && (e as SoranError).code === "TIMEOUT", (e as SoranError).code);
 }
 
+// ---- 0.4.0: identity & enumeration (hint host = local API) ----
+const HINT = process.env.SORAN_SMOKE_HINT ?? "http://localhost:4000";
+const ALICE = "GDHNO4WKFQJJAPX6YLQTGWFR5QCKZXKJBHKRFCSNRRFSTEJIQZ4Y5UBU";
+const hinted = new Soran({ hintUrl: HINT });
+
+const prof = await hinted.profile("alice.nova");
+check("profile returns object", typeof prof === "object" && prof !== null, JSON.stringify(prof).slice(0, 60));
+
+const rn = await hinted.reverseNames(ALICE, ["nova"]);
+check("reverseNames finds alice.nova", rn.some((r) => r.name === "alice.nova"), JSON.stringify(rn));
+check("reverseNames primary flagged", rn.every((r) => typeof r.primary === "boolean"));
+
+const held = await hinted.namesOf(ALICE);
+check("namesOf verified >0", held.length > 0, `${held.length} names`);
+check("namesOf all chain-verified holders", held.every((n) => n.holder === ALICE));
+check("namesOf includes alice.nova", held.some((n) => n.name === "alice.nova"), held.map((n) => n.name).join(","));
+
+const hist = await hinted.history("alice.nova");
+check("history issued event", hist.events.some((e) => e.action === "issued") && hist.issuedLedger > 0, `${hist.events.length} events`);
+
+const idn = await hinted.identity("alice.nova");
+check("identity core", idn.details.address === ALICE && typeof idn.profile === "object");
+check("identity enrichments typed", ["holderPrimary", "addressDisplayName", "namespaceOwnerPrimary"].every((k) => (idn as never as Record<string, unknown>)[k] === null || typeof (idn as never as Record<string, unknown>)[k] === "string"), `display=${idn.addressDisplayName} primary=${idn.holderPrimary}`);
+
+const wp = await hinted.walletProfile(ALICE);
+check("walletProfile names verified", wp.names !== null && wp.names.length > 0);
+check("walletProfile reverse+primary coherent", wp.primary === null || wp.reverseNames.some((r) => r.primary && r.name === wp.primary), `primary=${wp.primary}`);
+
+// namesOf without hint = CONFIG; forged-hint resistance is structural (verified on chain)
+try {
+  await new Soran().namesOf(ALICE);
+  check("namesOf no-hint CONFIG", false);
+} catch (e) {
+  check("namesOf no-hint CONFIG", e instanceof SoranError && (e as SoranError).code === "CONFIG", (e as SoranError).code);
+}
+
 console.log(fails === 0 ? "\nALL PASS" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

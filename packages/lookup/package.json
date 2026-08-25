@@ -1,6 +1,6 @@
 {
   "name": "@sorandomains/lookup",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Resolve Soran names (alice.nova) on Stellar \u2014 trustlessly, straight from the chain.",
   "type": "module",
   "main": "./dist/index.js",
