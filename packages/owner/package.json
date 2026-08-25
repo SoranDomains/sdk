@@ -1,6 +1,6 @@
 {
   "name": "@sorandomains/owner",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Run your Soran namespace on Stellar \u2014 issue names, manage lifecycle, transfer, and walk the one-way permanence door.",
   "type": "module",
   "main": "./dist/index.js",

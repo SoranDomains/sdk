@@ -28,11 +28,12 @@ await me.setProfile("alice.nova", {  // the standard keys every wallet reads
 | --- | --- |
 | `setRecord` | Point your name's explicit resolver record at any address (generation-gated — stops resolving the moment the name changes hands) |
 | `setAddress` | Re-point the built-in (Registrar) resolution target |
-| `setText` / `setProfile` | Publish text records; `setProfile` writes the standard `PROFILE_KEYS` (one transaction per key) |
+| `setText` / `setProfile` / `clearText` | Publish text records; `setProfile` writes the standard `PROFILE_KEYS` (one transaction per key); records are overwrite-only on chain — `clearText` retracts by writing the empty value standard readers treat as unset |
 | `setReverse` / `clearReverse` | Claim your address→name reverse record — the contract refuses names that don't already resolve to you (`ForwardMismatch`) |
 | `setPrimary` / `clearPrimary` | Your one cross-namespace display name, re-verified on chain at every read |
 | `proposeNameTransfer` / `acceptNameTransfer` / `cancelNameTransfer` | Two-step, accept-to-move name transfers (policy-gated) |
 | `pendingNameTransfer` | Read the pending proposal |
+| `registrarOf` / `resolverOf` | Discover the namespace's attested Registrar / resolver pointer |
 
 Everything is holder-authorized **on chain** — the Resolver checks you hold
 the name right now, reverse and primary claims are authorized by the address

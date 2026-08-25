@@ -436,7 +436,11 @@ export class Soran {
     this.registryId = opts.registryId ?? base.registryId;
     // `null` = explicit opt-out (the preset ships a primaryId, so merely omitting
     // it keeps the feature on); `undefined` inherits the preset.
-    this.primaryId = opts.primaryId === null ? undefined : (opts.primaryId ?? base.primaryId);
+    // The preset PrimaryName is anchored to the preset Registry — never let it
+    // leak onto a custom registryId, where it could only mis-verify.
+    const presetPrimary =
+      opts.registryId && opts.registryId !== base.registryId ? undefined : base.primaryId;
+    this.primaryId = opts.primaryId === null ? undefined : (opts.primaryId ?? presetPrimary);
     // Fail-closed at construction (same discipline as reverseNamespaces): a
     // malformed contract id is a config bug, surfaced immediately — not at
     // first use, deep inside a wallet's render path.
@@ -1338,6 +1342,10 @@ export class Soran {
 
 // ---- helpers ----
 
+/** Split and validate `label.namespace`, lowercasing first. Throws SoranError
+ *  (code "INVALID_INPUT") — @sorandomains/holder exports the same helper
+ *  throwing its own HolderError; import from the package whose errors you
+ *  handle. */
 export function parseName(name: string): { label: string; namespace: string } {
   const parts = name.toLowerCase().split(".");
   if (parts.length !== 2)

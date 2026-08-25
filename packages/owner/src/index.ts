@@ -20,7 +20,7 @@
  * `acceptNamespaceTransfer`, which the proposed NEW owner signs. Name-holder
  * powers (transferring an individual name, pointing it at a new address,
  * electing a primary name) are the holder's alone — they live in the contracts'
- * holder-authorized entry points and will ship in a holder-side module; this
+ * holder-authorized entry points and live in `@sorandomains/holder`; this
  * package deliberately cannot exercise them.
  *
  * SIGNING. Supply a `TxSigner`: `keypairSigner(secret)` for backends, or wrap a

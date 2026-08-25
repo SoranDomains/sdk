@@ -1,7 +1,7 @@
 {
   "name": "@sorandomains/holder",
-  "version": "0.1.0",
-  "description": "Manage your own Soran name on Stellar — records, profile, reverse, primary, and transfers, signed by your key.",
+  "version": "0.1.1",
+  "description": "Manage your own Soran name on Stellar \u2014 records, profile, reverse, primary, and transfers, signed by your key.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

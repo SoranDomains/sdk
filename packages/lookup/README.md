@@ -65,6 +65,7 @@ const ok = await soran.reverseVerify(sender, "alice.nova");
 new Soran({
   network: "testnet",              // deployment preset (mainnet at launch)
   rpcUrl: "https://your-rpc",      // bring your own RPC
+  passphrase: "…",                 // network passphrase (preset supplies it)
   registryId: "C…",                // override the immutable Registry
   primaryId: "C…",                 // PrimaryName contract id (the testnet preset
                                    // supplies one — pass `null` to DISABLE the feature)

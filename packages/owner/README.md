@@ -34,11 +34,12 @@ for (const o of batch.outcomes) if (!o.issued) console.warn(o.label, o.reason);
 | `makePermanent` | The one-way door — irreversible, guarded by `{ confirmIrreversible: true }` |
 | `proposeNamespaceTransfer` / `acceptNamespaceTransfer` / `cancelNamespaceTransfer` | Two-step, accept-to-move namespace transfer |
 | `setResolver` | Point the namespace at a resolver (frozen once permanent) |
-| `policy` / `isPermanent` / `nameState` / `pendingNamespaceTransfer` / `namespaceOwner` | Reads that support the write flows |
+| `policy` / `isPermanent` / `nameState` / `pendingNamespaceTransfer` / `namespaceOwner` / `registrarOf` / `assertOwner` | Reads that support the write flows |
 
 Name-**holder** powers (transferring an individual name, re-pointing it,
 electing a primary name) are deliberately absent: the contracts grant them to
-holders, not owners, and they will ship in a holder-side module.
+holders, not owners — they live in
+[`@sorandomains/holder`](https://www.npmjs.com/package/@sorandomains/holder).
 
 ## Signing
 

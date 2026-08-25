@@ -439,17 +439,37 @@ export class SoranHolder {
    * and the contract enforces that the name's forward record already
    * resolves to you (ForwardMismatch otherwise): a reverse claim on a name
    * that doesn't point back at you is spoofing, and the chain refuses it.
+   *
+   * NOTE the forward proof must be the RESOLVER's OWN record — the
+   * Registrar's built-in target (which `lookup.resolve` also honors for
+   * fresh names) does not count. On a freshly issued name, call
+   * `setRecord(name, yourAddress)` first, then `setReverse(name)`.
    */
   async setReverse(name: string): Promise<Submitted> {
     const { namespace } = parseName(name);
     const resolverId = await this.resolverOf(namespace);
     const pub = await this.signer.publicKey();
-    const r = await this.invoke(
-      resolverId,
-      "set_reverse",
-      [addrArg(pub), nativeToScVal(name.toLowerCase(), { type: "string" })],
-      RESOLVER_ERRORS,
-    );
+    let r: Invoked;
+    try {
+      r = await this.invoke(
+        resolverId,
+        "set_reverse",
+        [addrArg(pub), nativeToScVal(name.toLowerCase(), { type: "string" })],
+        RESOLVER_ERRORS,
+      );
+    } catch (e) {
+      if (e instanceof HolderError && e.codeName === "ForwardMismatch") {
+        throw new HolderError(
+          `${e.message} — the resolver only accepts its OWN forward record as proof; if this name still resolves via the Registrar's built-in target, call setRecord(name, yourAddress) first, then retry setReverse`,
+          e.contractId,
+          e.fn,
+          e.code,
+          e.codeName,
+          e.txHash,
+        );
+      }
+      throw e;
+    }
     return { hash: r.hash, ledger: r.ledger };
   }
 
