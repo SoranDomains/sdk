@@ -93,8 +93,9 @@ function decodeIssuedEvents(
       const body = ev.body().v0();
       const topics = body.topics();
       if (topics.length < 1 || scValToNative(topics[0]) !== "issued") continue;
-      const data = scValToNative(body.data()) as [Uint8Array, string];
-      out.push({ label: Buffer.from(data[0]).toString("utf8"), holder: String(data[1]) });
+      const data = scValToNative(body.data()) as [unknown, unknown];
+      if (!(data?.[0] instanceof Uint8Array) || typeof data?.[1] !== "string") continue;
+      out.push({ label: new TextDecoder().decode(data[0]), holder: data[1] });
     } catch {
       /* not an issued event — skip */
     }
@@ -272,16 +273,38 @@ function assertLabel(label: string): void {
 }
 
 /** Registry namehash of a top-level namespace: sha256(ZERO32 ‖ sha256(ns)). */
-function namehash(namespace: string): Buffer {
-  return hash(Buffer.concat([Buffer.alloc(32), hash(Buffer.from(namespace, "utf8"))]));
+// Byte helpers with zero Node built-ins of our own — browser bundlers get no
+// bare `Buffer` references from this package. (`hash` accepts Uint8Array at
+// runtime; its Buffer parameter type is cast around.)
+const utf8 = (str: string): Uint8Array => new TextEncoder().encode(str);
+function concatBytes(...parts: Uint8Array[]): Uint8Array {
+  const out = new Uint8Array(parts.reduce((n, part) => n + part.length, 0));
+  let offset = 0;
+  for (const part of parts) {
+    out.set(part, offset);
+    offset += part.length;
+  }
+  return out;
+}
+
+function namehash(namespace: string): Uint8Array {
+  const labelHash = new Uint8Array(hash(utf8(namespace) as Buffer));
+  return new Uint8Array(hash(concatBytes(new Uint8Array(32), labelHash) as Buffer));
 }
 
 const labelArg = (label: string) =>
-  nativeToScVal(Buffer.from(label, "utf8"), { type: "bytes" });
+  nativeToScVal(utf8(label), { type: "bytes" });
 const addrArg = (address: string) => nativeToScVal(address, { type: "address" });
-const nodeArg = (node: Buffer) => nativeToScVal(node, { type: "bytes" });
+const nodeArg = (node: Uint8Array) => nativeToScVal(node, { type: "bytes" });
 
-const toHex = (v: unknown): string => Buffer.from(v as Uint8Array).toString("hex");
+function toHex(v: unknown): string {
+  if (!(v instanceof Uint8Array)) {
+    throw new OwnerError(
+      `expected 32 bytes from the contract, got ${typeof v} — ABI drift; refusing to fabricate a node id`,
+    );
+  }
+  return Array.from(v, (b) => b.toString(16).padStart(2, "0")).join("");
+}
 
 // Simulation-only reads need a well-formed source account that never signs.
 const SIM_SOURCE = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";

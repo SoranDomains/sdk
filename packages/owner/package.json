@@ -1,7 +1,7 @@
 {
   "name": "@sorandomains/owner",
-  "version": "0.2.0",
-  "description": "Run your Soran namespace on Stellar — issue names, manage lifecycle, transfer, and walk the one-way permanence door.",
+  "version": "0.3.0",
+  "description": "Run your Soran namespace on Stellar \u2014 issue names, manage lifecycle, transfer, and walk the one-way permanence door.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -11,7 +11,8 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "tsc"
+    "prepublishOnly": "tsc",
+    "check:browser": "esbuild dist/index.js --bundle --platform=browser --external:@stellar/stellar-sdk --outfile=browser-check.js --legal-comments=none --log-level=error && node -e \"const fs=require('fs');const s=fs.readFileSync('browser-check.js','utf8');fs.unlinkSync('browser-check.js');if(/\\bBuffer\\b/.test(s)){console.error('FAIL: bare Buffer reference in browser bundle');process.exit(1)}console.log('browser bundle clean')\""
   },
   "license": "MIT",
   "repository": {
@@ -38,6 +39,13 @@
     "@stellar/stellar-sdk": "^16.2.0",
     "@types/node": "^22.20.1",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "esbuild": "^0.25.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
   }
 }
