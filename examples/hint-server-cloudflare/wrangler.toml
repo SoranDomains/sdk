@@ -1,0 +1,30 @@
+# Soran hint server — Cloudflare Worker edition.
+#
+#   npx wrangler kv namespace create HINT_KV     # then paste the id below
+#   npx wrangler deploy
+#
+# Local dev (no Cloudflare account needed):
+#   npx wrangler dev --test-scheduled
+#   curl "http://localhost:8787/__scheduled?cron=*"   # trigger one poll
+
+name = "soran-hint-server"
+main = "worker.mjs"
+compatibility_date = "2026-08-01"
+
+# The indexer: polls your Registrar's chain events once a minute.
+[triggers]
+crons = ["* * * * *"]
+
+[vars]
+SORAN_NAMESPACE = "acme"
+# Your namespace's attested Registrar (C…). One-time lookup:
+#   new SoranOwner({...}).registrarOf("acme")  — or your console's namespace page.
+SORAN_REGISTRAR_ID = "CXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+SORAN_RPC_URL = "https://soroban-testnet.stellar.org"
+# Optional backfill start (must be within your RPC's event retention);
+# unset = follow from the current ledger.
+# SORAN_START_LEDGER = "4320000"
+
+[[kv_namespaces]]
+binding = "HINT_KV"
+id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"

@@ -20,6 +20,6 @@ npm install @sorandomains/owner      # write: run your namespace
 npm install @sorandomains/holder     # write: manage your own name
 ```
 
-Want to run your own discovery source? [`examples/hint-server`](examples/hint-server/) is a complete, self-hostable hint server in one file — the SDK verifies everything it serves on chain, so it needs no database and no auth.
+Want to run your own discovery source? [`examples/hint-server`](examples/hint-server/) is a complete, self-hostable hint server in one file — the SDK verifies everything it serves on chain, so it needs no database and no auth. Prefer serverless? [`examples/hint-server-cloudflare`](examples/hint-server-cloudflare/) is the same thing as a zero-dependency Cloudflare Worker.
 
 Docs: <https://github.com/SoranDomains/docs> · License: MIT

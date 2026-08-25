@@ -67,6 +67,8 @@ before that window won't appear from events alone. Two remedies:
 | `SORAN_POLL_MS` | `10000` | event poll interval |
 | `SORAN_START_LEDGER` | current ledger | backfill start |
 
+Prefer serverless? [`../hint-server-cloudflare`](../hint-server-cloudflare/) is the same server as a **zero-dependency Cloudflare Worker** (Cron Trigger + KV).
+
 Serve it over HTTPS in production (the SDK's hint fetch refuses redirects) —
 a reverse proxy in front of `127.0.0.1:8787` is the intended setup. The
 hosted platform API serves the same endpoints with a fuller index (all
