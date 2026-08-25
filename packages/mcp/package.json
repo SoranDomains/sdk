@@ -1,0 +1,37 @@
+{
+  "name": "@sorandomains/mcp",
+  "version": "0.1.0",
+  "description": "MCP server for Soran — AI agents resolve, verify, own, and manage names on Stellar.",
+  "type": "module",
+  "bin": { "soran-mcp": "dist/stdio.js" },
+  "main": "./dist/tools.js",
+  "types": "./dist/tools.d.ts",
+  "exports": {
+    ".": { "types": "./dist/tools.d.ts", "default": "./dist/tools.js" }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "tsc"
+  },
+  "license": "MIT",
+  "repository": { "type": "git", "url": "git+https://github.com/SoranDomains/sdk.git", "directory": "packages/mcp" },
+  "homepage": "https://github.com/SoranDomains/sdk/tree/main/packages/mcp#readme",
+  "bugs": { "url": "https://github.com/SoranDomains/sdk/issues" },
+  "keywords": ["mcp", "model-context-protocol", "stellar", "soroban", "soran", "name-service", "ai-agents"],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@sorandomains/lookup": "^0.4.2",
+    "@sorandomains/owner": "^0.3.0",
+    "@sorandomains/holder": "^0.1.0",
+    "zod": "^3.24.0"
+  },
+  "peerDependencies": { "@stellar/stellar-sdk": ">=13 <17" },
+  "devDependencies": {
+    "@stellar/stellar-sdk": "^16.2.0",
+    "@types/node": "^22.20.1",
+    "typescript": "^5.7.3",
+    "tsx": "^4.19.2"
+  }
+}
