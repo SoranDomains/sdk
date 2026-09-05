@@ -44,6 +44,7 @@ import {
   Keypair,
   Networks,
   Operation,
+  StrKey,
   TransactionBuilder,
   hash,
   nativeToScVal,
@@ -116,7 +117,7 @@ export const DEPLOYMENTS = {
     passphrase: Networks.TESTNET as string,
     // The immutable Registry. The Registrar for a namespace is discovered on
     // chain via `registrar_of(node)` — never configured by hand.
-    registryId: "CDSORANCV3IFF3MKHJ7KI4MKEJOJZFMTDVAZCD5XFOR4WTGNXJJNOKQE",
+    registryId: "CASORANI5CN2NJFEO2MGTRDA35AOEF3D3OCVBWN3FS6B6FXNQ74RTJ7H",
   },
 } as const;
 
@@ -303,7 +304,11 @@ function namehash(namespace: string): Uint8Array {
 
 const labelArg = (label: string) =>
   nativeToScVal(utf8(label), { type: "bytes" });
-const addrArg = (address: string) => nativeToScVal(address, { type: "address" });
+const addrArg = (address: string) => {
+  if (!StrKey.isValidEd25519PublicKey(address) && !StrKey.isValidContract(address))
+    throw new OwnerError("ownership and operator addresses must be G or C; muxed M is a payment destination only");
+  return nativeToScVal(address, { type: "address" });
+};
 const nodeArg = (node: Uint8Array) => nativeToScVal(node, { type: "bytes" });
 
 function toHex(v: unknown): string {

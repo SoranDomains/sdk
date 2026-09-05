@@ -1,5 +1,10 @@
 # @sorandomains/mcp
 
+> Native muxed release. The testnet deployment below was verified on chain at
+> ledger 4521644 on 5 September 2026 (18:10 UTC). See the
+> [release status](https://docs.soran.domains/reference/release-status) for package and service availability.
+
+
 Soran for AI agents, over the [Model Context Protocol](https://modelcontextprotocol.io).
 An agent can resolve and verify names trustlessly, look up any wallet's
 identity, **create its own wallet, claim a namespace, hold names, and publish
@@ -15,7 +20,7 @@ Two transports, one tool set:
   read tools — what hosted agents (claude.ai connectors and friends) reach
   with no install.
 
-Version 0.5.1 targets the namespace-bound **Stellar testnet** deployment from 2026-09-05.
+Version 0.6.0 targets the namespace-bound **Stellar testnet** deployment from 2026-09-05.
 The default Registry, Lookup, Primary and Allocator pins belong to that deployment.
 
 ## Install
@@ -134,10 +139,29 @@ import { registerReadTools, registerWriteTools } from "@sorandomains/mcp";
 Source: <https://github.com/SoranDomains/sdk> · Docs: <https://github.com/SoranDomains/docs> · License: MIT
 
 
-Version 0.5.1 uses Stellar SDK17 and the matching lookup 0.5.2,
-holder 0.3.1 and owner 0.5.1 packages. Both transports pass the same universal
-configuration and export the same MCP version. The deployment was verified at ledger 4520986; custom Registry or passphrase
+Version 0.6.0 uses Stellar SDK17 and the matching lookup 0.6.0,
+holder 0.4.0 and owner 0.6.0 packages. Both transports pass the same universal
+configuration and export the same MCP version. The v2 deployment was verified at ledger 4521644; custom Registry or passphrase
 settings require their own Allocator pin and do not inherit testnet fee routing.
+
+`resolve_payment`, `lookup_name`, `verify_payment` and `set_payment` accept or return
+complete muxed M destinations with memo `none`. `resolve_name` retains the full M
+address. M-plus-ID/text/hash is rejected; its embedded ID is not a transaction memo.
+Example tool payment input:
+
+```json
+{
+  "address": "MA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAAAAAABUTGI4",
+  "memo": { "type": "none" }
+}
+```
+
+Lookup capability is read on chain: successful version 1 uses the original ABI;
+version 2 requires destination version 2 and selects the new destination ABI.
+Failure never selects an older method. Local `set_payment` uses Holder's exact
+`set_muxed` authorization for M and preserves the base G account plus u64 ID.
+Account ownership, wallet signing, reverse and Primary remain G/C; no M-to-G
+identity or transaction-memo substitution is performed.
 
 Namespace claims require the exact reviewed `expectedFee` from `claim_fee_quote`
 and an explicit `maxNetworkFeeStroops` ceiling (network/resource fee, separate from
@@ -171,14 +195,14 @@ quote; the tool never substitutes a hardcoded amount for the on-chain policy.
 
 ## Verified testnet deployment
 
-Verified on 2026-09-05 at ledger 4520986. Network passphrase: `Test SDF Network ; September 2015`.
+Verified on 5 September 2026 at ledger **4521644** (18:10 UTC). Network passphrase: `Test SDF Network ; September 2015`.
 
 | Contract | Address |
 |---|---|
-| Registry | `CDSORANCV3IFF3MKHJ7KI4MKEJOJZFMTDVAZCD5XFOR4WTGNXJJNOKQE` |
-| Lookup | `CDSORANO7K4FSBR2MLV4PNELJ6UXCDNG4MJZSH6HCVZZZQN5B5GMOP64` |
-| Primary | `CCSORANOADXKLSW5CUANBW5WZFVCNZ5KZ4KNMIUWOZOES3LXYRUYZ56X` |
-| Allocator | `CASORANSKKNXDJYXPZK7OJFIJQL5EMVO7VLYJJSWTCZLT26WWATBI4HY` |
+| Registry | `CASORANI5CN2NJFEO2MGTRDA35AOEF3D3OCVBWN3FS6B6FXNQ74RTJ7H` |
+| Lookup | `CDSORANKG77YZITKWCLWGPKLB2R3HPTP4D6KKZZ7X3R5HLXLMNOTGCDD` |
+| Primary | `CCSORANJZOR5ZYTI4KAW34ESAQFMJAO4NKMTIVOVJOI2VDKCDK3RICXZ` |
+| Allocator | `CDSORANPTRS2EYHN57OZEXTW23P2HPDM3WEAC754B7GNHRB5V6FTJ2EE` |
 
 Mainnet has no deployment preset. Custom networks must supply their own verified
 addresses. Universal Lookup upgrades remain immediately executable; an address

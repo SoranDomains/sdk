@@ -72,10 +72,10 @@ test("MCP sign-in rejects real sequence or different authentication domain befor
 
 
 test("MCP namespace-bound activation requires branded address and ignores API scheme", async () => {
-  const selectedRegistry = "CDSORANCV3IFF3MKHJ7KI4MKEJOJZFMTDVAZCD5XFOR4WTGNXJJNOKQE";
+  const selectedRegistry = "CASORANI5CN2NJFEO2MGTRDA35AOEF3D3OCVBWN3FS6B6FXNQ74RTJ7H";
   const node = await new Soran({ registryId: selectedRegistry }).namehash("nova");
   // Known public nonce from the new release's namespace-bound vanity search.
-  const nonce = Uint8Array.from("99175732531c4ea5548b37dea1cdeae0b7c7f07856e7d04fad8a5f0000000000".match(/../g)!, byte => Number.parseInt(byte, 16));
+  const nonce = Uint8Array.from("420ba0c7f5481a816479cd1471a9c28f29170f664730b79a1e1cfb0100000000".match(/../g)!, byte => Number.parseInt(byte, 16));
   const field = (key: string, val: xdr.ScVal) => new xdr.ScMapEntry({ key: xdr.ScVal.scvSymbol(key), val });
   const policy = xdr.ScVal.scvMap([field("default_term_secs", nativeToScVal(0n, { type: "u64" })), field("reclaimable", xdr.ScVal.scvBool(true)), field("trade_fee_bps", xdr.ScVal.scvU32(0)), field("tradeable", xdr.ScVal.scvBool(false)), field("transferable", xdr.ScVal.scvBool(true))]);
   const domain = new TextEncoder().encode("soran:namespace-deploy:v1\0");
@@ -83,7 +83,7 @@ test("MCP namespace-bound activation requires branded address and ignores API sc
   encoded.set(node, 27); encoded.set(nonce, 59);
   const address = (salt: Uint8Array) => StrKey.encodeContract(hash(xdr.HashIdPreimage.envelopeTypeContractId(new xdr.HashIdPreimageContractId({ networkId: hash(new TextEncoder().encode(Networks.TESTNET)), contractIdPreimage: xdr.ContractIdPreimage.contractIdPreimageFromAddress(new xdr.ContractIdPreimageFromAddress({ address: new Address(selectedRegistry).toScAddress(), salt })) })).toXDR()));
   const bound = address(hash(encoded)), raw = address(nonce);
-  assert.equal(bound, "CCSORANUM6CHXIOLOTA65NNZK6PJNCY44354SXKIANFUY2VVKOPZUYSP");
+  assert.equal(bound, "CDSORANZHOVD6EO345UWC23BNEXSPNFWCYJD4X35HXFC2S3GWQ3S64YX");
   const args = [xdr.ScVal.scvBytes(node), new Address(wallet).toScVal(), policy, xdr.ScVal.scvBytes(nonce)];
   for (const [predictedId, configuredVersion, succeeds] of [[bound, 1, true], [raw, 1, false], [bound, 0, false], [bound, null, true]] as const) {
     const child = inv(predictedId, "__constructor", [new Address(selectedRegistry).toScVal(), args[0], new Address(wallet).toScVal(), args[1], policy, xdr.ScVal.scvBool(true)]);

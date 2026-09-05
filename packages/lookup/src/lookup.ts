@@ -1,5 +1,5 @@
 import { StrKey } from "@stellar/stellar-sdk";
-import { paymentFromNative, type PaymentDestination } from "./payment.js";
+import { destinationFromNative, paymentFromNative, type PaymentDestination } from "./payment.js";
 
 type LookupContext = {
   /** Canonical name submitted to the contract. */
@@ -27,8 +27,8 @@ export type LegacyAddressResolution = LookupContext & {
 
 export type LookupResult = NativePaymentResolution | LegacyAddressResolution;
 
-/** Decode the universal Lookup v1 ABI without coercing or discarding fields. */
-export function lookupFromNative(raw: unknown, expectedName: string): LookupResult {
+/** Decode the universal Lookup v1/v2 ABI without coercing or discarding fields. */
+export function lookupFromNative(raw: unknown, expectedName: string, version: 1 | 2 = 1): LookupResult {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("invalid lookup result");
   const r = raw as Record<string, unknown>;
   if (Object.keys(r).sort().join(",") !== "generation,name,registrar,resolver,result")
@@ -44,7 +44,7 @@ export function lookupFromNative(raw: unknown, expectedName: string): LookupResu
   const context = { name: expectedName, registrar: r.registrar, generation: r.generation };
   if (r.result[0] === "NativePayment") {
     if (r.resolver === null) throw new Error("native payment requires a Resolver");
-    return { ...context, kind: "nativePayment", resolver: r.resolver, payment: paymentFromNative(r.result[1]) };
+    return { ...context, kind: "nativePayment", resolver: r.resolver, payment: version === 2 ? destinationFromNative(r.result[1]) : paymentFromNative(r.result[1]) };
   }
   if (r.result[0] === "LegacyAddress") {
     const address: unknown = r.result[1];

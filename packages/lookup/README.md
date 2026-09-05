@@ -1,5 +1,10 @@
 # @sorandomains/lookup
 
+> Native muxed release. The testnet deployment below was verified on chain at
+> ledger 4521644 on 5 September 2026 (18:10 UTC). See the
+> [release status](https://docs.soran.domains/reference/release-status) for package and service availability.
+
+
 Read Soran names on Stellar through the on-chain Universal Lookup contract. The SDK
 is optional: wallets, explorers and other contracts can call the same ABI directly.
 Reads use your configured Soroban RPC. No hosted Soran service supplies payment answers.
@@ -13,11 +18,11 @@ if (!(await soran.verifyPayment("alice.nova", payment))) throw new Error("Instru
 ```
 
 This release uses Universal Lookup **by default**. The testnet preset pins the verified
-2026-09-05 deployment; no extra contract configuration is needed. A network without a Lookup pin fails with
+native muxed deployment listed below. A network without a Lookup pin fails with
 `CONFIG`; it never silently uses direct Resolver calls. Mainnet has no preset until
 its reviewed deployment exists. A custom Registry or passphrase does not inherit
-Lookup or Primary pins from another deployment. The deployment anchors, Lookup version and code hashes were verified at ledger
-4520986. Older testnet clients require this package update to follow the new Registry.
+Lookup or Primary pins from another deployment. Verify the deployment anchors, Lookup version and code hashes together. Older
+testnet clients need the matching new package and deployment pins.
 
 Explicit compatibility mode remains available with `resolutionMode: "direct"`
 (or `lookupId: null`). Direct mode discovers native Resolvers from Registry and
@@ -45,22 +50,51 @@ Address-only methods also reject a native required memo with `PAYMENT_REQUIRED`.
 Payment memos are `{type:"none"}`, `{type:"id",value:"canonical u64 decimal"}`,
 `{type:"text",value:"exact UTF-8 text"}` or `{type:"hash",value:"64 lowercase hex"}`.
 Text is nonempty and at most 28 UTF-8 bytes. IDs remain strings, never JS numbers.
-G addresses support all four; C addresses support `none` only. M addresses and
-contract-specific routing arguments are outside this ABI. A classic transaction
-has one memo; separate payments requiring different memos.
+G addresses support all four; C addresses support `none` only. Muxed M addresses
+are self-contained payment destinations with `memo: { type: "none" }`. Their exact
+64-bit operation ID stays embedded in the M address; never strip it to G or turn
+it into a transaction memo. Additional contract-specific routing arguments remain
+outside this ABI. A classic transaction has one memo; separate payments requiring
+different memos.
 
 Ordinary native records with no current-generation configuration marker return the
 ordinary address with memo `none`. A persistent Resolver marker prevents lost
 configured payment instructions from becoming this default. Missing configured,
 malformed, stale, archived and unreadable instructions fail closed. Holders remove
 memos explicitly with the holder SDK's `setPayment(..., {memo:{type:"none"}})`.
-No read error retries through an old ABI, Registrar address, or direct Resolver.
+The SDK reads `Lookup.version()` successfully before selecting `resolve` (v1) or
+`resolve_v2` (v2). V2 also requires `destination_version() == 2`. Direct mode
+selects on a successful native `payment_version()` result of 1 or 2. Unknown,
+failed and malformed capabilities are errors; no read error retries through an
+older ABI, Registrar address, or direct Resolver. V1 G/C/memo results remain
+compatible. Older clients reject the new Lookup version, and raw old Resolver
+methods reject muxed destinations instead of returning the base G account.
 
 Rechecking catches stale client data but cannot prevent a holder changing instructions
 before a later classic payment settles. Resolver permanence does not freeze holder
 records. A payment recipient can be an exchange or another party; a memo-bearing
 payment route is not proof the name holder owns that recipient account. Reverse
 and Primary results identify an account, not a customer's memo on a pooled account.
+
+### Muxed example
+
+```ts
+import { encodeMuxedAddress } from "@sorandomains/lookup";
+const address = encodeMuxedAddress(
+  "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ",
+  "420",
+);
+// MA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAAAAAABUTGI4
+const instruction = { address, memo: { type: "none" as const } };
+```
+
+This is an illustrative destination, not a request to send funds. `resolve` and
+`record` return the full M address when no separate memo is required. A G-plus-ID
+memo is a different instruction even if its numeric value matches. Your payment
+transport and recipient must support muxed routing. Ownership, signer, reverse and
+Primary account inputs remain G/C. Changing a name's destination to M can invalidate
+its account-level reverse/Primary proof; payment support does not create a muxed
+customer identity or signing account.
 
 ## Read API
 
@@ -153,12 +187,20 @@ not pin the executable code or constrain upgraded code. Review the current Wasm,
 governance and upgrade state. Namespace `assurance().trustworthy` covers Resolver
 provenance only; it does not cover Lookup governance, recipient identity or RPC honesty.
 
-Direct contract ABI includes `registry`, `version`, `primary`, `resolve`,
+V2 adds `destination_version`, `resolve_v2` and strict `resolve_destination`.
+`ResolutionV2.result` is `NativePayment(PaymentDestination) | LegacyAddress(Address)`,
+where `PaymentDestination` is `Direct(Payment) | Muxed({account: Address, id: u64})`.
+The Muxed account must be G. The SDK reconstructs the canonical full M address.
+`encodeMuxedAddress(account, id)` and `decodeMuxedAddress(address)` preserve IDs as
+canonical decimal strings, including `0` and `18446744073709551615`. They never
+establish that a recipient supports an alternative G-plus-memo route.
+
+The original direct contract ABI includes `registry`, `version`, `primary`, `resolve`,
 `resolve_payment`, `resolve_address`, `namespace_metadata`, `name_metadata`, `text`,
 `reverse` and `primary_name`. Send canonical lowercase strings. `ResolutionResult`
 is `NativePayment(Payment) | LegacyAddress(Address)` and `PaymentMemo` is
 `None | Id(u64) | Text(String) | Hash(BytesN<32>)`. Strict helpers reject legacy
-(error 12) and required memos in address-only reads (error 13).
+(error 12), required memos in address-only reads (error 13), and muxed destinations in the original methods (error 22).
 
 Failures are `SoranError` with `code`: `INVALID_INPUT`, `CONFIG`, `RPC`, `SIMULATION`,
 `ARCHIVED`, `ABI`, `TIMEOUT`, `PAYMENT_REQUIRED`, `LEGACY_MEMO_UNKNOWN`, `INCOMPLETE`.
@@ -171,14 +213,14 @@ and declares peer `>=17 <18`. It does not claim untested SDK14–16 compatibilit
 
 ## Verified testnet deployment
 
-Verified on 2026-09-05 at ledger 4520986. Network passphrase: `Test SDF Network ; September 2015`.
+Verified on 5 September 2026 at ledger **4521644** (18:10 UTC). Network passphrase: `Test SDF Network ; September 2015`.
 
 | Contract | Address |
 |---|---|
-| Registry | `CDSORANCV3IFF3MKHJ7KI4MKEJOJZFMTDVAZCD5XFOR4WTGNXJJNOKQE` |
-| Lookup | `CDSORANO7K4FSBR2MLV4PNELJ6UXCDNG4MJZSH6HCVZZZQN5B5GMOP64` |
-| Primary | `CCSORANOADXKLSW5CUANBW5WZFVCNZ5KZ4KNMIUWOZOES3LXYRUYZ56X` |
-| Allocator | `CASORANSKKNXDJYXPZK7OJFIJQL5EMVO7VLYJJSWTCZLT26WWATBI4HY` |
+| Registry | `CASORANI5CN2NJFEO2MGTRDA35AOEF3D3OCVBWN3FS6B6FXNQ74RTJ7H` |
+| Lookup | `CDSORANKG77YZITKWCLWGPKLB2R3HPTP4D6KKZZ7X3R5HLXLMNOTGCDD` |
+| Primary | `CCSORANJZOR5ZYTI4KAW34ESAQFMJAO4NKMTIVOVJOI2VDKCDK3RICXZ` |
+| Allocator | `CDSORANPTRS2EYHN57OZEXTW23P2HPDM3WEAC754B7GNHRB5V6FTJ2EE` |
 
 Mainnet has no deployment preset. Custom networks must supply their own verified
 addresses. Universal Lookup upgrades remain immediately executable; an address
