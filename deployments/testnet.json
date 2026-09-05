@@ -72,5 +72,12 @@
   "namespaceDeploymentSaltVersion": 1,
   "lookupDestinationVersion": 2,
   "resolverPaymentVersion": 2,
-  "resolverDestinationVersion": 2
+  "resolverDestinationVersion": 2,
+  "lookup": {
+    "version": 2,
+    "destinationVersion": 2,
+    "upgradeDelaySeconds": 0,
+    "governance": "GAJCWWNMBKCSTQQISDFTHFTCEOGXYA37YTP3U3ZW7Q5CYQPHSW6TB4QX"
+  },
+  "verificationScope": "Contract code hashes and deployment receipts, Registry deployment-salt version and predictions, namespace routing and policy, Lookup/Resolver version and destination capability getters, Lookup configuration and claim-fee policy at the verified ledger. Separately, 20 live RPC simulation cases passed against the deployed contracts without persisting names or payments. No persistent payment, name-issuance or refund smoke transaction is claimed."
 }
