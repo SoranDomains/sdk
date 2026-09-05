@@ -48,8 +48,8 @@ import {
   xdr,
 } from "@stellar/stellar-sdk";
 
-import { paymentFromNative, paymentMemoToScVal, validatePaymentDestination, type PaymentDestination } from "./payment.js";
-export { PAYMENT_RECORD_KEY, encodePaymentRecord, parsePaymentRecord, validatePaymentDestination, type PaymentMemo, type PaymentDestination } from "./payment.js";
+import { decodeMuxedAddress, destinationFromNative, paymentFromNative, paymentMemoToScVal, validatePaymentDestination, type PaymentDestination } from "./payment.js";
+export { encodeMuxedAddress, decodeMuxedAddress, PAYMENT_RECORD_KEY, encodePaymentRecord, parsePaymentRecord, validatePaymentDestination, type PaymentMemo, type PaymentDestination } from "./payment.js";
 
 type Invoked = { hash: string; ledger: number; returnValue: unknown };
 
@@ -62,8 +62,8 @@ export const DEPLOYMENTS = {
   testnet: {
     rpcUrl: "https://soroban-testnet.stellar.org",
     passphrase: Networks.TESTNET as string,
-    registryId: "CDSORANCV3IFF3MKHJ7KI4MKEJOJZFMTDVAZCD5XFOR4WTGNXJJNOKQE",
-    primaryId: "CCSORANOADXKLSW5CUANBW5WZFVCNZ5KZ4KNMIUWOZOES3LXYRUYZ56X",
+    registryId: "CASORANI5CN2NJFEO2MGTRDA35AOEF3D3OCVBWN3FS6B6FXNQ74RTJ7H",
+    primaryId: "CCSORANJZOR5ZYTI4KAW34ESAQFMJAO4NKMTIVOVJOI2VDKCDK3RICXZ",
   },
 } as const;
 
@@ -141,6 +141,7 @@ const RESOLVER_ERRORS: Record<number, string> = {
   18: "UsePaymentMethod",
   19: "PaymentContextMismatch",
   20: "PaymentUnavailable",
+  21: "MuxedDestination",
 };
 
 const PRIMARY_ERRORS: Record<number, string> = {
@@ -258,7 +259,11 @@ function nameNode(label: string, namespace: string): Uint8Array {
 }
 
 const labelArg = (label: string) => nativeToScVal(utf8(label), { type: "bytes" });
-const addrArg = (address: string) => nativeToScVal(address, { type: "address" });
+const addrArg = (address: string) => {
+  if (!StrKey.isValidEd25519PublicKey(address) && !StrKey.isValidContract(address))
+    throw new HolderError("this account/address operation requires G or C; use setPayment for muxed destinations");
+  return nativeToScVal(address, { type: "address" });
+};
 const bytesArg = (b: Uint8Array) => nativeToScVal(b, { type: "bytes" });
 
 const SIM_SOURCE = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
@@ -349,8 +354,17 @@ export class SoranHolder {
     let payment: PaymentDestination;
     try { payment = validatePaymentDestination(destination); }
     catch (e) { throw new HolderError(String(e)); }
-    const { resolver } = await this.paymentResolverOf(namespace);
+    const { resolver, version } = await this.paymentResolverOf(namespace);
     const holder = await this.signer.publicKey();
+    if (StrKey.isValidMed25519PublicKey(payment.address)) {
+      if (version !== 2) throw new HolderError("muxed destinations require native Resolver v2", resolver, "payment_version");
+      const muxed = decodeMuxedAddress(payment.address);
+      const r = await this.invoke(resolver, "set_muxed", [
+        nativeToScVal(`${label}.${namespace}`, { type: "string" }), addrArg(holder),
+        addrArg(muxed.account), nativeToScVal(BigInt(muxed.id), { type: "u64" }),
+      ], RESOLVER_ERRORS);
+      return { hash: r.hash, ledger: r.ledger };
+    }
     const r = await this.invoke(resolver, "set_payment", [
       nativeToScVal(`${label}.${namespace}`, { type: "string" }), addrArg(holder),
       addrArg(payment.address), paymentMemoToScVal(payment.memo),
@@ -672,7 +686,7 @@ export class SoranHolder {
 
   // ---- internals (same pipeline discipline as @sorandomains/owner) --------
 
-  private async paymentResolverOf(namespace: string): Promise<{ resolver: string; registrar: string }> {
+  private async paymentResolverOf(namespace: string): Promise<{ resolver: string; registrar: string; version: 1 | 2 }> {
     const nsNode = namehash(namespace);
     const args = [bytesArg(nsNode)];
     const [resolver, registrar] = await Promise.all([
@@ -695,17 +709,21 @@ export class SoranHolder {
         !(anchors[1] instanceof Uint8Array) || anchors[1].length !== nsNode.length ||
         !nsNode.every((byte, index) => anchors[1][index] === byte))
       throw new HolderError("Registrar anchors do not match this Registry and namespace", registrar, "anchors");
-    if (version !== 1) throw new HolderError("unsupported native payment Resolver version", resolver, "payment_version");
-    return { resolver, registrar };
+    if (version !== 1 && version !== 2) throw new HolderError("unsupported native payment Resolver version", resolver, "payment_version");
+    if (version === 2 && await this.read(resolver, "destination_version", []) !== 2)
+      throw new HolderError("unsupported Resolver destination version", resolver, "destination_version");
+    return { resolver, registrar, version };
   }
 
   private async assertMemoFree(name: string): Promise<string> {
     const { label, namespace } = parseName(name);
-    const { resolver, registrar } = await this.paymentResolverOf(namespace);
-    const raw = await this.read(resolver, "resolve_payment", [nativeToScVal(`${label}.${namespace}`, { type: "string" })]);
+    const { resolver, registrar, version } = await this.paymentResolverOf(namespace);
+    const fn = version === 2 ? "resolve_destination" : "resolve_payment";
+    const raw = await this.read(resolver, fn, [nativeToScVal(`${label}.${namespace}`, { type: "string" })]);
     let payment: PaymentDestination;
-    try { payment = paymentFromNative(raw); }
-    catch (e) { throw new HolderError(`invalid payment result: ${String(e)}`, resolver, "resolve_payment"); }
+    try { payment = version === 2 ? destinationFromNative(raw) : paymentFromNative(raw); }
+    catch (e) { throw new HolderError(`invalid payment result: ${String(e)}`, resolver, fn); }
+    if (StrKey.isValidMed25519PublicKey(payment.address)) throw new HolderError("this name has a muxed routing ID; use setPayment to explicitly update its destination");
     if (payment.memo.type !== "none") throw new HolderError("this name requires a memo; use setPayment to update address and memo together");
     // Registrar-only write below cannot alter a Resolver's explicit addr/memo.
     // A concurrent set_payment installs its own addr, preserving its memo routing.
@@ -789,6 +807,27 @@ export class SoranHolder {
     }
   }
 
+  /** Native payment writes authorize exactly the locally selected destination. */
+  private assertPaymentIntent(prepared: { source: string; operations: unknown[] }, pub: string, contractId: string, fn: string, args: xdr.ScVal[]): void {
+    if (fn !== "set_payment" && fn !== "set_muxed") return;
+    if (prepared.source !== pub || prepared.operations.length !== 1) throw new HolderError("unexpected payment transaction source or operation count", contractId, fn);
+    const op = prepared.operations[0] as {
+      type: string; source?: string; func: xdr.HostFunction; auth?: xdr.SorobanAuthorizationEntry[];
+    };
+    if (op.type !== "invokeHostFunction" || (op.source !== undefined && op.source !== pub) || op.func.type !== "hostFunctionTypeInvokeContract")
+      throw new HolderError("unexpected payment operation", contractId, fn);
+    const call = op.func.invokeContract;
+    if (Address.fromScAddress(call.contractAddress).toString() !== contractId || call.functionName.toString() !== fn ||
+        call.args.length !== args.length || call.args.some((value, i) => value.toXDR("base64") !== args[i].toXDR("base64")))
+      throw new HolderError("payment operation differs from selected intent", contractId, fn);
+    if (!op.auth || op.auth.length !== 1 || op.auth[0].credentials.type !== "sorobanCredentialsSourceAccount")
+      throw new HolderError("payment requires exactly the source holder authorization", contractId, fn);
+    const root = op.auth[0].rootInvocation;
+    if (root.function.type !== "sorobanAuthorizedFunctionTypeContractFn" || root.subInvocations.length ||
+        root.function.contractFn.toXDR("base64") !== call.toXDR("base64"))
+      throw new HolderError("payment authorization differs from selected intent", contractId, fn);
+  }
+
   private invoke(
     contractId: string,
     fn: string,
@@ -843,9 +882,11 @@ export class SoranHolder {
     }
     const prepared = rpc.assembleTransaction(tx, sim).build();
     this.assertSatisfiableAuth(prepared, pub, contractId, fn);
+    this.assertPaymentIntent(prepared, pub, contractId, fn, args);
     const txHash = toHex(prepared.hash()); // (SDK17) hash() is Uint8Array
     const signed = await this.signEnvelope(prepared.toXDR());
     const envelope = TransactionBuilder.fromXDR(signed, this.passphrase);
+    if ((fn === "set_payment" || fn === "set_muxed") && toHex(envelope.hash()) !== txHash) throw new HolderError("signer changed the reviewed transaction body", contractId, fn);
     let sent: Awaited<ReturnType<rpc.Server["sendTransaction"]>>;
     try {
       sent = await this.server.sendTransaction(envelope);

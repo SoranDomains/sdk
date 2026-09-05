@@ -101,7 +101,7 @@ test("wrong or malformed Registry anchor and version prevent resolve without fal
     await assert.rejects(s.lookup("alice.nova"), code("CONFIG"));
     assert.ok(calls.every(({ fn }) => fn !== "resolve"));
   }
-  for (const version of [null, 0, 2, 1n, "1", true, [1]]) {
+  for (const version of [null, 0, 3, 1n, "1", true, [1]]) {
     const { s, calls } = client(undefined, { version });
     await assert.rejects(s.lookup("alice.nova"), code("ABI"));
     assert.ok(calls.every(({ fn }) => fn !== "resolve"));
@@ -220,7 +220,7 @@ test("anchor and version changes after a successful read are detected before ano
     const overrides: Record<string, unknown> = {};
     const { s, calls } = client(undefined, overrides);
     await s.resolvePayment("alice.nova");
-    overrides[change] = change === "registry" ? RESOLVER : 2;
+    overrides[change] = change === "registry" ? RESOLVER : 3;
     await assert.rejects(s.resolvePayment("alice.nova"), code(change === "registry" ? "CONFIG" : "ABI"));
     assert.equal(calls.filter(({ fn }) => fn === "resolve").length, 1);
   }

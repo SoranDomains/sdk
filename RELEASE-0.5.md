@@ -1,3 +1,5 @@
+> Historical release notes. For the current native muxed release and deployment, see [RELEASE-0.6.md](RELEASE-0.6.md) and [deployments/testnet.json](deployments/testnet.json).
+
 # Namespace-bound deployment SDK release
 
 The published release contains lookup 0.5.2, holder 0.3.1, owner 0.5.1 and MCP 0.5.1,

@@ -66,7 +66,7 @@ if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(NAMESPACE) || NAMESPACE.length > 63)
 }
 const RPC_URL = process.env.SORAN_RPC_URL ?? "https://soroban-testnet.stellar.org";
 const REGISTRY_ID =
-  process.env.SORAN_REGISTRY_ID ?? "CDSORANCV3IFF3MKHJ7KI4MKEJOJZFMTDVAZCD5XFOR4WTGNXJJNOKQE";
+  process.env.SORAN_REGISTRY_ID ?? "CASORANI5CN2NJFEO2MGTRDA35AOEF3D3OCVBWN3FS6B6FXNQ74RTJ7H";
 const PASSPHRASE = process.env.SORAN_PASSPHRASE ?? Networks.TESTNET;
 const PORT = Number(process.env.PORT ?? 8787);
 const HOST = process.env.HOST ?? "127.0.0.1";

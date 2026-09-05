@@ -1,9 +1,18 @@
 # @sorandomains/owner
 
-Version 0.5.1 targets Stellar SDK17 (`>=17 <18`). ASCII names
+> Native muxed release. The testnet deployment below was verified on chain at
+> ledger 4521644 on 5 September 2026 (18:10 UTC). See the
+> [release status](https://docs.soran.domains/reference/release-status) for package and service availability.
+
+
+Version 0.6.0 targets Stellar SDK17 (`>=17 <18`). ASCII names
 and labels are validated before lowercase normalization; Unicode lookalikes are
 rejected. Writes continue to target the owning Registry/Registrar/Resolver. Universal
-Lookup is the read entry point in `@sorandomains/lookup` 0.5.1.
+Lookup is the read entry point in `@sorandomains/lookup` 0.6.0.
+
+Ownership, issuer, holder and treasury inputs remain G/C account or contract
+addresses. Muxed M addresses are payment destinations only: issue the name to its
+actual G/C holder, then that holder can call Holder `setPayment` to publish M.
 
 Run your Soran namespace on Stellar, programmatically. Issue names to your
 users, manage their lifecycle, transfer the namespace, and — when you are
@@ -76,11 +85,11 @@ Docs: <https://github.com/SoranDomains/docs> · License: MIT
 
 ## Verified testnet deployment
 
-Verified on 2026-09-05 at ledger 4520986. Network passphrase: `Test SDF Network ; September 2015`.
+Verified on 5 September 2026 at ledger **4521644** (18:10 UTC). Network passphrase: `Test SDF Network ; September 2015`.
 
 | Contract | Address |
 |---|---|
-| Registry | `CDSORANCV3IFF3MKHJ7KI4MKEJOJZFMTDVAZCD5XFOR4WTGNXJJNOKQE` |
+| Registry | `CASORANI5CN2NJFEO2MGTRDA35AOEF3D3OCVBWN3FS6B6FXNQ74RTJ7H` |
 
 Mainnet has no deployment preset. Custom networks must supply their own verified
 addresses. Universal Lookup upgrades remain immediately executable; an address

@@ -1,9 +1,14 @@
 # @sorandomains/holder
 
-Version 0.3.1 targets Stellar SDK17 (`>=17 <18`). ASCII names
+> Native muxed release. The testnet deployment below was verified on chain at
+> ledger 4521644 on 5 September 2026 (18:10 UTC). See the
+> [release status](https://docs.soran.domains/reference/release-status) for package and service availability.
+
+
+Version 0.4.0 targets Stellar SDK17 (`>=17 <18`). ASCII names
 and labels are validated before lowercase normalization; Unicode lookalikes are
 rejected. Writes continue to target the owning Registry/Registrar/Resolver. Universal
-Lookup is the read entry point in `@sorandomains/lookup` 0.5.1.
+Lookup is the read entry point in `@sorandomains/lookup` 0.6.0.
 
 Your Soran name, managed with your own key. The third piece of the SDK
 trilogy: [`@sorandomains/lookup`](https://www.npmjs.com/package/@sorandomains/lookup)
@@ -45,7 +50,12 @@ await me.setPayment("alice.nova", { address: myAddress, memo: { type: "none" } }
 
 ID values are canonical unsigned 64-bit decimal strings; text is exact nonempty
 UTF-8 up to 28 bytes; hashes are 64 lowercase hex characters. Required memos work
-only with G addresses. C addresses permit `none`. The Resolver authorizes the
+only with G addresses. C addresses permit `none`. A full muxed M address also
+requires `none`: its embedded ID belongs to the operation destination, not a
+transaction memo. On native Resolver v2, `setPayment` decodes M and signs
+`set_muxed(name, holder, baseG, exactU64Id)`; G/C uses `set_payment` as before.
+The signed authorization must match the exact selected call, base account and ID.
+A signer returning a different transaction body is rejected before submission. The Resolver authorizes the
 current holder and updates its records atomically. Failures never retry as separate
 address and text writes. Old unsupported Resolvers fail closed; no payment-specific
 contract address is configured.
@@ -53,17 +63,34 @@ contract address is configured.
 `setText` and `clearText` reserve `payment` for `setPayment`. Configured missing or
 empty instructions remain errors. Remove a memo with explicit `none`.
 `setRecord` invokes native `set_addr`, which atomically permits ordinary names and
-updates an existing valid `none` tuple while rejecting required memos or broken
+updates an existing valid direct `none` tuple while rejecting muxed routes, required memos or broken
 state. A concurrently added memo cannot be replaced by a client-side None rewrite.
 `setAddress` retains its Registrar-only semantics and first requires a valid native
-`none` result. It changes only the built-in target; an explicit Resolver payment
+direct `none` result. It changes only the built-in target; an explicit Resolver payment
 record continues to take precedence. Failed preflight reads never permit a write.
 
 Resolver selection follows the namespace owner's Registry pointer. Compatibility
 and anchor checks do not prove custom/upgraded code is trustworthy. Upgraded
 Resolvers remain supported. Payment readers must use `resolvePayment` and preserve
 the returned memo; old deployed code and direct Registrar reads cannot be upgraded
-by installing this SDK. The verified deployment used by this release is listed below.
+by installing this SDK. The verified deployment for this release is listed below.
+
+### Publish a muxed destination
+
+```ts
+await me.setPayment("customer420.nova", {
+  address: "MA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAAAAAABUTGI4",
+  memo: { type: "none" },
+});
+```
+
+This illustrative M address contains the G account shown in Stellar's examples
+and ID 420. Publish only the actual route supplied by the recipient. No separate
+ID/text/hash memo is permitted. V1 Resolvers cannot store M and fail before signing.
+Use `setPayment` to explicitly replace or remove muxed routing; `setAddress` and
+`setRecord` remain G/C account-address operations. Namespace/name ownership,
+operator and signer addresses remain G/C. Muxed payment destinations do not act
+as separate reverse/Primary identities.
 
 ## What's in the box
 
@@ -115,12 +142,12 @@ supply the matching `primaryId` explicitly.
 
 ## Verified testnet deployment
 
-Verified on 2026-09-05 at ledger 4520986. Network passphrase: `Test SDF Network ; September 2015`.
+Verified on 5 September 2026 at ledger **4521644** (18:10 UTC). Network passphrase: `Test SDF Network ; September 2015`.
 
 | Contract | Address |
 |---|---|
-| Registry | `CDSORANCV3IFF3MKHJ7KI4MKEJOJZFMTDVAZCD5XFOR4WTGNXJJNOKQE` |
-| Primary | `CCSORANOADXKLSW5CUANBW5WZFVCNZ5KZ4KNMIUWOZOES3LXYRUYZ56X` |
+| Registry | `CASORANI5CN2NJFEO2MGTRDA35AOEF3D3OCVBWN3FS6B6FXNQ74RTJ7H` |
+| Primary | `CCSORANJZOR5ZYTI4KAW34ESAQFMJAO4NKMTIVOVJOI2VDKCDK3RICXZ` |
 
 Mainnet has no deployment preset. Custom networks must supply their own verified
 addresses. Universal Lookup upgrades remain immediately executable; an address

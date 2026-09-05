@@ -16,11 +16,11 @@ import {
   xdr,
 } from "@stellar/stellar-sdk";
 
-import { paymentFromNative, validatePaymentDestination, type PaymentDestination } from "./payment.js";
+import { destinationFromNative, paymentFromNative, validatePaymentDestination, type PaymentDestination } from "./payment.js";
 import { lookupFromNative, type LookupResult } from "./lookup.js";
 import { nameFromNative, namespaceFromNative, type NameMetadata, type NamespaceMetadata } from "./views.js";
 export type { NameMetadata, NamespaceMetadata, NamespacePolicy } from "./views.js";
-export { PAYMENT_RECORD_KEY, encodePaymentRecord, parsePaymentRecord, validatePaymentDestination, type PaymentMemo, type PaymentDestination } from "./payment.js";
+export { encodeMuxedAddress, decodeMuxedAddress, PAYMENT_RECORD_KEY, encodePaymentRecord, parsePaymentRecord, validatePaymentDestination, type PaymentMemo, type PaymentDestination } from "./payment.js";
 export type { LookupResult, NativePaymentResolution, LegacyAddressResolution } from "./lookup.js";
 
 /** Known public deployments. Override any field via SoranOptions. */
@@ -28,11 +28,11 @@ export const DEPLOYMENTS = {
   testnet: {
     rpcUrl: "https://soroban-testnet.stellar.org",
     passphrase: Networks.TESTNET as string,
-    // Verified fresh testnet deployment, 2026-09-05 (ledger 4520986).
-    registryId: "CDSORANCV3IFF3MKHJ7KI4MKEJOJZFMTDVAZCD5XFOR4WTGNXJJNOKQE",
-    lookupId: "CDSORANO7K4FSBR2MLV4PNELJ6UXCDNG4MJZSH6HCVZZZQN5B5GMOP64",
-    primaryId: "CCSORANOADXKLSW5CUANBW5WZFVCNZ5KZ4KNMIUWOZOES3LXYRUYZ56X",
-    allocatorId: "CASORANSKKNXDJYXPZK7OJFIJQL5EMVO7VLYJJSWTCZLT26WWATBI4HY",
+    // Native muxed testnet deployment verified at ledger 4521644 (2026-09-05 18:10 UTC).
+    registryId: "CASORANI5CN2NJFEO2MGTRDA35AOEF3D3OCVBWN3FS6B6FXNQ74RTJ7H",
+    lookupId: "CDSORANKG77YZITKWCLWGPKLB2R3HPTP4D6KKZZ7X3R5HLXLMNOTGCDD",
+    primaryId: "CCSORANJZOR5ZYTI4KAW34ESAQFMJAO4NKMTIVOVJOI2VDKCDK3RICXZ",
+    allocatorId: "CDSORANPTRS2EYHN57OZEXTW23P2HPDM3WEAC754B7GNHRB5V6FTJ2EE",
   },
   // mainnet: populated at mainnet launch
 } as const;
@@ -451,13 +451,20 @@ export class Soran {
     } catch (e) { throw new SoranError(`invalid display name: ${String(e)}`, "ABI"); }
   }
 
-  private async universalRead(fn: string, args: xdr.ScVal[]): Promise<unknown> {
+  private async universalContext(): Promise<{ id: string; version: 1 | 2 }> {
     if (this.resolutionMode !== "universal" || !this.lookupId)
       throw new SoranError("Universal Lookup is not deployed/configured for this network; supply a verified lookupId or explicitly select resolutionMode: direct", "CONFIG");
     const [anchor, version] = await Promise.all([this.read(this.lookupId, "registry", []), this.read(this.lookupId, "version", [])]);
     if (typeof anchor !== "string" || !StrKey.isValidContract(anchor) || anchor !== this.registryId) throw new SoranError("Lookup has an invalid or different Registry anchor", "CONFIG");
-    if (version !== 1) throw new SoranError("unsupported universal Lookup version", "ABI");
-    return this.read(this.lookupId, fn, args);
+    if (version !== 1 && version !== 2) throw new SoranError("unsupported universal Lookup version", "ABI");
+    if (version === 2 && await this.read(this.lookupId, "destination_version", []) !== 2)
+      throw new SoranError("unsupported Lookup destination version", "ABI");
+    return { id: this.lookupId, version };
+  }
+
+  private async universalRead(fn: string, args: xdr.ScVal[]): Promise<unknown> {
+    const { id } = await this.universalContext();
+    return this.read(id, fn, args);
   }
 
   // ---- resolution ----
@@ -470,8 +477,9 @@ export class Soran {
     if (typeof name !== "string") throw new SoranError("name must be a string", "INVALID_INPUT");
     const { label, namespace } = parseName(name);
     const canonical = `${label}.${namespace}`;
-    const raw = await this.universalRead("resolve", [nativeToScVal(canonical, { type: "string" })]);
-    try { return lookupFromNative(raw, canonical); }
+    const { id, version } = await this.universalContext();
+    const raw = await this.read(id, version === 2 ? "resolve_v2" : "resolve", [nativeToScVal(canonical, { type: "string" })]);
+    try { return lookupFromNative(raw, canonical, version); }
     catch (e) { throw new SoranError(`invalid universal lookup result: ${String(e)}`, "ABI"); }
   }
 
@@ -513,9 +521,11 @@ export class Soran {
         !(anchors[1] instanceof Uint8Array) || anchors[1].length !== nsNode.length ||
         !nsNode.every((byte, index) => anchors[1][index] === byte))
       throw new SoranError("Registrar anchors do not match this Registry and namespace", "CONFIG");
-    if (version !== 1) throw new SoranError("unsupported native payment Resolver version", "ABI");
-    const raw = await this.read(resolver, "resolve_payment", [nativeToScVal(`${label}.${namespace}`, { type: "string" })]);
-    try { return { payment: paymentFromNative(raw), resolver }; }
+    if (version !== 1 && version !== 2) throw new SoranError("unsupported native payment Resolver version", "ABI");
+    if (version === 2 && await this.read(resolver, "destination_version", []) !== 2)
+      throw new SoranError("unsupported Resolver destination version", "ABI");
+    const raw = await this.read(resolver, version === 2 ? "resolve_destination" : "resolve_payment", [nativeToScVal(`${label}.${namespace}`, { type: "string" })]);
+    try { return { payment: version === 2 ? destinationFromNative(raw) : paymentFromNative(raw), resolver }; }
     catch (e) { throw new SoranError(`invalid payment result: ${String(e)}`, "ABI"); }
   }
 
@@ -1450,7 +1460,7 @@ export const LOOKUP_ERRORS: Readonly<Record<number, string>> = Object.freeze({
   1: "InvalidRegistry", 2: "InvalidGovernance", 3: "NotInitialized", 4: "MalformedName", 5: "NamespaceNotFound",
   6: "RegistrarMissing", 7: "NameInactive", 8: "ContextMismatch", 9: "UnsupportedImplementation", 10: "DependencyUnavailable",
   11: "InvalidPayment", 12: "LegacyMemoUnknown", 13: "MemoRequired", 14: "UpgradePending", 15: "NoPendingUpgrade",
-  16: "UpgradeNotReady", 17: "UpgradeHashMismatch", 18: "TimestampOverflow", 19: "PrimaryNotConfigured", 20: "InvalidPrimary", 21: "ReadTooLarge",
+  16: "UpgradeNotReady", 17: "UpgradeHashMismatch", 18: "TimestampOverflow", 19: "PrimaryNotConfigured", 20: "InvalidPrimary", 21: "ReadTooLarge", 22: "MuxedDestination",
 });
 function lookupError(detail: string): { code: number; name: string } | null {
   // Match only the RPC's leading contract failure, never an inner trace/log.

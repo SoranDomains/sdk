@@ -1,6 +1,6 @@
 {
   "name": "@sorandomains/holder",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Manage your own Soran name on Stellar \u2014 records, profile, reverse, primary, and transfers, signed by your key.",
   "type": "module",
   "main": "./dist/index.js",
@@ -19,7 +19,7 @@
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "tsc",
     "check:browser": "esbuild dist/index.js --bundle --platform=browser --external:@stellar/stellar-sdk --outfile=browser-check.js --legal-comments=none --log-level=error && node -e \"const fs=require('fs');const s=fs.readFileSync('browser-check.js','utf8');fs.unlinkSync('browser-check.js');if(/\\bBuffer\\b/.test(s)){console.error('FAIL: bare Buffer reference in browser bundle');process.exit(1)}console.log('browser bundle clean')\"",
-    "test": "node --import tsx test/decode-failure.test.mts && node --import tsx --test test/payment.test.mts test/integration.test.mts"
+    "test": "node --import tsx test/decode-failure.test.mts && node --import tsx --test test/payment.test.mts test/integration.test.mts test/muxed.test.mts"
   },
   "license": "MIT",
   "repository": {
