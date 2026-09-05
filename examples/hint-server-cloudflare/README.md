@@ -1,5 +1,10 @@
 # Hint server on Cloudflare Workers
 
+This historical example exposes the earlier, unpaginated discovery format. It does
+not implement the cursor and coverage contract required for complete holdings in
+lookup 0.5.0. Use a compatible current indexer for `namesOfPage` and do not treat
+this example's holdings response as a complete inventory.
+
 The [self-hostable hint server](../hint-server/), adapted to Cloudflare — with
 **zero dependencies**: Soroban RPC's `xdrFormat: "json"` mode returns events
 as plain JSON, so no Stellar SDK and no XDR decoding is needed at the edge.

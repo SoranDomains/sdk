@@ -1,25 +1,18 @@
-/** Live demo against the public testnet deployment: `npm run demo` */
-import { Soran } from "./src/index.js";
-
-const soran = new Soran({ network: "testnet" });
-
-console.log("— @sorandomains/lookup live demo (public testnet, pure chain reads) —");
-
-const addr = await soran.resolve("alice.nova");
-console.log(`resolve("alice.nova")            → ${addr}`);
-
-const rec = await soran.record("alice.nova");
-console.log(`record().resolver                → ${rec.resolver?.slice(0, 10)}…`);
-
-console.log(`verify("alice.nova", that addr)  → ${await soran.verify("alice.nova", addr!)}`);
-console.log(`verify("alice.nova", WRONG addr) → ${await soran.verify("alice.nova", "GAAHFS7CISNAJOQK5VS447NS6ZFPRLLQQP6IM2EA4W7XZWGJNMXZ4VLK")}`);
-
-console.log(`reverseVerify(addr,"alice.nova") → ${await soran.reverseVerify(addr!, "alice.nova")}`);
-console.log(`reverseVerify(addr,"bob.nova")   → ${await soran.reverseVerify(addr!, "bob.nova")}`);
-
-const ns = await soran.namespace("nova");
-console.log(`namespace("nova").owner          → ${ns?.owner.slice(0, 8)}…`);
-console.log(`isAvailable("nova")              → ${await soran.isAvailable("nova")}`);
-console.log(`isAvailable("totally-free-name") → ${await soran.isAvailable("totally-free-name")}`);
-
-console.log(`resolve("ghost.nova")            → ${await soran.resolve("ghost.nova")}`);
+/** Read-only demo for the current testnet preset: npm run demo [-- issued.name] */
+import { Soran, SoranError } from "./src/index.js";
+const soran = new Soran({ network: "testnet", timeoutMs: 20_000 });
+console.log("nova namespace metadata:", await soran.namespaceMetadata("nova"));
+const name = process.argv[2];
+if (name) {
+  try {
+    const payment = await soran.resolvePayment(name);
+    console.log("Complete payment instructions:", payment);
+    console.log("Fresh comparison:", await soran.verifyPayment(name, payment));
+  } catch (error) {
+    if (error instanceof SoranError && error.contractError === "NameInactive") {
+      console.log("The supplied name is not currently active; no payment instructions are available.");
+    } else throw error;
+  }
+} else {
+  console.log("Supply an issued name to inspect complete address and memo instructions. No issued sample names are assumed by this fresh-deployment demo.");
+}

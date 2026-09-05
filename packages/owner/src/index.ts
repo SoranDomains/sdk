@@ -65,12 +65,14 @@ type Invoked = {
 function extractContractEvents(meta: xdr.TransactionMeta | undefined): xdr.ContractEvent[] {
   try {
     if (!meta) return [];
-    if (meta.switch() === 3) return meta.v3().sorobanMeta()?.events() ?? [];
-    if (meta.switch() === 4) {
-      const v4 = meta.v4();
+    // (SDK17/js-xdr v5) TransactionMeta discriminates on `.type`; the arm value
+    // is `.value`; struct fields (sorobanMeta, operations, events) are properties.
+    if (meta.type === "v3") return meta.value.sorobanMeta?.events ?? [];
+    if (meta.type === "v4") {
+      const v4 = meta.value;
       return [
-        ...v4.operations().flatMap((op) => op.events()),
-        ...v4.events().map((te) => te.event()),
+        ...v4.operations.flatMap((op) => op.events),
+        ...v4.events.map((te) => te.event),
       ];
     }
     return [];
@@ -87,13 +89,13 @@ function decodeIssuedEvents(
   const out: Array<{ label: string; holder: string }> = [];
   for (const ev of events) {
     try {
-      const cid = ev.contractId();
+      const cid = ev.contractId; // (SDK17) property, ContractId | null
       if (!cid) continue;
-      if (Address.contract(cid as unknown as Buffer).toString() !== registrarId) continue;
-      const body = ev.body().v0();
-      const topics = body.topics();
+      if (Address.contract(cid.toBytes() as unknown as Buffer).toString() !== registrarId) continue;
+      const body = ev.body.value; // ContractEventBody → ContractEventV0
+      const topics = body.topics;
       if (topics.length < 1 || scValToNative(topics[0]) !== "issued") continue;
-      const data = scValToNative(body.data()) as [unknown, unknown];
+      const data = scValToNative(body.data) as [unknown, unknown];
       if (!(data?.[0] instanceof Uint8Array) || typeof data?.[1] !== "string") continue;
       out.push({ label: new TextDecoder().decode(data[0]), holder: data[1] });
     } catch {
@@ -114,7 +116,7 @@ export const DEPLOYMENTS = {
     passphrase: Networks.TESTNET as string,
     // The immutable Registry. The Registrar for a namespace is discovered on
     // chain via `registrar_of(node)` — never configured by hand.
-    registryId: "CAUEHYVLLNNDZ4H5QWCPBDWEONRI44SI3XYSEACB4U3HYILIVQGQAMNI",
+    registryId: "CBSORANXTUFKBZK74AAM2ZM5OX2V7PIXUADM3HGP6WU3IDN7M3YEEDLU",
   },
 } as const;
 
@@ -264,6 +266,13 @@ function typedError(
 const LABEL_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
 
 /** Contract label rules: 1–63 bytes of a-z 0-9, `-` neither first nor last. */
+export function normalizeLabel(value: string): string {
+  if (typeof value !== "string" || /[^\x00-\x7f]/.test(value)) throw new OwnerError("label must contain ASCII characters only");
+  const normalized = value.toLowerCase();
+  assertLabel(normalized);
+  return normalized;
+}
+
 function assertLabel(label: string): void {
   if (label.length < 1 || label.length > 63 || !LABEL_RE.test(label)) {
     throw new OwnerError(
@@ -433,7 +442,7 @@ export class SoranOwner {
 
   /** The namespace's on-chain attested Registrar id. Cached per instance. */
   async registrarOf(namespace: string): Promise<string> {
-    assertLabel(namespace);
+    namespace = normalizeLabel(namespace);
     const hit = this.registrars.get(namespace);
     if (hit && Date.now() - hit.at < SoranOwner.REGISTRAR_TTL_MS) return hit.value;
     const id = (await this.read(this.registryId, "registrar_of", [
@@ -452,7 +461,7 @@ export class SoranOwner {
 
   /** The namespace's current owner on the Registry, or null if unallocated. */
   async namespaceOwner(namespace: string): Promise<string | null> {
-    assertLabel(namespace);
+    namespace = normalizeLabel(namespace);
     return (await this.read(this.registryId, "owner_of", [
       nodeArg(namehash(namespace)),
     ])) as string | null;
@@ -481,7 +490,7 @@ export class SoranOwner {
 
   /** Issue `label.namespace` to `holder`. Owner-signed; term set by policy. */
   async issue(namespace: string, label: string, holder: string): Promise<IssueResult> {
-    assertLabel(label);
+    label = normalizeLabel(label);
     const registrarId = await this.registrarOf(namespace);
     const r = await this.invoke(
       registrarId,
@@ -510,7 +519,7 @@ export class SoranOwner {
         `issueBatch: ${entries.length} entries exceeds the contract cap of ${MAX_BATCH} per transaction — split the batch`,
       );
     }
-    for (const e of entries) assertLabel(e.label);
+    entries = entries.map(e => ({ ...e, label: normalizeLabel(e.label) }));
     const registrarId = await this.registrarOf(namespace);
 
     const r = await this.invoke(
@@ -605,7 +614,7 @@ export class SoranOwner {
    * policy never allowed it and after `make_permanent` removed it forever.
    */
   async reclaim(namespace: string, label: string): Promise<Submitted> {
-    assertLabel(label);
+    label = normalizeLabel(label);
     const registrarId = await this.registrarOf(namespace);
     const r = await this.invoke(registrarId, "reclaim", [labelArg(label)], REGISTRAR_ERRORS);
     return { hash: r.hash, ledger: r.ledger };
@@ -617,7 +626,7 @@ export class SoranOwner {
     label: string,
     extendSecs: number | bigint,
   ): Promise<Submitted & { expiresAt: bigint }> {
-    assertLabel(label);
+    label = normalizeLabel(label);
     const registrarId = await this.registrarOf(namespace);
     const r = await this.invoke(
       registrarId,
@@ -668,7 +677,7 @@ export class SoranOwner {
    * accepts; re-proposing replaces the pending offer, cancel withdraws it.
    */
   async proposeNamespaceTransfer(namespace: string, to: string): Promise<Submitted> {
-    assertLabel(namespace);
+    namespace = normalizeLabel(namespace);
     const r = await this.invoke(
       this.registryId,
       "propose_transfer",
@@ -680,7 +689,7 @@ export class SoranOwner {
 
   /** Accept a namespace offered to you. Signer must be the PROPOSED owner. */
   async acceptNamespaceTransfer(namespace: string): Promise<Submitted> {
-    assertLabel(namespace);
+    namespace = normalizeLabel(namespace);
     const r = await this.invoke(
       this.registryId,
       "accept_transfer",
@@ -692,7 +701,7 @@ export class SoranOwner {
 
   /** Withdraw a pending namespace transfer. Current owner only. */
   async cancelNamespaceTransfer(namespace: string): Promise<Submitted> {
-    assertLabel(namespace);
+    namespace = normalizeLabel(namespace);
     const r = await this.invoke(
       this.registryId,
       "cancel_transfer",
@@ -707,7 +716,7 @@ export class SoranOwner {
    * Refused (ResolverFrozen) once the namespace is permanent.
    */
   async setResolver(namespace: string, resolver: string | null): Promise<Submitted> {
-    assertLabel(namespace);
+    namespace = normalizeLabel(namespace);
     const r = await this.invoke(
       this.registryId,
       "set_resolver",
@@ -746,14 +755,14 @@ export class SoranOwner {
 
   /** Current state of `label.namespace`, or null if never issued. */
   async nameState(namespace: string, label: string): Promise<NameState | null> {
-    assertLabel(label);
+    label = normalizeLabel(label);
     const registrarId = await this.registrarOf(namespace);
     return this.readRecord(registrarId, label);
   }
 
   /** The pending namespace transfer on the Registry, or null. */
   async pendingNamespaceTransfer(namespace: string): Promise<unknown | null> {
-    assertLabel(namespace);
+    namespace = normalizeLabel(namespace);
     return this.read(this.registryId, "pending_transfer", [nodeArg(namehash(namespace))]);
   }
 
@@ -873,11 +882,11 @@ export class SoranOwner {
   ): void {
     const op = prepared.operations[0] as { auth?: xdr.SorobanAuthorizationEntry[] };
     for (const entry of op?.auth ?? []) {
-      const cred = entry.credentials();
-      if (cred.switch() !== xdr.SorobanCredentialsType.sorobanCredentialsAddress()) continue;
+      const cred = entry.credentials;
+      if (cred.type !== "sorobanCredentialsAddress") continue;
       let required: string;
       try {
-        required = Address.fromScAddress(cred.address().address()).toString();
+        required = Address.fromScAddress(cred.address.address).toString();
       } catch {
         continue; // unreadable credential — let the chain be the judge
       }
@@ -906,7 +915,10 @@ export class SoranOwner {
         .build();
 
     let tx = build(await this.sourceAccount(pub, fn));
-    let sim = await this.server.simulateTransaction(tx);
+    // (SDK17/P28) useUpgradedAuth=false keeps legacy V1 SorobanCredentials rather
+    // than CAP-71 address-bound V2 — valid against P27 (pre-vote) and P28 (post),
+    // and keeps assertSatisfiableAuth's `sorobanCredentialsAddress` check exact.
+    let sim = await this.server.simulateTransaction(tx, undefined, undefined, false);
     // Archived entries (e.g. a dormant Registrar's instance) need restoring
     // before the call can run. Each restore is its own owner-signed
     // transaction; two rounds cover an entry archiving mid-flow, and beyond
@@ -921,7 +933,7 @@ export class SoranOwner {
       }
       await this.restore(sim, pub);
       tx = build(await this.sourceAccount(pub, fn));
-      sim = await this.server.simulateTransaction(tx);
+      sim = await this.server.simulateTransaction(tx, undefined, undefined, false);
     }
     if (rpc.Api.isSimulationError(sim)) {
       throw typedError(contractId, fn, sim.error, errNames);
@@ -930,7 +942,7 @@ export class SoranOwner {
     this.assertSatisfiableAuth(prepared, pub, contractId, fn);
     // The hash is fixed before signatures — compute it now so every failure
     // past this point can carry it (the "re-check before retrying" contract).
-    const txHash = prepared.hash().toString("hex");
+    const txHash = toHex(prepared.hash()); // (SDK17) hash() is Uint8Array
     const signed = await this.signEnvelope(prepared.toXDR());
     const envelope = TransactionBuilder.fromXDR(signed, this.passphrase);
     let sent: Awaited<ReturnType<rpc.Server["sendTransaction"]>>;
@@ -1068,19 +1080,19 @@ export class SoranOwner {
     try {
       const meta = got.resultMetaXdr;
       const diags: xdr.DiagnosticEvent[] = got.diagnosticEventsXdr ?? (
-        meta && meta.switch() === 3
-          ? (meta.v3().sorobanMeta()?.diagnosticEvents() ?? [])
-          : meta && meta.switch() === 4
-            ? meta.v4().diagnosticEvents()
+        meta && meta.type === "v3"
+          ? (meta.value.sorobanMeta?.diagnosticEvents ?? [])
+          : meta && meta.type === "v4"
+            ? meta.value.diagnosticEvents
             : []
       );
       outer: for (const d of diags) {
-        const body = d.event().body().v0();
-        for (const v of [...body.topics(), body.data()]) {
-          if (v.switch() === xdr.ScValType.scvError()) {
-            const err = v.error();
-            if (err.switch() === xdr.ScErrorType.sceContract()) {
-              code = err.contractCode();
+        const body = d.event.body.value;
+        for (const v of [...body.topics, body.data]) {
+          if (v.type === "scvError") {
+            const err = v.error;
+            if (err.type === "sceContract") {
+              code = err.contractCode;
               break outer;
             }
           }
@@ -1091,7 +1103,7 @@ export class SoranOwner {
     }
     let resultCode = `tx status ${got.status}`;
     try {
-      resultCode = got.resultXdr?.result().switch().name ?? resultCode;
+      resultCode = got.resultXdr?.result.type ?? resultCode;
     } catch {
       /* keep the plain status */
     }

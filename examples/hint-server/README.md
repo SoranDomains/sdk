@@ -1,5 +1,10 @@
 # Self-hosted hint server
 
+This historical example exposes the earlier, unpaginated discovery format. It does
+not implement the cursor and coverage contract required for complete holdings in
+lookup 0.5.0. Use a compatible current indexer for `namesOfPage` and do not treat
+this example's holdings response as a complete inventory.
+
 A complete, self-hostable hint server for one namespace in a single file —
 the discovery source `@sorandomains/lookup` uses as its `hintUrl`.
 

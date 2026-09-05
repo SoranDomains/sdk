@@ -1,7 +1,11 @@
+// Historical fixture for the pre-2026-09-05 testnet Registry and issued sample names.
+// Not a validation of the fresh deployment; use npm run demo for current read-only checks.
 /* Live-testnet smoke for the 0.3.0 additions — details(), structured error
  * codes, timeoutMs, and the reverseLookup config guard. Run:
  *   npx tsx smoke.mts */
 import { Soran, SoranError } from "./src/index.js";
+
+if (process.env.SORAN_RUN_HISTORICAL_FIXTURE !== "yes") throw new Error("Historical sample fixture disabled; use npm run demo for the current deployment");
 
 let fails = 0;
 const check = (n: string, ok: boolean, d = "") => {

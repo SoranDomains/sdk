@@ -1,133 +1,185 @@
 # @sorandomains/lookup
 
-Resolve Soran names (`alice.nova`) on Stellar — **trustlessly, straight from the
-chain**. No Soran servers in the trust path: every call is a read-only Soroban
-RPC simulation against the deployed contracts. Point it at any RPC you trust,
-including your own.
+Read Soran names on Stellar through the on-chain Universal Lookup contract. The SDK
+is optional: wallets, explorers and other contracts can call the same ABI directly.
+Reads use your configured Soroban RPC. No hosted Soran service supplies payment answers.
 
 ```ts
 import { Soran } from "@sorandomains/lookup";
-
 const soran = new Soran({ network: "testnet" });
-
-await soran.resolve("alice.nova");
-// "GDHNO4WK…"  (null if unissued, expired, or namespace has no public resolver)
+const payment = await soran.resolvePayment("Alice.Nova");
+// Preserve BOTH payment.address and payment.memo when building a payment.
+if (!(await soran.verifyPayment("alice.nova", payment))) throw new Error("Instructions changed");
 ```
 
-## Wallet integration in three calls
+This release uses Universal Lookup **by default**. The testnet preset pins the verified
+2026-09-05 deployment; no extra contract configuration is needed. A network without a Lookup pin fails with
+`CONFIG`; it never silently uses direct Resolver calls. Mainnet has no preset until
+its reviewed deployment exists. A custom Registry or passphrase does not inherit
+Lookup or Primary pins from another deployment. The deployment anchors, Lookup version and code hashes were verified at ledger
+4515471. Older testnet clients require this package update to follow the new Registry.
+
+Explicit compatibility mode remains available with `resolutionMode: "direct"`
+(or `lookupId: null`). Direct mode discovers native Resolvers from Registry and
+checks their Registry, Registrar authority and payment API version. It has no
+old-address fallback. The universal-only `lookup`, `namespaceMetadata` and
+`nameMetadata` methods require universal mode.
+
+## Payment instructions
 
 ```ts
-// 1. Send-to-name: swap the address field for a name field.
-const dest = await soran.resolve(input);          // "alice.nova" → G…
-if (!dest) throw new Error("name doesn't resolve");
-
-// 2. Safety re-check at confirm time (names can move between keystrokes
-//    and confirmation — expired, transferred, reissued):
-if (!(await soran.verify(input, dest))) throw new Error("resolution changed");
-
-// 3. Show names instead of addresses in history (verified, never spoofable):
-const name = await soran.reverseLookup(sender);   // contract-verified plaintext, straight from the Resolver
-// or, if you already have a candidate:
-const ok = await soran.reverseVerify(sender, "alice.nova");
+const result = await soran.lookup("alice.nova");
+if (result.kind === "nativePayment") {
+  useCompletePayment(result.payment); // { address, memo }
+} else {
+  showLegacyAddress(result.address); // memoCapability is "unknown"
+}
 ```
 
-## API
+Both variants include canonical name, Registrar, optional Resolver and exact bigint
+generation. `legacyAddress` does not establish that no memo is needed.
+`resolvePayment`, `verifyPayment`, `resolve`, `record`, `verify` and payment fields
+in `details`/`identity` reject legacy results with `LEGACY_MEMO_UNKNOWN`.
+Address-only methods also reject a native required memo with `PAYMENT_REQUIRED`.
 
-| Call | Returns | Notes |
-|---|---|---|
-| `resolve(name)` | `string \| null` | The address the name pays to |
-| `record(name)` | `{ name, address, node, resolver }` | Full resolution record |
-| `verify(name, addr)` | `boolean` | Pay-to-name safety check |
-| `text(name, key)` | `string \| null` | Text records (`url`, `avatar`, …) |
-| `reverseVerify(addr, name)` | `boolean` | Trustless reverse check: the Resolver's `name_of` enforces the reverse record's freshness **and** the forward match on chain |
-| `reverseLookup(addr, namespaces?)` | `string \| null` | Primary name first (if `primaryId` set), then a pure on-chain read across candidate namespaces, probed in parallel with deterministic priority; `hintUrl` may supply only the namespace LIST — a lying hint can hide a name, never forge one |
-| `primaryOf(addr)` | `string \| null` | Cross-namespace primary display name (requires `primaryId`); already contract-verified — the PrimaryName contract re-checks the namespace Resolver's live `name_of` on every read. Read failures throw, never masquerade as "no primary" |
-| `assurance(name)` | `{ resolverAttested, resolverTainted, resolverLocked, trustworthy }` | Opt-in trust check on the namespace's resolver (attested by the Registry, never upgraded, locked by permanence). `resolve()` follows the owner's pointer regardless — use this before trusting a resolution for high-value display/payment |
-| `details(name)` | `NameDetails` | The full live picture in one call: resolution, holder, expiry, generation, namespace owner/registrar/resolver, policy, permanence, assurance. Registration *date* is deliberately absent — the chain stores no timestamps (see `history`) |
-| `namespace(ns)` | `{ owner, resolver } \| null` | Namespace-level record |
-| `isAvailable(ns)` | `boolean` | Unregistered → claimable via the public window |
-| `namehash(ns)` / `node(name)` | `Uint8Array` | The exact on-chain hashing, exposed |
+Payment memos are `{type:"none"}`, `{type:"id",value:"canonical u64 decimal"}`,
+`{type:"text",value:"exact UTF-8 text"}` or `{type:"hash",value:"64 lowercase hex"}`.
+Text is nonempty and at most 28 UTF-8 bytes. IDs remain strings, never JS numbers.
+G addresses support all four; C addresses support `none` only. M addresses and
+contract-specific routing arguments are outside this ABI. A classic transaction
+has one memo; separate payments requiring different memos.
 
-### Identity & enumeration
+Ordinary native records with no current-generation configuration marker return the
+ordinary address with memo `none`. A persistent Resolver marker prevents lost
+configured payment instructions from becoming this default. Missing configured,
+malformed, stale, archived and unreadable instructions fail closed. Holders remove
+memos explicitly with the holder SDK's `setPayment(..., {memo:{type:"none"}})`.
+No read error retries through an old ABI, Registrar address, or direct Resolver.
 
-| Call | Returns | Trust |
-|---|---|---|
-| `namesOf(addr)` | `NameSummary[]` | Every name a wallet holds — candidates discovered via `hintUrl`'s indexer, then EACH verified on chain (`holder_of_node`, contract expiry-gated). The hint can omit, never forge. Best-effort: failing/archived candidates are skipped |
-| `reverseNames(addr, namespaces?)` | `ReverseName[]` | ALL contract-verified reverse names, with the cross-namespace primary flagged |
-| `profile(name)` | `SoranProfile` | The standard `PROFILE_KEYS` text records (`org`, `url`, `email`, `description`, `avatar`, `location`, `twitter`, `github`) — generation-gated on chain; values are holder-authored free text, render as untrusted |
-| `identity(name)` | `NameIdentity` | One-call name page: `details` + `profile` + holder primary + verified display name + the namespace owner's primary name |
-| `walletProfile(addr)` | `WalletProfile` | One-call wallet page: primary + reverse names + verified holdings + the primary's profile |
-| `history(name)` | `NameHistory` | Issued/transferred/reclaimed timeline — **indexed, informational** (the chain stores no timestamps); every entry carries `ledger` + `txHash` for independent verification. Needs `hintUrl` |
+Rechecking catches stale client data but cannot prevent a holder changing instructions
+before a later classic payment settles. Resolver permanence does not freeze holder
+records. A payment recipient can be an exchange or another party; a memo-bearing
+payment route is not proof the name holder owns that recipient account. Reverse
+and Primary results identify an account, not a customer's memo on a pooled account.
 
-## Options
+## Read API
+
+| Method | Result and semantics |
+|---|---|
+| `lookup(name)` | Discriminated `LookupResult`: native payment or legacy address with unknown memo capability |
+| `resolvePayment(name)` / `verifyPayment(name,payment)` | Complete atomic instructions / fresh exact comparison |
+| `resolve(name)` / `record(name)` / `verify(name,address)` | Native memo-free address convenience methods |
+| `namespaceMetadata(namespace)` | Namespace owner, routing, policy, provenance flags and permanence, or `null` |
+| `nameMetadata(name)` | Holder, built-in address, exact generation/expiry, active/no-expiry flags, or `null`; built-in address is metadata, not effective payment |
+| `text(name,key)` | Holder-authored text or `null`; Symbol key and 4096-byte response limits |
+| `reverse(namespace,address)` | One namespace's verified canonical display name or `null` |
+| `primaryOf(address)` | Universal Lookup's configured Primary result; `primaryId:null` disables it |
+| `reverseVerify(address,name)` | Scoped reverse comparison |
+| `reverseLookup(address,namespaces?)` | Primary first, then ordered bounded namespace probes |
+| `reverseNames(address,namespaces?)` | Verified names among candidate namespaces; not global enumeration |
+| `assurance(name)` | Attested, locked and untainted Resolver provenance; `trustworthy` requires all three |
+| `namespace(namespace)` / `isAvailable(namespace)` | Namespace owner/Resolver subset / absence check |
+| `details(name)` | Metadata plus complete effective payment; rejects mixed generations/routing across reads |
+| `profile(name)` / `identity(name)` | Standard text fields / full identity view; text is untrusted content |
+| `namesOfPage(address,{cursor?,limit?})` | Bounded verified holdings page, continuation and completeness details |
+| `namesOf(address)` | Compatibility aggregate, up to 1000 candidates; throws `INCOMPLETE` when partial |
+| `walletProfile(address)` | Primary, reverse names, first holdings page and profile; inspect `holdings` for continuation/coverage |
+| `history(name)` | Bounded indexed, informational timeline with ledger/transaction references |
+| `namehash(namespace)` / `node(name)` | On-chain hashing helpers |
+
+Universal mode routes forward, metadata, text, scoped reverse and Primary reads
+through Lookup. Each invocation checks its Registry anchor and numeric ABI version
+`1`; decoded results have strict names, shapes, addresses, enums and exact bigint
+u64s. Separate simulations are not an atomic snapshot of all metadata fields.
+
+Input names/labels must be ASCII before case conversion. ASCII uppercase is
+canonicalized to lowercase. Unicode lookalikes, including characters that would
+lowercase into ASCII, are rejected. Leading/trailing whitespace is not removed.
+On-chain reverse/Primary answers must already be canonical lowercase names.
+
+A successful `primaryOf` returning `null` means Primary supplied no verified name.
+The existing Primary ABI also collapses failed dependent proof reads into `None`,
+so this cannot distinguish absence from every downstream failure. Lookup errors
+such as `PrimaryNotConfigured` still throw. `reverseLookup` and `reverseNames`
+can recover from a Primary failure by probing the candidate namespaces through
+Lookup. Direct mode verifies the configured Primary's Registry anchor before reading.
+
+## Discovery and completeness
+
+```ts
+const page = await soran.namesOfPage(address, { limit: 40 });
+render(page.names);
+showCoverage(page.coverage, page.verification);
+if (page.hasMore) showNextPage(page.nextCursor!);
+```
+
+`namesOfPage` uses the optional indexer `hintUrl` for candidate discovery and
+checks each candidate's current holder and active state on chain. Results contain
+`nextCursor`, `hasMore`, `complete`, indexer `coverage`, and verification counts
+(`candidates`, `verified`, `excluded`, `failed`). A failed candidate is distinct from
+a proven stale/nonheld one. Pages are limited to 100 candidates with bounded concurrency.
+
+Coverage includes processed/head ledgers and explicit gaps. It is the indexer's
+report, not a proof it omitted nothing. `complete` is true only for a final page
+whose indexer reports complete coverage and whose candidate checks did not fail.
+`namesOf` refuses partial aggregates instead of silently claiming all holdings.
+`walletProfile.names` is the first verified page; use `walletProfile.holdings` to
+continue. Indexer history remains informational and is not on-chain ownership proof.
+
+## Configuration and trust
 
 ```ts
 new Soran({
-  network: "testnet",              // deployment preset (mainnet at launch)
-  rpcUrl: "https://your-rpc",      // bring your own RPC
-  passphrase: "…",                 // network passphrase (preset supplies it)
-  registryId: "C…",                // override the immutable Registry
-  primaryId: "C…",                 // PrimaryName contract id (the testnet preset
-                                   // supplies one — pass `null` to DISABLE the feature)
-  registrars: { nova: "C…" },      // closed (registrar-side) resolution opt-in
-  reverseNamespaces: ["nova"],     // which Resolvers reverseLookup probes (in order)
-  resolverCacheTtlMs: 30_000,      // how long a namespace→resolver pointer is cached (0 = off)
-  hintUrl: "https://your-deployment-api", // OPTIONAL discovery/indexer source: the
-                                   // namespace-list hint for reverseLookup, the
-                                   // candidate list for namesOf (each candidate
-                                   // chain-verified), and the history() timeline.
-                                   // It can omit; it can never forge
-  timeoutMs: 10_000,               // per-chain-read wait bound → SoranError "TIMEOUT"
-                                   // (unset = no SDK-imposed bound)
+  network: "testnet",
+  registryId: verifiedRegistryId,
+  lookupId: verifiedLookupId,
+  rpcUrl: trustedRpcUrl,
+  passphrase: networkPassphrase,
+  primaryId: verifiedPrimaryId, // optional extra anchor check; null disables Primary
+  reverseNamespaces: ["nova"],
+  hintUrl: discoveryApiUrl,
+  timeoutMs: 10_000,
 });
 ```
 
-## Errors
+The RPC, network/passphrase and deployed addresses are trusted configuration. Lookup
+uses Registry routes and supports only reviewed implementations. Native compatibility
+checks do not prove custom or upgraded namespace code is honest. Namespace owners
+choose Resolvers and holders choose payment instructions.
 
-Every failure is a `SoranError` with a machine-readable `code` — branch on it,
-not on message text: `INVALID_INPUT`, `CONFIG`, `RPC`, `SIMULATION`,
-`ARCHIVED` (the entry exists but its rent lapsed), `ABI`, `TIMEOUT`. A `null`
-return always means a *successful* read that found nothing.
+Lookup governance can execute approved upgrades immediately: there is **no mandatory
+upgrade delay**. Registry/version checks validate reported wiring and ABI; they do
+not pin the executable code or constrain upgraded code. Review the current Wasm,
+governance and upgrade state. Namespace `assurance().trustworthy` covers Resolver
+provenance only; it does not cover Lookup governance, recipient identity or RPC honesty.
 
-## Primary name (optional, cross-namespace)
+Direct contract ABI includes `registry`, `version`, `primary`, `resolve`,
+`resolve_payment`, `resolve_address`, `namespace_metadata`, `name_metadata`, `text`,
+`reverse` and `primary_name`. Send canonical lowercase strings. `ResolutionResult`
+is `NativePayment(Payment) | LegacyAddress(Address)` and `PaymentMemo` is
+`None | Id(u64) | Text(String) | Hash(BytesN<32>)`. Strict helpers reject legacy
+(error 12) and required memos in address-only reads (error 13).
 
-An address may additionally declare ONE **primary name** on the
-platform-deployed, immutable `PrimaryName` contract — a single display name
-that works across namespaces (a user holding both `alice.nova` and
-`alice.stellar` picks one to show everywhere). The primary adds no new trust:
-it is only a pointer to a name, and the contract re-runs that namespace's own
-Resolver `name_of` gates on **every** read, answering `None` the moment the
-stored name stops verifying — so the SDK's `primaryOf(addr)` answer is already
-contract-verified and needs no client-side re-check. Per-namespace reverse
-records are unchanged and keep working exactly as before; when `primaryId` is
-configured, `reverseLookup` simply asks PrimaryName first and falls back to
-the per-namespace probes when there is no primary (a *failed* primary read
-also degrades to the namespace probes rather than failing the lookup — the
-optional pointer must not break the pre-existing baseline). Because each
-`primary_of` read costs two cross-contract calls in simulation, wallets
-rendering address lists are expected to apply brief client-side caching
-(seconds, the same discipline as `resolverCacheTtlMs`) for batch rendering —
-correctness never depends on any cache, since the contract re-verifies on
-every read. Writes (`set_primary` / `clear_primary`) are address-authorized
-transactions built and signed by wallets; the SDK only reads.
+Failures are `SoranError` with `code`: `INVALID_INPUT`, `CONFIG`, `RPC`, `SIMULATION`,
+`ARCHIVED`, `ABI`, `TIMEOUT`, `PAYMENT_REQUIRED`, `LEGACY_MEMO_UNKNOWN`, `INCOMPLETE`.
+Recognized top-level Lookup contract failures also have `contractCode` and
+`contractError`. Unknown formats stay unclassified; nested diagnostic strings are
+not promoted to top-level errors. Do not branch on prose messages.
 
-## Trust model
+Supports Node, browsers and workers. This release is tested against Stellar SDK17
+and declares peer `>=17 <18`. It does not claim untested SDK14–16 compatibility.
 
-- **Forward resolution** is verified by the contracts themselves: records are
-  bound to the name's ownership *generation*, so expired, reissued, or
-  transferred names stop resolving on chain — the SDK never has to guess.
-- **Reverse resolution** is self-contained and contract-verified: reverse
-  records store the PLAINTEXT name, and the Resolver's `name_of` answers only
-  while the name is live (generation match) *and* its forward record points
-  back to the address — so a reverse answer needs no hint service and no
-  client-side re-check. Because reverse records live on per-namespace
-  Resolvers, `reverseLookup` probes candidate namespaces (`reverseNamespaces`
-  or the per-call param, in parallel with deterministic priority); an optional
-  `hintUrl` can supply just the namespace **list** — a liveness hint that can
-  hide a name by omission, but can never forge one.
-- The only trusted inputs are the RPC endpoint you choose and the immutable
-  Registry id (published, verifiable on-network).
+## Verified testnet deployment
 
-Works in browsers, Node, and workers out of the box — this package ships zero
-Node built-ins of its own (enforced in CI by a browser-bundle check), with
-`@stellar/stellar-sdk` as the only peer dependency.
+Verified on 2026-09-05 at ledger 4515471. Network passphrase: `Test SDF Network ; September 2015`.
+
+| Contract | Address |
+|---|---|
+| Registry | `CBSORANXTUFKBZK74AAM2ZM5OX2V7PIXUADM3HGP6WU3IDN7M3YEEDLU` |
+| Lookup | `CCSORANKMVVF5GCHCJAMB6M2FTF7KC53F7WN6V6ZD255TQY3IZCQPDRS` |
+| Primary | `CBSORANQVSWYBYGKRZ7RAUGOXDAXMXDXQWJSE42DQZOL4BK75BIEBUQK` |
+| Allocator | `CBSORANERRWAG5YT4DNQSCYJMOQ7M7UO5AHIAHVNF5ZLKK4JNK7FSKEE` |
+
+Mainnet has no deployment preset. Custom networks must supply their own verified
+addresses. Universal Lookup upgrades remain immediately executable; an address
+and ABI version do not pin the code that will execute after a governance upgrade.
