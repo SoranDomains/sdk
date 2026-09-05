@@ -1,5 +1,10 @@
 # @sorandomains/owner
 
+Version 0.5.1 targets Stellar SDK17 (`>=17 <18`). ASCII names
+and labels are validated before lowercase normalization; Unicode lookalikes are
+rejected. Writes continue to target the owning Registry/Registrar/Resolver. Universal
+Lookup is the read entry point in `@sorandomains/lookup` 0.5.1.
+
 Run your Soran namespace on Stellar, programmatically. Issue names to your
 users, manage their lifecycle, transfer the namespace, and — when you are
 ready — walk the one-way permanence door. Every operation is a transaction
@@ -68,3 +73,15 @@ trustless resolve, reverse lookup, and ownership assurance, with no signing
 code at all.
 
 Docs: <https://github.com/SoranDomains/docs> · License: MIT
+
+## Verified testnet deployment
+
+Verified on 2026-09-05 at ledger 4520986. Network passphrase: `Test SDF Network ; September 2015`.
+
+| Contract | Address |
+|---|---|
+| Registry | `CDSORANCV3IFF3MKHJ7KI4MKEJOJZFMTDVAZCD5XFOR4WTGNXJJNOKQE` |
+
+Mainnet has no deployment preset. Custom networks must supply their own verified
+addresses. Universal Lookup upgrades remain immediately executable; an address
+and ABI version do not pin the code that will execute after a governance upgrade.

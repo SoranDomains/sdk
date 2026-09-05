@@ -3,12 +3,12 @@ on:
   push: { branches: [main] }
   pull_request:
 jobs:
-  build:
+  validate:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        pkg: [lookup, owner, holder]
+        pkg: [lookup, owner, holder, mcp]
     defaults:
       run:
         working-directory: packages/${{ matrix.pkg }}
@@ -19,9 +19,16 @@ jobs:
           node-version: "22"
           cache: npm
           cache-dependency-path: packages/${{ matrix.pkg }}/package-lock.json
-      - name: Install (clean, from lockfile)
+      - name: Install from lockfile
         run: npm ci
-      - name: Audit (critical blocks)
+      - name: Audit critical vulnerabilities
         run: npm audit --audit-level=critical
-      - name: Build (tsc)
+      - name: Build
         run: npm run build
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm test
+      - name: Browser compatibility
+        if: matrix.pkg != 'mcp'
+        run: npm run check:browser

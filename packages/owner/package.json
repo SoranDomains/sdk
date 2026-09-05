@@ -1,6 +1,6 @@
 {
   "name": "@sorandomains/owner",
-  "version": "0.3.1",
+  "version": "0.5.1",
   "description": "Run your Soran namespace on Stellar \u2014 issue names, manage lifecycle, transfer, and walk the one-way permanence door.",
   "type": "module",
   "main": "./dist/index.js",
@@ -12,7 +12,8 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "tsc",
-    "check:browser": "esbuild dist/index.js --bundle --platform=browser --external:@stellar/stellar-sdk --outfile=browser-check.js --legal-comments=none --log-level=error && node -e \"const fs=require('fs');const s=fs.readFileSync('browser-check.js','utf8');fs.unlinkSync('browser-check.js');if(/\\bBuffer\\b/.test(s)){console.error('FAIL: bare Buffer reference in browser bundle');process.exit(1)}console.log('browser bundle clean')\""
+    "check:browser": "esbuild dist/index.js --bundle --platform=browser --external:@stellar/stellar-sdk --outfile=browser-check.js --legal-comments=none --log-level=error && node -e \"const fs=require('fs');const s=fs.readFileSync('browser-check.js','utf8');fs.unlinkSync('browser-check.js');if(/\\bBuffer\\b/.test(s)){console.error('FAIL: bare Buffer reference in browser bundle');process.exit(1)}console.log('browser bundle clean')\"",
+    "test": "node --import tsx test/decode-failure.test.mts && node --import tsx --test test/integration.test.mts"
   },
   "license": "MIT",
   "repository": {
@@ -33,14 +34,14 @@
     "issuance"
   ],
   "peerDependencies": {
-    "@stellar/stellar-sdk": ">=13 <17"
+    "@stellar/stellar-sdk": ">=17 <18"
   },
   "devDependencies": {
-    "@stellar/stellar-sdk": "^16.2.0",
+    "@stellar/stellar-sdk": "^17.0.1",
     "@types/node": "^22.20.1",
+    "esbuild": "^0.25.0",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.3",
-    "esbuild": "^0.25.0"
+    "typescript": "^5.7.3"
   },
   "exports": {
     ".": {

@@ -39,6 +39,7 @@ import {
   Keypair,
   Networks,
   Operation,
+  StrKey,
   TransactionBuilder,
   hash,
   nativeToScVal,
@@ -46,6 +47,9 @@ import {
   scValToNative,
   xdr,
 } from "@stellar/stellar-sdk";
+
+import { paymentFromNative, paymentMemoToScVal, validatePaymentDestination, type PaymentDestination } from "./payment.js";
+export { PAYMENT_RECORD_KEY, encodePaymentRecord, parsePaymentRecord, validatePaymentDestination, type PaymentMemo, type PaymentDestination } from "./payment.js";
 
 type Invoked = { hash: string; ledger: number; returnValue: unknown };
 
@@ -58,8 +62,8 @@ export const DEPLOYMENTS = {
   testnet: {
     rpcUrl: "https://soroban-testnet.stellar.org",
     passphrase: Networks.TESTNET as string,
-    registryId: "CAUEHYVLLNNDZ4H5QWCPBDWEONRI44SI3XYSEACB4U3HYILIVQGQAMNI",
-    primaryId: "CAZMXB6UBXKL4DGC2GUC5VKHIZMF47CIZXZFAZPYLM2RP6ZJZNSIIYS2",
+    registryId: "CDSORANCV3IFF3MKHJ7KI4MKEJOJZFMTDVAZCD5XFOR4WTGNXJJNOKQE",
+    primaryId: "CCSORANOADXKLSW5CUANBW5WZFVCNZ5KZ4KNMIUWOZOES3LXYRUYZ56X",
   },
 } as const;
 
@@ -129,6 +133,14 @@ const RESOLVER_ERRORS: Record<number, string> = {
   10: "InvalidRegistry",
   11: "UpgradeTaintFailed",
   12: "MalformedName",
+  13: "PaymentNotConfigured",
+  14: "MalformedPayment",
+  15: "DestinationMismatch",
+  16: "UnsupportedMemoDestination",
+  17: "InvalidMemo",
+  18: "UsePaymentMethod",
+  19: "PaymentContextMismatch",
+  20: "PaymentUnavailable",
 };
 
 const PRIMARY_ERRORS: Record<number, string> = {
@@ -193,6 +205,13 @@ const LABEL_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
 // Soroban Symbol constraint — text-record keys live in this alphabet.
 const SYMBOL_RE = /^[A-Za-z0-9_]{1,32}$/;
 
+export function normalizeLabel(value: string): string {
+  if (typeof value !== "string" || /[^\x00-\x7f]/.test(value)) throw new HolderError("label must contain ASCII characters only");
+  const normalized = value.toLowerCase();
+  assertLabel(normalized);
+  return normalized;
+}
+
 function assertLabel(label: string): void {
   if (label.length < 1 || label.length > 63 || !LABEL_RE.test(label)) {
     throw new HolderError(
@@ -205,6 +224,7 @@ function assertLabel(label: string): void {
  *  HolderError — @sorandomains/lookup exports the same helper throwing its
  *  own SoranError; import from the package whose errors you handle. */
 export function parseName(name: string): { label: string; namespace: string } {
+  if (typeof name !== "string" || /[^\x00-\x7f]/.test(name)) throw new HolderError("name must contain ASCII characters only");
   const parts = name.toLowerCase().split(".");
   if (parts.length !== 2) throw new HolderError(`expected "label.namespace", got "${name}"`);
   const [label, namespace] = parts;
@@ -222,6 +242,11 @@ function concatBytes(...parts: Uint8Array[]): Uint8Array {
     offset += part.length;
   }
   return out;
+}
+/** Browser-safe hex (SDK17: hash()/XDR bytes are Uint8Array, whose toString()
+ *  ignores a radix — and this package forbids a bare `Buffer` in the bundle). */
+function toHex(b: Uint8Array): string {
+  return Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
 }
 function namehash(namespace: string): Uint8Array {
   const labelHash = new Uint8Array(hash(utf8(namespace) as Buffer));
@@ -302,7 +327,7 @@ export class SoranHolder {
     this.registryId = opts.registryId ?? d.registryId;
     // The preset PrimaryName is anchored to the preset Registry — never let
     // it leak onto a custom registryId, where it could only mis-verify.
-    const presetPrimary = opts.registryId && opts.registryId !== d.registryId ? null : d.primaryId;
+    const presetPrimary = (opts.registryId && opts.registryId !== d.registryId) || (opts.passphrase && opts.passphrase !== d.passphrase) ? null : d.primaryId;
     this.primaryId = opts.primaryId === null ? null : (opts.primaryId ?? presetPrimary ?? null);
     this.signer = opts.signer;
     const t = opts.timeoutSecs ?? 60;
@@ -315,6 +340,25 @@ export class SoranHolder {
 
   // ---- resolution targets --------------------------------------------------
 
+  /** Atomically update the forward address and complete payment instruction.
+   * Use memo {type:"none"} to explicitly publish a memo-free destination.
+   * The native Resolver updates its own records atomically. This method never
+   * retries as separate set_addr/set_text calls. */
+  async setPayment(name: string, destination: PaymentDestination): Promise<Submitted> {
+    const { label, namespace } = parseName(name);
+    let payment: PaymentDestination;
+    try { payment = validatePaymentDestination(destination); }
+    catch (e) { throw new HolderError(String(e)); }
+    const { resolver } = await this.paymentResolverOf(namespace);
+    const holder = await this.signer.publicKey();
+    const r = await this.invoke(resolver, "set_payment", [
+      nativeToScVal(`${label}.${namespace}`, { type: "string" }), addrArg(holder),
+      addrArg(payment.address), paymentMemoToScVal(payment.memo),
+    ], RESOLVER_ERRORS);
+    return { hash: r.hash, ledger: r.ledger };
+  }
+
+
   /**
    * Re-point where YOUR name pays to on its BUILT-IN path (the Registrar's
    * record — what resolvers fall back to when no explicit record is set).
@@ -323,7 +367,7 @@ export class SoranHolder {
    */
   async setAddress(name: string, address: string): Promise<Submitted> {
     const { label, namespace } = parseName(name);
-    const registrarId = await this.registrarOf(namespace);
+    const registrarId = await this.assertMemoFree(name);
     const r = await this.invoke(
       registrarId,
       "set_address",
@@ -338,10 +382,13 @@ export class SoranHolder {
    * `lookup.resolve()` prefers over the built-in target. Generation-gated:
    * the Resolver verifies you hold the name right now (NotHolder otherwise),
    * and your record stops resolving the moment the name changes hands.
+   * Native set_addr checks the current payment state atomically: ordinary
+   * names and explicit None can change address; required memos require setPayment.
+   * No client preflight is converted into a later setPayment(None).
    */
   async setRecord(name: string, address: string): Promise<Submitted> {
     const { label, namespace } = parseName(name);
-    const resolverId = await this.resolverOf(namespace);
+    const { resolver: resolverId } = await this.paymentResolverOf(namespace);
     const pub = await this.signer.publicKey();
     const r = await this.invoke(
       resolverId,
@@ -365,6 +412,7 @@ export class SoranHolder {
    */
   async setText(name: string, key: string, value: string): Promise<Submitted> {
     const { label, namespace } = parseName(name);
+    if (key === "payment") throw new HolderError("payment records must be written atomically with setPayment");
     if (!SYMBOL_RE.test(key)) {
       throw new HolderError(`invalid text-record key "${key}" — 1-32 chars of A-Za-z0-9_`);
     }
@@ -475,8 +523,8 @@ export class SoranHolder {
 
   /** Remove your reverse record on a namespace's resolver. */
   async clearReverse(namespace: string): Promise<Submitted> {
-    assertLabel(namespace.toLowerCase());
-    const resolverId = await this.resolverOf(namespace.toLowerCase());
+    assertLabel(normalizeLabel(namespace));
+    const resolverId = await this.resolverOf(normalizeLabel(namespace));
     const pub = await this.signer.publicKey();
     const r = await this.invoke(resolverId, "clear_reverse", [addrArg(pub)], RESOLVER_ERRORS);
     return { hash: r.hash, ledger: r.ledger };
@@ -495,6 +543,7 @@ export class SoranHolder {
       );
     }
     parseName(name); // validate shape before spending anything
+    if (await this.read(this.primaryId, "registry", []) !== this.registryId) throw new HolderError("Primary is anchored to a different Registry");
     const pub = await this.signer.publicKey();
     const r = await this.invoke(
       this.primaryId,
@@ -512,6 +561,7 @@ export class SoranHolder {
         "clearPrimary needs the PrimaryName contract — configure primaryId (the testnet preset supplies one)",
       );
     }
+    if (await this.read(this.primaryId, "registry", []) !== this.registryId) throw new HolderError("Primary is anchored to a different Registry");
     const pub = await this.signer.publicKey();
     const r = await this.invoke(this.primaryId, "clear_primary", [addrArg(pub)], PRIMARY_ERRORS);
     return { hash: r.hash, ledger: r.ledger };
@@ -582,7 +632,7 @@ export class SoranHolder {
 
   /** The namespace's Registry-attested Registrar. Cached briefly. */
   async registrarOf(namespace: string): Promise<string> {
-    namespace = namespace.toLowerCase();
+    namespace = normalizeLabel(namespace);
     assertLabel(namespace);
     const hit = this.registrars.get(namespace);
     if (hit && Date.now() - hit.at < SoranHolder.POINTER_TTL_MS) return hit.value;
@@ -602,7 +652,7 @@ export class SoranHolder {
 
   /** The namespace's resolver pointer. Cached briefly. */
   async resolverOf(namespace: string): Promise<string> {
-    namespace = namespace.toLowerCase();
+    namespace = normalizeLabel(namespace);
     assertLabel(namespace);
     const hit = this.resolvers.get(namespace);
     if (hit && Date.now() - hit.at < SoranHolder.POINTER_TTL_MS) return hit.value;
@@ -611,7 +661,7 @@ export class SoranHolder {
     ])) as string | null;
     if (!id) {
       throw new HolderError(
-        `namespace "${namespace}" has no public resolver — records/reverse are unavailable (setAddress still works where the namespace has an attested Registrar)`,
+        `namespace "${namespace}" has no public resolver — records/reverse and SDK payment-address edits are unavailable`,
         this.registryId,
         "resolver_of",
       );
@@ -621,6 +671,46 @@ export class SoranHolder {
   }
 
   // ---- internals (same pipeline discipline as @sorandomains/owner) --------
+
+  private async paymentResolverOf(namespace: string): Promise<{ resolver: string; registrar: string }> {
+    const nsNode = namehash(namespace);
+    const args = [bytesArg(nsNode)];
+    const [resolver, registrar] = await Promise.all([
+      this.read(this.registryId, "resolver_of", args),
+      this.read(this.registryId, "registrar_of", args),
+    ]);
+    if (typeof resolver !== "string" || !StrKey.isValidContract(resolver))
+      throw new HolderError("namespace has no valid native payment Resolver");
+    if (typeof registrar !== "string" || !StrKey.isValidContract(registrar))
+      throw new HolderError("namespace has no valid Registrar");
+    const [anchor, authority, version, anchors] = await Promise.all([
+      this.read(resolver, "registry", []),
+      this.read(resolver, "authority", []),
+      this.read(resolver, "payment_version", []),
+      this.read(registrar, "anchors", []),
+    ]);
+    if (anchor !== this.registryId) throw new HolderError("payment Resolver is anchored to a different Registry", resolver, "registry");
+    if (authority !== registrar) throw new HolderError("payment Resolver authority does not match the namespace Registrar", resolver, "authority");
+    if (!Array.isArray(anchors) || anchors.length !== 2 || anchors[0] !== this.registryId ||
+        !(anchors[1] instanceof Uint8Array) || anchors[1].length !== nsNode.length ||
+        !nsNode.every((byte, index) => anchors[1][index] === byte))
+      throw new HolderError("Registrar anchors do not match this Registry and namespace", registrar, "anchors");
+    if (version !== 1) throw new HolderError("unsupported native payment Resolver version", resolver, "payment_version");
+    return { resolver, registrar };
+  }
+
+  private async assertMemoFree(name: string): Promise<string> {
+    const { label, namespace } = parseName(name);
+    const { resolver, registrar } = await this.paymentResolverOf(namespace);
+    const raw = await this.read(resolver, "resolve_payment", [nativeToScVal(`${label}.${namespace}`, { type: "string" })]);
+    let payment: PaymentDestination;
+    try { payment = paymentFromNative(raw); }
+    catch (e) { throw new HolderError(`invalid payment result: ${String(e)}`, resolver, "resolve_payment"); }
+    if (payment.memo.type !== "none") throw new HolderError("this name requires a memo; use setPayment to update address and memo together");
+    // Registrar-only write below cannot alter a Resolver's explicit addr/memo.
+    // A concurrent set_payment installs its own addr, preserving its memo routing.
+    return registrar;
+  }
 
   private async read(contractId: string, fn: string, args: xdr.ScVal[]): Promise<unknown> {
     const tx = new TransactionBuilder(new Account(SIM_SOURCE, "0"), {
@@ -639,7 +729,8 @@ export class SoranHolder {
         fn,
       );
     }
-    if (!rpc.Api.isSimulationSuccess(sim) || !sim.result?.retval) return null;
+    if (!rpc.Api.isSimulationSuccess(sim) || !sim.result?.retval)
+      throw new HolderError(`${fn}: missing simulation return value`, contractId, fn);
     const v = scValToNative(sim.result.retval);
     return v === undefined ? null : v;
   }
@@ -680,11 +771,11 @@ export class SoranHolder {
   ): void {
     const op = prepared.operations[0] as { auth?: xdr.SorobanAuthorizationEntry[] };
     for (const entry of op?.auth ?? []) {
-      const cred = entry.credentials();
-      if (cred.switch() !== xdr.SorobanCredentialsType.sorobanCredentialsAddress()) continue;
+      const cred = entry.credentials;
+      if (cred.type !== "sorobanCredentialsAddress") continue;
       let required: string;
       try {
-        required = Address.fromScAddress(cred.address().address()).toString();
+        required = Address.fromScAddress(cred.address.address).toString();
       } catch {
         continue;
       }
@@ -731,7 +822,10 @@ export class SoranHolder {
         .build();
 
     let tx = build(await this.sourceAccount(pub, fn));
-    let sim = await this.server.simulateTransaction(tx);
+    // (SDK17/P28) useUpgradedAuth=false keeps legacy V1 SorobanCredentials rather
+    // than CAP-71 address-bound V2 — valid against P27 (pre-vote) and P28 (post),
+    // and keeps assertSatisfiableAuth's `sorobanCredentialsAddress` check exact.
+    let sim = await this.server.simulateTransaction(tx, undefined, undefined, false);
     for (let round = 0; rpc.Api.isSimulationRestore(sim); round++) {
       if (round >= 2) {
         throw new HolderError(
@@ -742,14 +836,14 @@ export class SoranHolder {
       }
       await this.restore(sim, pub);
       tx = build(await this.sourceAccount(pub, fn));
-      sim = await this.server.simulateTransaction(tx);
+      sim = await this.server.simulateTransaction(tx, undefined, undefined, false);
     }
     if (rpc.Api.isSimulationError(sim)) {
       throw typedError(contractId, fn, sim.error, errNames);
     }
     const prepared = rpc.assembleTransaction(tx, sim).build();
     this.assertSatisfiableAuth(prepared, pub, contractId, fn);
-    const txHash = prepared.hash().toString("hex");
+    const txHash = toHex(prepared.hash()); // (SDK17) hash() is Uint8Array
     const signed = await this.signEnvelope(prepared.toXDR());
     const envelope = TransactionBuilder.fromXDR(signed, this.passphrase);
     let sent: Awaited<ReturnType<rpc.Server["sendTransaction"]>>;
@@ -883,18 +977,18 @@ export class SoranHolder {
       const meta = got.resultMetaXdr;
       const diags: xdr.DiagnosticEvent[] =
         got.diagnosticEventsXdr ??
-        (meta && meta.switch() === 3
-          ? (meta.v3().sorobanMeta()?.diagnosticEvents() ?? [])
-          : meta && meta.switch() === 4
-            ? meta.v4().diagnosticEvents()
+        (meta && meta.type === "v3"
+          ? (meta.value.sorobanMeta?.diagnosticEvents ?? [])
+          : meta && meta.type === "v4"
+            ? meta.value.diagnosticEvents
             : []);
       outer: for (const d of diags) {
-        const body = d.event().body().v0();
-        for (const v of [...body.topics(), body.data()]) {
-          if (v.switch() === xdr.ScValType.scvError()) {
-            const err = v.error();
-            if (err.switch() === xdr.ScErrorType.sceContract()) {
-              code = err.contractCode();
+        const body = d.event.body.value;
+        for (const v of [...body.topics, body.data]) {
+          if (v.type === "scvError") {
+            const err = v.error;
+            if (err.type === "sceContract") {
+              code = err.contractCode;
               break outer;
             }
           }
@@ -905,7 +999,7 @@ export class SoranHolder {
     }
     let resultCode = `tx status ${got.status}`;
     try {
-      resultCode = got.resultXdr?.result().switch().name ?? resultCode;
+      resultCode = got.resultXdr?.result.type ?? resultCode;
     } catch {
       /* keep plain status */
     }

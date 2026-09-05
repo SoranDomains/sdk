@@ -1,0 +1,74 @@
+{
+  "network": "testnet",
+  "networkPassphrase": "Test SDF Network ; September 2015",
+  "rpcUrl": "https://soroban-testnet.stellar.org",
+  "verifiedAt": "2026-09-05T17:15:21.603Z",
+  "verifiedLedger": 4520986,
+  "contracts": {
+    "registry": {
+      "id": "CDSORANCV3IFF3MKHJ7KI4MKEJOJZFMTDVAZCD5XFOR4WTGNXJJNOKQE",
+      "wasmHash": "430f296cdf389bef7d13c957eb1bbd3379f326fe617ccec548ea5c927f202776",
+      "deploymentTransaction": "70eaa410ef5c9bd428df3506eb8ec114d1530e07520ea6ce9e9bd3292730f816",
+      "deploymentLedger": 4520979
+    },
+    "allocator": {
+      "id": "CASORANSKKNXDJYXPZK7OJFIJQL5EMVO7VLYJJSWTCZLT26WWATBI4HY",
+      "wasmHash": "584d5dc1d82e34655d4130f4f0e93ae7b5cd75d6465484efb51b8525f13c3db0",
+      "deploymentTransaction": "b503f0b3c1d8d23a917c26adc6aec3f14057995490152bd7a1e77f8789dd615f",
+      "deploymentLedger": 4520980
+    },
+    "registrar": {
+      "id": "CCSORANUM6CHXIOLOTA65NNZK6PJNCY44354SXKIANFUY2VVKOPZUYSP",
+      "wasmHash": "ed06b3374ff4342b4a2316fc546505132cd8fd35be6666571cf088710af9bbc6",
+      "deploymentTransaction": "901152399a62e63192db20c38e4d6ad8fc48c864c901bd98ed5b899aaec61617",
+      "deploymentLedger": 4520983
+    },
+    "resolver": {
+      "id": "CCSORANQSCWQXIVDGERI4QRNQS2OB4RRDR7AHABNOJ57Z23JUFQOVCDU",
+      "wasmHash": "7e7a65a6260a2145095c52eb3466db50d0e669f10618a718f07b9badfeca874f",
+      "deploymentTransaction": "1cd2aeb1a255ec04bb68e07f1eea12ddaf4a3aff2225f912d5e06c42e9f6be23",
+      "deploymentLedger": 4520984
+    },
+    "primary": {
+      "id": "CCSORANOADXKLSW5CUANBW5WZFVCNZ5KZ4KNMIUWOZOES3LXYRUYZ56X",
+      "wasmHash": "bd17f0cf0b5066a925941afe11766a3fb933faf55564462844c36f749ec79b7d",
+      "deploymentTransaction": "aaf3023cdaf6b601e2bad4970335ebae879d4c70e0035068681be44b2c4be70f",
+      "deploymentLedger": 4520985
+    },
+    "lookup": {
+      "id": "CDSORANO7K4FSBR2MLV4PNELJ6UXCDNG4MJZSH6HCVZZZQN5B5GMOP64",
+      "wasmHash": "cc12257fc5bd5fc03bc72f925073fee94ea16001d1174f91c73ca1164d3e486f",
+      "deploymentTransaction": "7e46a3f0787c34d3bf074742e83592599a2493027edfb56a04a6e6407e901a1c",
+      "deploymentLedger": 4520986
+    }
+  },
+  "governance": "GAJCWWNMBKCSTQQISDFTHFTCEOGXYA37YTP3U3ZW7Q5CYQPHSW6TB4QX",
+  "namespaceDeploymentSaltVersion": 1,
+  "namespace": {
+    "label": "nova",
+    "owner": "GAAHFS7CISNAJOQK5VS447NS6ZFPRLLQQP6IM2EA4W7XZWGJNMXZ4VLK",
+    "node": "857f994cc3975eda4e373f51c9f5b0f7940451a5eb3ff225edc5cd468228b430"
+  },
+  "lookup": {
+    "version": 1,
+    "upgradeDelaySeconds": 0,
+    "governance": "GAJCWWNMBKCSTQQISDFTHFTCEOGXYA37YTP3U3ZW7Q5CYQPHSW6TB4QX"
+  },
+  "claimFee": {
+    "token": "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
+    "amount": "50000000000",
+    "recipient": "GAJCWWNMBKCSTQQISDFTHFTCEOGXYA37YTP3U3ZW7Q5CYQPHSW6TB4QX",
+    "asset": "XLM",
+    "decimals": 7,
+    "configurationTransaction": "22742519dda80bd60bb71d9790f6d243c2baebe0832d7e241c55cf68cc42a6ce",
+    "configurationLedger": 4520981,
+    "refundBps": {
+      "Awarded": 0,
+      "Rejected": 10000,
+      "Stuck": 10000,
+      "Withdrawn": 8000,
+      "Expired": 8000
+    }
+  },
+  "verificationScope": "Contract code hashes and deployment receipts, Registry deployment-salt version and predictions, namespace routing and policy, Lookup configuration and claim-fee policy. No live payment, name-issuance or refund smoke test is claimed."
+}

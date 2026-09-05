@@ -1,109 +1,7 @@
-/**
- * CHANGELOG (Option A — plaintext reverse records, BREAKING):
- * - This SDK version requires the post-Option-A Resolver ABI:
- *   `set_reverse(addr: Address, name: String)` (the node param is GONE — the
- *   contract derives the node from the name string, validates label syntax,
- *   and enforces the live-name + forward-match gates on-chain) and
- *   `name_of(addr) -> Option<String>` returning the FULL PLAINTEXT NAME
- *   ("alice.nova"), already gated on-chain by generation + forward-match
- *   checks. scValToNative decodes the String straight to a JS string — a
- *   plain string is the only legitimate shape. This SDK does NOT interoperate
- *   with pre-Option-A Resolvers, whose `name_of` returned a 32-byte node hash.
- * - `reverseLookup` is a pure on-chain read: candidate namespaces are probed
- *   IN PARALLEL, with DETERMINISTIC priority — when several Resolvers answer,
- *   the one earliest in the configured order wins.
- * - `hintUrl` is deprecated FOR ANSWERS but still serves one liveness-only
- *   job: when neither the per-call `namespaces` param nor `reverseNamespaces`
- *   is configured, `reverseLookup` fetches a namespace-LIST hint from the hint
- *   service, then probes those namespaces' Resolvers on chain as usual. The
- *   hint cannot forge anything — every candidate answer is still
- *   contract-verified by `name_of`'s on-chain gates.
- * - `reverseVerify` string-compares the contract-verified plaintext instead of
- *   hashing a candidate node and re-checking the forward record client-side.
- * - New `reverseNamespaces` option / per-call param scopes `reverseLookup`
- *   (reverse records live on per-namespace Resolvers, so the SDK must be told
- *   which namespaces to query when no name is known — or given a list hint).
- * - The SDK never built `set_reverse`/`clear_reverse` transactions (writes go
- *   through wallet signing); no transaction-builder changes were needed.
- */
-
-/**
- * CHANGELOG (PrimaryName — ADDITIVE, optional):
- * - New `primaryId` option points the SDK at the platform-deployed PrimaryName
- *   contract (one immutable instance per network; per-network preset lands in
- *   DEPLOYMENTS once deployed — see the TODO there). With no `primaryId`,
- *   behavior is byte-identical to the Option-A-only build.
- * - New `primaryOf(addr)`: a plain `primary_of` read, string-decoded, and
- *   fail-closed — a transport/ABI failure THROWS a SoranError and never
- *   masquerades as "no primary". No SDK-side verification of the answer is
- *   needed: the contract is self-verifying (it re-runs the namespace
- *   Resolver's live `name_of` gates on every read and answers None the moment
- *   the stored name stops passing).
- * - `reverseLookup` now tries the primary FIRST (when `primaryId` is set),
- *   then the configured/hinted namespaces in parallel with priority order
- *   (existing logic). A FAILED primary read falls through to the namespace
- *   probes rather than failing the whole lookup — documented on the method.
- *   Namespace-probe failures still throw, unchanged.
- * - No transaction builders: `set_primary`/`clear_primary` are
- *   address-authorized writes built and signed by wallets; the SDK only reads.
- */
-
-/**
- * @sorandomains/lookup — resolve Soran names on Stellar, trustlessly.
- *
- * Everything here is a READ against the deployed contracts via Soroban RPC
- * simulation: no signer, no fees, no Soran servers in the trust path. A wallet
- * that integrates this resolves `alice.nova` the same way the chain would.
- *
- *   import { Soran } from "@sorandomains/lookup";
- *   const soran = new Soran({ network: "testnet" });
- *   await soran.resolve("alice.nova");        // → "GDHN…" | null
- *   await soran.verify("alice.nova", "GDHN…"); // → true (pay-to-name safety)
- *   await soran.reverseVerify("GDHN…", "alice.nova"); // → true
- *
- * ## Resolution algorithm (canonical)
- * 1. Split `label.namespace`; both parts must be canonical ([a-z0-9-], 1–63).
- * 2. nsNode   = sha256(ZERO32 ‖ sha256(namespace))       — Registry namehash
- * 3. nameNode = sha256(nsNode ‖ sha256(label))           — Registrar subnode
- * 4. resolver = Registry.resolver_of(nsNode)              — owner's opt-in
- * 5. address  = Resolver.addr(nameNode)                   — generation-checked
- *    on chain: expired, reissued, or transferred names return null by contract
- *    logic, not by SDK guesswork.
- * A namespace with no resolver set is not publicly resolvable (the owner can
- * also run closed resolution via their Registrar; pass `registrars` to use it).
- *
- * ## Reverse resolution (address → name)
- * Reverse records store the PLAINTEXT name on chain (Option A). The Resolver's
- * `name_of(addr)` answers with the full name only while the name is still live
- * (generation match) AND its forward record resolves back to the address:
- * every reverse answer is self-contained and contract-verified, with
- * no hint service in the trust path. `reverseVerify(addr, name)` is a pure
- * string comparison against that verified answer. Because reverse records live
- * on per-namespace Resolvers, `reverseLookup(addr)` needs to know which
- * namespaces to probe — pass `reverseNamespaces` or the per-call param, or set
- * `hintUrl` to let the SDK fetch a namespace-LIST hint (liveness only; every
- * answer is still contract-verified).
- *
- * ## Primary name (optional, cross-namespace)
- * The platform-deployed PrimaryName contract lets an address declare ONE
- * display name across all namespaces. It adds no new trust: a primary is only
- * a pointer to a name the namespace's own Resolver already verifies —
- * `primary_of(addr)` re-runs the Resolver's live `name_of` gates on every read
- * and answers None the moment the stored name stops verifying, so the SDK's
- * answer is already contract-verified and needs no extra client-side check.
- * When `primaryId` is configured, `reverseLookup` asks PrimaryName FIRST and
- * falls back to the per-namespace probes only when there is no primary (or
- * when the primary read itself fails — see `reverseLookup`). Per-namespace
- * reverse records and `reverseVerify` are unchanged.
- *
- * READ COST: each `primary_of` simulation performs two
- * cross-contract calls (resolver_of + name_of) on chain. Wallets rendering
- * address lists are expected to apply brief CLIENT-side caching (seconds —
- * the same discipline as `resolverCacheTtlMs`) for batch rendering.
- * Correctness never depends on any cache: the contract re-verifies on every
- * read, so a stale cache can only delay noticing a change, never fabricate a
- * wrong name.
- */
+/** Read Soran names through Universal Lookup by default. Set resolutionMode:
+ * "direct" only for a deliberately selected native Resolver integration.
+ * Payment tuples are strict; legacy addresses never establish memo safety.
+ * Lookup governance may replace its code immediately. */
 
 import {
   Account,
@@ -118,20 +16,23 @@ import {
   xdr,
 } from "@stellar/stellar-sdk";
 
+import { paymentFromNative, validatePaymentDestination, type PaymentDestination } from "./payment.js";
+import { lookupFromNative, type LookupResult } from "./lookup.js";
+import { nameFromNative, namespaceFromNative, type NameMetadata, type NamespaceMetadata } from "./views.js";
+export type { NameMetadata, NamespaceMetadata, NamespacePolicy } from "./views.js";
+export { PAYMENT_RECORD_KEY, encodePaymentRecord, parsePaymentRecord, validatePaymentDestination, type PaymentMemo, type PaymentDestination } from "./payment.js";
+export type { LookupResult, NativePaymentResolution, LegacyAddressResolution } from "./lookup.js";
+
 /** Known public deployments. Override any field via SoranOptions. */
 export const DEPLOYMENTS = {
   testnet: {
     rpcUrl: "https://soroban-testnet.stellar.org",
     passphrase: Networks.TESTNET as string,
-    // The immutable Registry pins the approved Registrar/Resolver Wasm; the SDK
-    // reads resolver_of/owner_of from it, so pointing at the current Registry is
-    // enough. Updated by the platform on every redeploy.
-    registryId: "CAUEHYVLLNNDZ4H5QWCPBDWEONRI44SI3XYSEACB4U3HYILIVQGQAMNI",
-    // Platform-deployed PrimaryName (soran-primary), anchored to the Registry
-    // above — immutable, unpinned, one instance per network. Integrators get the
-    // primary-name step by default; omit/override via SoranOptions.primaryId.
-    // Updated by the platform on every redeploy.
-    primaryId: "CAZMXB6UBXKL4DGC2GUC5VKHIZMF47CIZXZFAZPYLM2RP6ZJZNSIIYS2",
+    // Verified fresh testnet deployment, 2026-09-05 (ledger 4520986).
+    registryId: "CDSORANCV3IFF3MKHJ7KI4MKEJOJZFMTDVAZCD5XFOR4WTGNXJJNOKQE",
+    lookupId: "CDSORANO7K4FSBR2MLV4PNELJ6UXCDNG4MJZSH6HCVZZZQN5B5GMOP64",
+    primaryId: "CCSORANOADXKLSW5CUANBW5WZFVCNZ5KZ4KNMIUWOZOES3LXYRUYZ56X",
+    allocatorId: "CASORANSKKNXDJYXPZK7OJFIJQL5EMVO7VLYJJSWTCZLT26WWATBI4HY",
   },
   // mainnet: populated at mainnet launch
 } as const;
@@ -146,6 +47,7 @@ type DeploymentPreset = {
   passphrase: string;
   registryId: string;
   primaryId?: string;
+  lookupId?: string;
 };
 
 export type SoranOptions = {
@@ -157,24 +59,17 @@ export type SoranOptions = {
   passphrase?: string;
   /** Override the immutable Registry id. */
   registryId?: string;
-  /**
-   * Optional id of the platform-deployed PrimaryName contract (one immutable
-   * instance per network). Pass `null` to opt out even when the network preset
-   * ships one. When set, `primaryOf(addr)` is enabled and
-   * `reverseLookup` asks PrimaryName before the per-namespace probes. Validated
-   * with StrKey.isValidContract at construction (fail-closed: a malformed id is
-   * a config bug, surfaced immediately). Omit to disable the feature entirely;
-   * a per-network preset lands in DEPLOYMENTS once deployed (see the TODO
-   * there). The contract is self-verifying — `primary_of` re-runs the
-   * namespace Resolver's live `name_of` gates on every read — so no extra
-   * SDK-side verification of the answer is ever needed.
-   */
+  /** Reviewed Universal Lookup deployment. Uses a matching network preset if
+   * present; missing configuration fails closed. null deliberately selects
+   * direct native mode. Registry/version checks do not pin executable code. */
+  lookupId?: string | null;
+  /** Universal is the default. Direct native discovery requires explicit opt-in.
+   * lookupId:null is also an explicit direct-mode compatibility opt-out. */
+  resolutionMode?: "universal" | "direct";
+  /** Optional Primary anchor. In universal mode this must match Lookup.primary;
+   * direct mode reads this deployment after checking its Registry. null disables
+   * Primary. Custom Registry/passphrase configurations inherit no Primary pin. */
   primaryId?: string | null;
-  /**
-   * Optional per-namespace Registrar ids for namespaces that run closed
-   * (registrar-side) resolution instead of a public Resolver.
-   */
-  registrars?: Record<string, string>;
   /**
    * Optional hint-service base URL, used ONLY as a namespace-LIST hint for
    * `reverseLookup` when neither the per-call `namespaces` param nor the
@@ -217,7 +112,7 @@ export type NameRecord = {
   name: string;
   address: string | null;
   node: string; // hex
-  resolver: string | null; // resolver contract id used, if any
+  resolver: string | null; // originating Resolver contract id, if any
 };
 
 /**
@@ -226,8 +121,8 @@ export type NameRecord = {
  * namespace, the owner can repoint at will (that is holder sovereignty, not a
  * bug). Before a high-value pay-to-name, also check `assurance()`: `trustworthy`
  * is true only when the resolver pointer is locked to the Registry-attested,
- * never-upgraded resolver, so the mapping cannot be silently changed underneath
- * the payer.
+ * never-upgraded resolver. This protects the implementation and pointer;
+ * holders can still update their own payment instructions.
  */
 export type NameAssurance = {
   /** resolver_of === attested_resolver_of (the provenance-bound resolver). */
@@ -236,7 +131,8 @@ export type NameAssurance = {
   resolverTainted: boolean;
   /** The resolver pointer is locked and can no longer be changed. */
   resolverLocked: boolean;
-  /** Locked ∧ attested ∧ not tainted — the resolution is immutable. */
+  /** Locked ∧ attested ∧ not tainted — implementation/pointer immutability,
+   * not immutability of holder-controlled payment records. */
   trustworthy: boolean;
 };
 
@@ -274,10 +170,14 @@ export type NameDetails = {
   name: string;
   /** Hex-encoded on-chain node hash. */
   node: string;
-  /** Current resolution — explicit resolver record, else the Registrar's
-   *  built-in target. Null when the name doesn't (or no longer) resolves. */
+  /** Current destination. Always carry `payment` alongside this field when
+   * present. Native payment read failures abort this metadata call. */
   address: string | null;
-  /** The resolver that answered (null when the built-in path answered). */
+  /** Complete native payment tuple. Never drop its memo. */
+  payment: PaymentDestination | null;
+  /** True when the complete payment tuple requires a memo. */
+  paymentRequired: boolean;
+  /** The native Resolver that answered the payment read. */
   resolver: string | null;
   /** The Registrar record's holder. Non-null even for an EXPIRED name — check
    *  `expiresAt` before treating the holder as current. Null = never issued. */
@@ -289,6 +189,13 @@ export type NameDetails = {
   namespace: NamespaceDetails;
   assurance: NameAssurance;
 };
+
+/** Coverage is an indexer report, not proof that discovery cannot omit names. */
+export type IndexCoverage = { source: "indexed"; complete: boolean; processedLedger: number | null; headLedger: number | null;
+  gaps: Array<{ contractId: string; fromLedger: number; toLedger: number; reason: string }> };
+export type NamesPage = { names: NameSummary[]; nextCursor: string | null; hasMore: boolean;
+  complete: boolean; coverage: IndexCoverage | null; verification: { candidates: number; verified: number; excluded: number; failed: number } };
+export type PageOptions = { cursor?: string; limit?: number };
 
 /** One chain-verified name held by a wallet (from `namesOf`). */
 export type NameSummary = {
@@ -353,6 +260,8 @@ export type WalletProfile = {
   primary: string | null;
   reverseNames: ReverseName[];
   names: NameSummary[] | null;
+  /** First verified page and explicit discovery/verification completeness. */
+  holdings: NamesPage | null;
   /** Profile records of the primary name; {} when there is no primary. */
   profile: SoranProfile;
 };
@@ -372,7 +281,9 @@ export type NameHistory = {
  *  CONFIG (bad or missing constructor options), RPC (network/transport),
  *  SIMULATION (the node rejected the read), ARCHIVED (entry exists but its
  *  rent lapsed), ABI (a contract answered with an unexpected shape),
- *  TIMEOUT (the configured `timeoutMs` elapsed). */
+ *  TIMEOUT (the configured `timeoutMs` elapsed), PAYMENT_REQUIRED (an address-only
+ *  call would drop a required memo), LEGACY_MEMO_UNKNOWN (a strict payment call
+ *  received a legacy address without native memo capability). */
 export type SoranErrorCode =
   | "INVALID_INPUT"
   | "CONFIG"
@@ -380,12 +291,17 @@ export type SoranErrorCode =
   | "SIMULATION"
   | "ARCHIVED"
   | "ABI"
-  | "TIMEOUT";
+  | "TIMEOUT"
+  | "PAYMENT_REQUIRED"
+  | "LEGACY_MEMO_UNKNOWN"
+  | "INCOMPLETE";
 
 export class SoranError extends Error {
   constructor(
     message: string,
     readonly code: SoranErrorCode = "RPC",
+    readonly contractCode: number | null = null,
+    readonly contractError: string | null = null,
   ) {
     super(message);
     this.name = "SoranError";
@@ -409,8 +325,6 @@ const HINT_MAX_BODY_BYTES = 4_096; // the namespace list is tiny; anything bigge
 const HINT_MAX_NAMESPACES = 12;
 // namesOf: candidate-list hint cap (100 names ≈ 20KB JSON) and how many
 // candidates are chain-verified per call (2 simulations each).
-const NAMES_HINT_MAX_BODY_BYTES = 65_536;
-const NAMES_VERIFY_CAP = 40;
 const HISTORY_MAX_BODY_BYTES = 32_768;
 
 export class Soran {
@@ -418,7 +332,10 @@ export class Soran {
   private passphrase: string;
   private registryId: string;
   private primaryId?: string;
-  private registrars: Record<string, string>;
+  private lookupId?: string;
+  private resolutionMode: "universal" | "direct";
+  private primaryDisabled: boolean;
+  private explicitPrimaryId?: string;
   private hintUrl?: string;
   private reverseNamespaces: string[];
   private resolverCache = new Map<string, { value: string | null; at: number }>();
@@ -428,18 +345,31 @@ export class Soran {
 
   constructor(opts: SoranOptions = {}) {
     const base: DeploymentPreset = DEPLOYMENTS[opts.network ?? "testnet"];
+    if (!base) throw new SoranError("unknown or undeployed network", "CONFIG");
     // Plain HTTP only for a local node — a production consumer
     // over http:// would let an on-path attacker forge every read this SDK makes.
     const rpcUrl = opts.rpcUrl ?? base.rpcUrl;
     this.server = new rpc.Server(rpcUrl, { allowHttp: /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?(\/|$)/i.test(rpcUrl) });
     this.passphrase = opts.passphrase ?? base.passphrase;
     this.registryId = opts.registryId ?? base.registryId;
+    this.resolutionMode = opts.resolutionMode ?? (opts.lookupId === null ? "direct" : "universal");
+    if (!["universal", "direct"].includes(this.resolutionMode)) throw new SoranError("invalid resolutionMode", "CONFIG");
+    if ((this.resolutionMode === "direct" && typeof opts.lookupId === "string") || (this.resolutionMode === "universal" && opts.lookupId === null))
+      throw new SoranError("lookupId conflicts with resolutionMode", "CONFIG");
+    const customNetwork = (opts.registryId !== undefined && opts.registryId !== base.registryId) ||
+      (opts.passphrase !== undefined && opts.passphrase !== base.passphrase);
+    this.lookupId = this.resolutionMode === "direct" ? undefined : (opts.lookupId ?? (customNetwork ? undefined : base.lookupId));
+    this.primaryDisabled = opts.primaryId === null;
+    this.explicitPrimaryId = opts.primaryId ?? undefined;
+    if (this.lookupId !== undefined && (typeof this.lookupId !== "string" || !StrKey.isValidContract(this.lookupId))) {
+      throw new SoranError("invalid lookupId — expected a C… contract strkey", "CONFIG");
+    }
     // `null` = explicit opt-out (the preset ships a primaryId, so merely omitting
     // it keeps the feature on); `undefined` inherits the preset.
     // The preset PrimaryName is anchored to the preset Registry — never let it
     // leak onto a custom registryId, where it could only mis-verify.
     const presetPrimary =
-      opts.registryId && opts.registryId !== base.registryId ? undefined : base.primaryId;
+      customNetwork ? undefined : base.primaryId;
     this.primaryId = opts.primaryId === null ? undefined : (opts.primaryId ?? presetPrimary);
     // Fail-closed at construction (same discipline as reverseNamespaces): a
     // malformed contract id is a config bug, surfaced immediately — not at
@@ -450,15 +380,13 @@ export class Soran {
         "CONFIG",
       );
     }
-    this.registrars = opts.registrars ?? {};
     // Liveness-only namespace-list hint endpoint; absent means "no fallback —
     // reverseLookup without candidates returns null" (fail-closed).
     this.hintUrl = opts.hintUrl?.replace(/\/+$/, "") || undefined;
     // Fail-closed at construction: a malformed namespace label is a config bug,
     // not a runtime condition to skip silently. Lowercased to match parseName.
     this.reverseNamespaces = (opts.reverseNamespaces ?? []).map((ns) => {
-      const l = ns.toLowerCase();
-      assertLabel(l);
+      const l = normalizeLabel(ns);
       return l;
     });
     this.cacheTtlMs = Math.max(0, opts.resolverCacheTtlMs ?? 30_000);
@@ -472,6 +400,7 @@ export class Soran {
 
   /** Registry namehash of a top-level namespace: sha256(ZERO32 ‖ sha256(ns)). */
   async namehash(namespace: string): Promise<Uint8Array> {
+    namespace = normalizeLabel(namespace);
     const labelHash = await sha256(utf8(namespace));
     return sha256(concat(new Uint8Array(32), labelHash));
   }
@@ -483,51 +412,147 @@ export class Soran {
     return sha256(concat(nsNode, await sha256(utf8(label))));
   }
 
+  /** Fresh universal namespace context; None means an unallocated namespace. */
+  async namespaceMetadata(namespace: string): Promise<NamespaceMetadata | null> {
+    namespace = normalizeLabel(namespace);
+    const raw = await this.universalRead("namespace_metadata", [nativeToScVal(namespace, { type: "string" })]);
+    try { return namespaceFromNative(raw, namespace, hex(await this.namehash(namespace))); }
+    catch (e) { throw new SoranError(`invalid namespace metadata: ${String(e)}`, "ABI"); }
+  }
+
+  /** Ownership metadata is distinct from the effective payment destination. */
+  async nameMetadata(name: string): Promise<NameMetadata | null> {
+    const { label, namespace } = parseName(name);
+    const canonical = `${label}.${namespace}`;
+    const raw = await this.universalRead("name_metadata", [nativeToScVal(canonical, { type: "string" })]);
+    try { return nameFromNative(raw, canonical, hex(await this.node(canonical))); }
+    catch (e) { throw new SoranError(`invalid name metadata: ${String(e)}`, "ABI"); }
+  }
+
+  /** A verified account display name scoped to one namespace. */
+  async reverse(namespace: string, address: string): Promise<string | null> {
+    namespace = normalizeLabel(namespace);
+    if (!StrKey.isValidEd25519PublicKey(address) && !StrKey.isValidContract(address)) throw new SoranError("invalid address", "INVALID_INPUT");
+    if (this.resolutionMode === "universal") {
+      const raw = await this.universalRead("reverse", [nativeToScVal(namespace, { type: "string" }), nativeToScVal(address, { type: "address" })]);
+      return this.canonicalResult(raw, namespace);
+    }
+    const resolverId = await this.resolverOf(namespace);
+    return resolverId ? this.canonicalResult(await this.nameOf(resolverId, address), namespace) : null;
+  }
+
+  private canonicalResult(raw: unknown, namespace?: string): string | null {
+    if (raw === null) return null;
+    try {
+      if (typeof raw !== "string") throw new Error("non-string name");
+      const parsed = parseName(raw);
+      if (`${parsed.label}.${parsed.namespace}` !== raw || (namespace !== undefined && parsed.namespace !== namespace)) throw new Error("noncanonical or wrong-namespace name");
+      return raw;
+    } catch (e) { throw new SoranError(`invalid display name: ${String(e)}`, "ABI"); }
+  }
+
+  private async universalRead(fn: string, args: xdr.ScVal[]): Promise<unknown> {
+    if (this.resolutionMode !== "universal" || !this.lookupId)
+      throw new SoranError("Universal Lookup is not deployed/configured for this network; supply a verified lookupId or explicitly select resolutionMode: direct", "CONFIG");
+    const [anchor, version] = await Promise.all([this.read(this.lookupId, "registry", []), this.read(this.lookupId, "version", [])]);
+    if (typeof anchor !== "string" || !StrKey.isValidContract(anchor) || anchor !== this.registryId) throw new SoranError("Lookup has an invalid or different Registry anchor", "CONFIG");
+    if (version !== 1) throw new SoranError("unsupported universal Lookup version", "ABI");
+    return this.read(this.lookupId, fn, args);
+  }
+
   // ---- resolution ----
 
-  /** The address `label.namespace` pays to, or null. Trustless chain read. */
+  /** Resolve through the explicitly configured universal contract. A legacy
+   * address has unknown memo capability and must never be used as proof of None.
+   * No direct Resolver fallback occurs after an error. */
+  async lookup(name: string): Promise<LookupResult> {
+    if (this.resolutionMode !== "universal") throw new SoranError("lookup requires universal mode", "CONFIG");
+    if (typeof name !== "string") throw new SoranError("name must be a string", "INVALID_INPUT");
+    const { label, namespace } = parseName(name);
+    const canonical = `${label}.${namespace}`;
+    const raw = await this.universalRead("resolve", [nativeToScVal(canonical, { type: "string" })]);
+    try { return lookupFromNative(raw, canonical); }
+    catch (e) { throw new SoranError(`invalid universal lookup result: ${String(e)}`, "ABI"); }
+  }
+
+  /** Complete instructions through Lookup when configured, otherwise from the
+   * namespace's native Resolver. Ordinary
+   * names return None; unsupported ABI, corrupt state and read failures throw.
+   * No address-only or Registrar fallback is permitted. */
+  async resolvePayment(name: string): Promise<PaymentDestination> {
+    return (await this.paymentRecord(name)).payment;
+  }
+
+  private async paymentRecord(name: string): Promise<{ payment: PaymentDestination; resolver: string; generation?: bigint; registrar?: string }> {
+    if (this.resolutionMode === "universal") {
+      const result = await this.lookup(name);
+      if (result.kind === "legacyAddress")
+        throw new SoranError("legacy address has unknown memo capability; native payment instructions are required", "LEGACY_MEMO_UNKNOWN");
+      return { payment: result.payment, resolver: result.resolver, generation: result.generation, registrar: result.registrar };
+    }
+    const { label, namespace } = parseName(name);
+    const nsNode = await this.namehash(namespace);
+    // Payment discovery is always fresh, independent of metadata/reverse caches.
+    const [resolver, registrar] = await Promise.all([
+      this.read(this.registryId, "resolver_of", [bytes(nsNode)]),
+      this.read(this.registryId, "registrar_of", [bytes(nsNode)]),
+    ]);
+    if (typeof resolver !== "string" || !StrKey.isValidContract(resolver))
+      throw new SoranError("namespace has no valid native payment Resolver", "CONFIG");
+    if (typeof registrar !== "string" || !StrKey.isValidContract(registrar))
+      throw new SoranError("namespace has no valid Registrar", "CONFIG");
+    const [anchor, authority, version, anchors] = await Promise.all([
+      this.read(resolver, "registry", []),
+      this.read(resolver, "authority", []),
+      this.read(resolver, "payment_version", []),
+      this.read(registrar, "anchors", []),
+    ]);
+    if (anchor !== this.registryId) throw new SoranError("payment Resolver is anchored to a different Registry", "CONFIG");
+    if (authority !== registrar) throw new SoranError("payment Resolver authority does not match the namespace Registrar", "CONFIG");
+    if (!Array.isArray(anchors) || anchors.length !== 2 || anchors[0] !== this.registryId ||
+        !(anchors[1] instanceof Uint8Array) || anchors[1].length !== nsNode.length ||
+        !nsNode.every((byte, index) => anchors[1][index] === byte))
+      throw new SoranError("Registrar anchors do not match this Registry and namespace", "CONFIG");
+    if (version !== 1) throw new SoranError("unsupported native payment Resolver version", "ABI");
+    const raw = await this.read(resolver, "resolve_payment", [nativeToScVal(`${label}.${namespace}`, { type: "string" })]);
+    try { return { payment: paymentFromNative(raw), resolver }; }
+    catch (e) { throw new SoranError(`invalid payment result: ${String(e)}`, "ABI"); }
+  }
+
+  /** Recheck every destination field at confirmation, including the memo. This
+   * is a fresh read, not a guarantee against subsequent holder changes. */
+  async verifyPayment(name: string, expected: PaymentDestination): Promise<boolean> {
+    let want: PaymentDestination;
+    try { want = validatePaymentDestination(expected); }
+    catch (e) { throw new SoranError(String(e), "INVALID_INPUT"); }
+    const got = await this.resolvePayment(name);
+    return got.address === want.address && got.memo.type === want.memo.type &&
+      (got.memo.type === "none" || (want.memo.type !== "none" && got.memo.value === want.memo.value));
+  }
+
+  /** Address-only lookup. Accepts only the native Resolver's atomic None
+   * result; a required memo must be consumed through resolvePayment. */
   async resolve(name: string): Promise<string | null> {
     return (await this.record(name)).address;
   }
 
-  /** Full resolution record (address + node + which resolver answered). */
+  /** Address-only record; the complete native payment read must prove None. */
   async record(name: string): Promise<NameRecord> {
-    const { label, namespace } = parseName(name);
-    const nameNode = await this.node(name);
-
-    const resolverId = await this.resolverOf(namespace);
-    if (resolverId) {
-      const addr = (await this.read(resolverId, "addr", [bytes(nameNode)])) as string | null;
-      if (addr) return { name, address: addr, node: hex(nameNode), resolver: resolverId };
-      // No explicit resolver record (records are holder-set and optional):
-      // fall back to the Registrar's BUILT-IN resolution target — `issue`
-      // initializes it to the holder, so freshly issued names resolve before
-      // their holder ever touches the resolver. Same trust base: the Registrar
-      // consulted is the one the immutable Registry itself attests for the
-      // namespace, and its `resolve` is expiry-gated on chain.
-      const attested = await this.attestedRegistrarOf(namespace);
-      if (attested) {
-        const builtIn = (await this.read(attested, "resolve", [
-          nativeToScVal(utf8(label), { type: "bytes" }),
-        ])) as string | null;
-        return { name, address: builtIn ?? null, node: hex(nameNode), resolver: builtIn ? null : resolverId };
-      }
-      return { name, address: null, node: hex(nameNode), resolver: resolverId };
-    }
-    // Closed resolution via a known Registrar (owner opt-out of public resolver).
-    const registrarId = this.registrars[namespace] ?? (await this.attestedRegistrarOf(namespace));
-    if (registrarId) {
-      const addr = (await this.read(registrarId, "resolve", [
-        nativeToScVal(utf8(label), { type: "bytes" }),
-      ])) as string | null;
-      return { name, address: addr ?? null, node: hex(nameNode), resolver: null };
-    }
-    return { name, address: null, node: hex(nameNode), resolver: null };
+    const { payment, resolver } = await this.paymentRecord(name);
+    if (payment.memo.type !== "none") throw new SoranError("this name requires a memo; use resolvePayment", "PAYMENT_REQUIRED");
+    return { name, address: payment.address, node: hex(await this.node(name)), resolver };
   }
 
   /** A text record (e.g. "url", "avatar") for a name, or null. */
   async text(name: string, key: string): Promise<string | null> {
-    const { namespace } = parseName(name);
+    const { label, namespace } = parseName(name);
+    if (!/^[A-Za-z0-9_]{1,32}$/.test(key)) throw new SoranError("invalid text record key", "INVALID_INPUT");
+    if (this.resolutionMode === "universal") {
+      const raw = await this.universalRead("text", [nativeToScVal(`${label}.${namespace}`, { type: "string" }), nativeToScVal(key, { type: "symbol" })]);
+      if (raw === null) return null;
+      if (typeof raw !== "string" || utf8(raw).length > 4096) throw new SoranError("invalid text result", "ABI");
+      return raw;
+    }
     const resolverId = await this.resolverOf(namespace);
     if (!resolverId) return null;
     const nameNode = await this.node(name);
@@ -547,11 +572,16 @@ export class Soran {
    * owner's CURRENT pointer, which for a reclaimable namespace the owner may
    * repoint. For a high-value pay-to-name, gate on `trustworthy` here: it is
    * true only when the resolver pointer is locked to the Registry-attested,
-   * never-upgraded resolver — i.e. the mapping is immutable and cannot be
-   * changed underneath the payer between the check and the payment.
+   * never-upgraded resolver. Holder-controlled records can still change;
+   * this verdict does not bind a later payment to a prior lookup.
    */
   async assurance(name: string): Promise<NameAssurance> {
     const { namespace } = parseName(name);
+    if (this.resolutionMode === "universal") {
+      const meta = await this.namespaceMetadata(namespace);
+      return { resolverAttested: meta?.resolverAttested ?? false, resolverLocked: meta?.resolverLocked ?? false,
+        resolverTainted: meta?.resolverTainted ?? false, trustworthy: !!meta && meta.resolverAttested && meta.resolverLocked && !meta.resolverTainted };
+    }
     const nsNode = await this.namehash(namespace);
     const [locked, tainted, live, attested] = await Promise.all([
       this.read(this.registryId, "resolver_locked", [bytes(nsNode)]),
@@ -583,9 +613,7 @@ export class Soran {
     if (!StrKey.isValidEd25519PublicKey(address) && !StrKey.isValidContract(address)) return false;
     // Cheap client-side shape check (throws SoranError on malformed names).
     const { namespace } = parseName(name);
-    const resolverId = await this.resolverOf(namespace);
-    if (!resolverId) return false;
-    const claimed = await this.nameOf(resolverId, address);
+    const claimed = await this.reverse(namespace, address);
     return claimed === name.toLowerCase();
   }
 
@@ -632,7 +660,7 @@ export class Soran {
     if (!StrKey.isValidEd25519PublicKey(address) && !StrKey.isValidContract(address)) return null;
     // 1. Primary name first (optional cross-namespace feature). A failed read
     //    falls through to the namespace probes by design — see the doc comment.
-    if (this.primaryId) {
+    if (!this.primaryDisabled && (this.resolutionMode === "universal" || this.primaryId)) {
       try {
         const primary = await this.primaryOf(address);
         if (primary) return primary;
@@ -646,7 +674,7 @@ export class Soran {
       namespaces === undefined &&
       this.reverseNamespaces.length === 0 &&
       !this.hintUrl &&
-      !this.primaryId
+      (this.primaryDisabled || (this.resolutionMode === "direct" && !this.primaryId))
     ) {
       throw new SoranError(
         "reverseLookup has no way to answer: configure primaryId, reverseNamespaces, or hintUrl — or pass `namespaces` per call",
@@ -661,17 +689,14 @@ export class Soran {
     // label is a caller bug, surfaced as a typed SoranError, not skipped.
     // Validated for ALL candidates up front, before any network I/O fires.
     const labels = candidates.map((ns) => {
-      const l = ns.toLowerCase();
-      assertLabel(l);
+      const l = normalizeLabel(ns);
       return l;
     });
     // Fire every probe in parallel. Each chain is independent: resolve the
     // namespace's Resolver pointer, then ask it for the reverse record.
     const settled = await Promise.allSettled(
       labels.map(async (l) => {
-        const resolverId = await this.resolverOf(l);
-        if (!resolverId) return null; // namespace has no public Resolver — nothing to ask
-        return this.nameOf(resolverId, address);
+        return this.reverse(l, address);
       }),
     );
     // Deterministic priority: scan in configured order. A rejection at index i
@@ -711,8 +736,18 @@ export class Soran {
    * on any cache: the contract re-verifies on every read.
    */
   async primaryOf(address: string): Promise<string | null> {
-    if (!this.primaryId) return null; // feature not configured on this network
+    if (this.primaryDisabled) return null;
     if (!StrKey.isValidEd25519PublicKey(address) && !StrKey.isValidContract(address)) return null;
+    if (this.resolutionMode === "universal") {
+      if (this.explicitPrimaryId) {
+        const selected = await this.universalRead("primary", []);
+        if (selected !== this.explicitPrimaryId) throw new SoranError("Lookup Primary does not match configured primaryId", "CONFIG");
+      }
+      const raw = await this.universalRead("primary_name", [nativeToScVal(address, { type: "address" })]);
+      return this.canonicalResult(raw);
+    }
+    if (!this.primaryId) return null;
+    if (await this.read(this.primaryId, "registry", []) !== this.registryId) throw new SoranError("Primary is anchored to a different Registry", "CONFIG");
     const raw = (await this.read(this.primaryId, "primary_of", [
       nativeToScVal(address, { type: "address" }),
     ])) as unknown;
@@ -724,14 +759,18 @@ export class Soran {
         "ABI",
       );
     }
-    return raw;
+    return this.canonicalResult(raw);
   }
 
   // ---- namespace-level reads ----
 
   /** { owner, resolver } of a namespace, or null if unregistered. */
   async namespace(ns: string): Promise<{ owner: string; resolver: string | null } | null> {
-    assertLabel(ns);
+    ns = normalizeLabel(ns);
+    if (this.resolutionMode === "universal") {
+      const meta = await this.namespaceMetadata(ns);
+      return meta ? { owner: meta.owner, resolver: meta.resolver } : null;
+    }
     const nsNode = await this.namehash(ns);
     const owner = (await this.read(this.registryId, "owner_of", [bytes(nsNode)])) as string | null;
     if (!owner) return null;
@@ -756,11 +795,31 @@ export class Soran {
    */
   async details(name: string): Promise<NameDetails> {
     const { label, namespace } = parseName(name);
+    if (this.resolutionMode === "universal") {
+      const [meta, ns, paymentRecord] = await Promise.all([this.nameMetadata(name), this.namespaceMetadata(namespace), this.paymentRecord(name)]);
+      if (!meta || !ns || meta.generation !== paymentRecord.generation || meta.registrar !== paymentRecord.registrar ||
+          ns.registrar !== meta.registrar || ns.resolver !== paymentRecord.resolver)
+        throw new SoranError("name metadata changed during lookup", "SIMULATION");
+      return { name: `${label}.${namespace}`, node: meta.node, address: paymentRecord.payment.address, payment: paymentRecord.payment,
+        paymentRequired: paymentRecord.payment.memo.type !== "none", resolver: paymentRecord.resolver,
+        holder: meta.holder, expiresAt: meta.expiresAt, generation: meta.generation,
+        namespace: { namespace, owner: ns.owner, registrar: ns.registrar, resolver: ns.resolver, permanent: ns.permanent, policy: ns.policy },
+        assurance: { resolverAttested: ns.resolverAttested, resolverLocked: ns.resolverLocked, resolverTainted: ns.resolverTainted,
+          trustworthy: ns.resolverAttested && ns.resolverLocked && !ns.resolverTainted } };
+    }
     // Warm the two pointer caches first so the fan-out below reuses them
     // instead of re-simulating the same Registry reads.
     const registrarId = await this.attestedRegistrarOf(namespace);
+    let payment: PaymentDestination | null = null;
+    let paymentRequired = false;
+    const metadataRecord = async (): Promise<NameRecord> => {
+      const result = await this.paymentRecord(name);
+      payment = result.payment;
+      paymentRequired = payment.memo.type !== "none";
+      return { name, address: payment.address, node: hex(await this.node(name)), resolver: result.resolver };
+    };
     const [rec, ns, assur] = await Promise.all([
-      this.record(name),
+      metadataRecord(),
       this.namespace(namespace),
       this.assurance(name),
     ]);
@@ -808,6 +867,8 @@ export class Soran {
       name: rec.name,
       node: rec.node,
       address: rec.address,
+      payment,
+      paymentRequired,
       resolver: rec.resolver,
       holder,
       expiresAt,
@@ -840,7 +901,7 @@ export class Soran {
   async profile(name: string): Promise<SoranProfile> {
     // One resolver_of read up front — the parallel text() calls below would
     // otherwise each fire their own before the cache is populated.
-    await this.resolverOf(parseName(name).namespace);
+    if (this.resolutionMode === "direct") await this.resolverOf(parseName(name).namespace);
     const values = await Promise.all(PROFILE_KEYS.map((k) => this.text(name, k)));
     const out: SoranProfile = {};
     PROFILE_KEYS.forEach((k, i) => {
@@ -868,7 +929,7 @@ export class Soran {
       namespaces === undefined &&
       this.reverseNamespaces.length === 0 &&
       !this.hintUrl &&
-      !this.primaryId
+      (this.primaryDisabled || (this.resolutionMode === "direct" && !this.primaryId))
     ) {
       throw new SoranError(
         "reverseNames has no way to answer: configure primaryId, reverseNamespaces, or hintUrl — or pass `namespaces` per call",
@@ -886,15 +947,12 @@ export class Soran {
     else if (this.reverseNamespaces.length > 0) candidates = this.reverseNamespaces;
     else candidates = await this.namespaceHint();
     const labels = candidates.map((ns) => {
-      const l = ns.toLowerCase();
-      assertLabel(l);
+      const l = normalizeLabel(ns);
       return l;
     });
     const settled = await Promise.allSettled(
       labels.map(async (ns) => {
-        const resolverId = await this.resolverOf(ns);
-        if (!resolverId) return null;
-        return this.nameOf(resolverId, address);
+        return this.reverse(ns, address);
       }),
     );
     const out: ReverseName[] = [];
@@ -919,90 +977,82 @@ export class Soran {
     return out;
   }
 
-  /**
-   * Every name a wallet holds — DISCOVERED via the hint host's indexer, then
-   * every candidate VERIFIED on chain (`holder_of_node`, which the contract
-   * expiry-gates itself): the hint can omit names, but it can never forge
-   * one into the result. Requires `hintUrl` (on-chain storage is not
-   * enumerable — a CONFIG error explains this); throws INVALID_INPUT for a
-   * malformed address. At most 40 candidates are verified per call (~2
-   * simulations each); `truncated` in the hint payload is not surfaced —
-   * treat a 40-name result as possibly partial.
-   *
-   * Enumeration is BEST-EFFORT by construction: a candidate whose chain
-   * reads fail (transient RPC trouble, or a dormant namespace whose entries
-   * are archived) is SKIPPED, not fatal — one cold name must not blank a
-   * wallet's whole holdings view, and a hostile hint must not be able to
-   * inject a failing candidate as a denial of service. Per-name reads
-   * (`details`, `nameState`) give the precise per-name error instead.
-   */
-  async namesOf(address: string): Promise<NameSummary[]> {
-    if (!StrKey.isValidEd25519PublicKey(address) && !StrKey.isValidContract(address)) {
-      throw new SoranError(`invalid address "${address}"`, "INVALID_INPUT");
-    }
-    if (!this.hintUrl) {
-      throw new SoranError(
-        "namesOf needs a discovery source: set hintUrl — chain storage is not enumerable; every candidate is still verified on chain",
-        "CONFIG",
-      );
-    }
-    const payload = await this.hintFetch(
-      `/v1/names/by-holder/${address}`,
-      NAMES_HINT_MAX_BODY_BYTES,
-    );
-    if (payload === null) {
-      throw new SoranError("names-by-holder hint unavailable — retry, or query the chain per name", "RPC");
-    }
-    const list = (payload as { names?: unknown } | null)?.names;
-    if (!Array.isArray(list)) return [];
-    // Untrusted candidates: keep only well-formed name ids, dedupe, cap.
+  /** One bounded discovery page, with every included holding verified on chain.
+   * Follow nextCursor; complete also requires the indexer's reported coverage
+   * and successful candidate checks. An indexer can still omit names. */
+  async namesOfPage(address: string, options: PageOptions = {}): Promise<NamesPage> {
+    if (!StrKey.isValidEd25519PublicKey(address) && !StrKey.isValidContract(address)) throw new SoranError("invalid holder address", "INVALID_INPUT");
+    if (!this.hintUrl) throw new SoranError("namesOfPage requires a discovery hintUrl", "CONFIG");
+    const limit = options.limit ?? 40;
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100 || (options.cursor !== undefined && (typeof options.cursor !== "string" || options.cursor.length < 1 || options.cursor.length > 2048)))
+      throw new SoranError("invalid page limit/cursor", "INVALID_INPUT");
+    const query = `?limit=${limit}${options.cursor ? `&cursor=${encodeURIComponent(options.cursor)}` : ""}`;
+    const payload = await this.hintFetch(`/v1/names/by-holder/${address}${query}`, 131072);
+    if (!payload || typeof payload !== "object") throw new SoranError("holdings discovery unavailable", "RPC");
+    const raw = payload as Record<string, unknown>;
+    if (raw.holder !== address || !Array.isArray(raw.names) || raw.names.length > limit || typeof raw.hasMore !== "boolean" ||
+        !(raw.nextCursor === null || (typeof raw.nextCursor === "string" && raw.nextCursor.length > 0 && raw.nextCursor.length <= 2048)) || raw.hasMore !== (raw.nextCursor !== null))
+      throw new SoranError("invalid holdings discovery page", "ABI");
+    const coverage = decodeCoverage(raw.coverage);
     const seen = new Set<string>();
-    const candidates: Array<{ name: string; label: string; namespace: string }> = [];
-    for (const entry of list) {
-      const raw = (entry as { name?: unknown } | null)?.name;
-      if (typeof raw !== "string") continue;
-      const nm = raw.toLowerCase();
-      if (seen.has(nm)) continue;
-      const parts = nm.split(".");
-      if (parts.length !== 2) continue;
-      const [label, namespace] = parts;
-      if (!LABEL_RE.test(label) || label.length > 63) continue;
-      if (!LABEL_RE.test(namespace) || namespace.length > 63) continue;
-      seen.add(nm);
-      candidates.push({ name: nm, label, namespace });
-      if (candidates.length >= NAMES_VERIFY_CAP) break;
+    let excluded = 0, failed = 0;
+    const names: NameSummary[] = [];
+    // Eight workers bound RPC fan-out even when a page contains 100 candidates.
+    let index = 0;
+    const workers = Array.from({ length: Math.min(8, raw.names.length) }, async () => {
+      while (index < (raw.names as unknown[]).length) {
+        const entry = (raw.names as unknown[])[index++];
+        try {
+          const input = (entry as { name?: unknown } | null)?.name;
+          if (typeof input !== "string") throw new Error("invalid candidate");
+          const { label, namespace } = parseName(input);
+          const name = `${label}.${namespace}`;
+          if (seen.has(name)) { excluded++; continue; }
+          seen.add(name);
+          let expiresAt: bigint;
+          if (this.resolutionMode === "universal") {
+            const meta = await this.nameMetadata(name);
+            if (!meta || !meta.active || meta.holder !== address) { excluded++; continue; }
+            expiresAt = meta.expiresAt;
+          } else {
+            const registrarId = await this.attestedRegistrarOf(namespace);
+            if (!registrarId) { excluded++; continue; }
+            const [holder, value] = await Promise.all([
+              this.read(registrarId, "holder_of_node", [bytes(await this.node(name))]),
+              this.read(registrarId, "record_of", [nativeToScVal(utf8(label), { type: "bytes" })]),
+            ]);
+            const rec = value as { holder?: unknown; expires_at?: unknown } | null;
+            if (holder !== address || !rec || rec.holder !== address) { excluded++; continue; }
+            if (typeof rec.expires_at !== "bigint" || rec.expires_at < 0n || rec.expires_at > 18446744073709551615n) throw new Error("invalid expiry");
+            expiresAt = rec.expires_at;
+          }
+          names.push({ name, namespace, label, node: hex(await this.node(name)), holder: address, expiresAt });
+        } catch { failed++; }
+      }
+    });
+    await Promise.all(workers);
+    names.sort((a, b) => a.name.localeCompare(b.name, "en"));
+    return { names, nextCursor: raw.nextCursor as string | null, hasMore: raw.hasMore,
+      complete: !raw.hasMore && coverage?.complete === true && failed === 0, coverage,
+      verification: { candidates: raw.names.length, verified: names.length, excluded, failed } };
+  }
+
+  /** Compatibility array API. It follows at most ten 100-name pages and throws
+   * INCOMPLETE if discovery/verification is partial; use namesOfPage for UI. */
+  async namesOf(address: string): Promise<NameSummary[]> {
+    const names = new Map<string, NameSummary>();
+    const cursors = new Set<string>();
+    let cursor: string | undefined;
+    for (let pageNumber = 0; pageNumber < 10; pageNumber++) {
+      const page = await this.namesOfPage(address, { cursor, limit: 100 });
+      for (const name of page.names) names.set(name.name, name);
+      if (page.verification.failed || page.coverage?.complete !== true) throw new SoranError("holdings discovery or verification is incomplete; use namesOfPage", "INCOMPLETE");
+      if (!page.hasMore) return [...names.values()];
+      if (!page.nextCursor || cursors.has(page.nextCursor)) throw new SoranError("repeated holdings cursor", "ABI");
+      cursors.add(page.nextCursor);
+      cursor = page.nextCursor;
     }
-    const verified = await Promise.allSettled(
-      candidates.map(async (c) => {
-        const registrarId = await this.attestedRegistrarOf(c.namespace);
-        if (!registrarId) return null;
-        const nameNode = await this.node(c.name);
-        const [holder, rec] = await Promise.all([
-          this.read(registrarId, "holder_of_node", [bytes(nameNode)]) as Promise<string | null>,
-          this.read(registrarId, "record_of", [
-            nativeToScVal(utf8(c.label), { type: "bytes" }),
-          ]) as Promise<{ holder: string; expires_at: bigint } | null>,
-        ]);
-        // Both reads must agree the queried address holds the name — the
-        // holder check on record_of ties the expiry to the SAME incarnation
-        // (a reissue between the two simulations shows a different holder and
-        // drops the candidate; a renew-only race is benign). Never fabricate
-        // an expiry from a missing record.
-        if (holder !== address || !rec || String(rec.holder) !== address) return null;
-        return {
-          name: c.name,
-          namespace: c.namespace,
-          label: c.label,
-          node: hex(nameNode),
-          holder: address,
-          expiresAt: BigInt(rec.expires_at),
-        } satisfies NameSummary;
-      }),
-    );
-    // Rejections (archived entries, transient RPC failures) skip the
-    // candidate — see the doc above. The hint cannot forge; failures cannot
-    // amplify.
-    return verified.flatMap((r) => (r.status === "fulfilled" && r.value ? [r.value] : []));
+    throw new SoranError("holdings exceed the bounded aggregate; use namesOfPage", "INCOMPLETE");
   }
 
   /**
@@ -1017,7 +1067,7 @@ export class Soran {
     const { label, namespace } = parseName(name);
     if (!this.hintUrl) {
       throw new SoranError(
-        "history needs an indexer source: set hintUrl — the chain stores no timestamps",
+        "history needs an indexer source: set hintUrl",
         "CONFIG",
       );
     }
@@ -1075,9 +1125,7 @@ export class Soran {
         details.holder ? this.primaryOf(details.holder).catch(() => null) : Promise.resolve(null),
         (async () => {
           if (!details.address) return null;
-          const resolverId = await this.resolverOf(namespace);
-          if (!resolverId) return null;
-          return this.nameOf(resolverId, details.address);
+          return this.reverse(namespace, details.address);
         })().catch(() => null),
         details.namespace.owner
           ? this.primaryOf(details.namespace.owner).catch(() => null)
@@ -1092,25 +1140,24 @@ export class Soran {
    * (hint-discovered + chain-verified; null without `hintUrl`), and the
    * profile records of its primary name.
    *
-   * Degrade semantics: `reverseNames`' CONFIG case (no probe sources) and
-   * `namesOf`'s CONFIG case degrade to []/null here rather than failing the
-   * whole profile — a wallet with only `primaryId` configured still gets the
-   * primary + its profile. Probe/read failures still throw (fail-closed).
+   * With no discovery URL, holdings is null. Missing reverse probe sources
+   * degrade to an empty candidate result; chain failures still throw. Holdings
+   * is the first page with explicit continuation/coverage, not all holdings.
    */
   async walletProfile(address: string): Promise<WalletProfile> {
     if (!StrKey.isValidEd25519PublicKey(address) && !StrKey.isValidContract(address)) {
       throw new SoranError(`invalid address "${address}"`, "INVALID_INPUT");
     }
-    const [primary, reverseNames, names] = await Promise.all([
+    const [primary, reverseNames, holdings] = await Promise.all([
       this.primaryOf(address),
       this.reverseNames(address).catch((e) => {
         if (e instanceof SoranError && e.code === "CONFIG") return [] as ReverseName[];
         throw e;
       }),
-      this.hintUrl ? this.namesOf(address) : Promise.resolve(null),
+      this.hintUrl ? this.namesOfPage(address) : Promise.resolve(null),
     ]);
     const profile = primary ? await this.profile(primary) : {};
-    return { address, primary, reverseNames, names, profile };
+    return { address, primary, reverseNames, names: holdings?.names ?? null, holdings, profile };
   }
 
   async isAvailable(ns: string): Promise<boolean> {
@@ -1210,6 +1257,7 @@ export class Soran {
       const label =
         typeof entry === "string" ? entry : (entry as { label?: unknown } | null)?.label;
       if (typeof label !== "string") continue;
+      if (/[^\x00-\x7f]/.test(label)) continue;
       const l = label.toLowerCase();
       if (!LABEL_RE.test(l) || l.length > 63 || seen.has(l)) continue;
       seen.add(l);
@@ -1324,7 +1372,8 @@ export class Soran {
     }
     if (!rpc.Api.isSimulationSuccess(sim)) {
       const detail = (sim as { error?: unknown }).error ?? "unknown";
-      throw new SoranError(`simulate ${fn} on ${contractId} failed: ${String(detail)}`, "SIMULATION");
+      const known = contractId === this.lookupId ? lookupError(String(detail)) : null;
+      throw new SoranError(`simulate ${fn} on ${contractId} failed: ${String(detail)}`, "SIMULATION", known?.code ?? null, known?.name ?? null);
     }
     // An entry needing restore is ARCHIVED (rent lapsed), not absent — "null"
     // here would tell a wallet a dormant-but-owned name doesn't resolve. A
@@ -1335,8 +1384,9 @@ export class Soran {
         "ARCHIVED",
       );
     }
-    if (!sim.result?.retval) return null; // genuine None
-    return scValToNative(sim.result.retval);
+    if (!sim.result?.retval) throw new SoranError(`read ${fn}: missing simulation return value`, "ABI");
+    try { return scValToNative(sim.result.retval); }
+    catch (e) { throw new SoranError(`cannot decode ${fn} result: ${String(e)}`, "ABI"); }
   }
 }
 
@@ -1347,6 +1397,7 @@ export class Soran {
  *  throwing its own HolderError; import from the package whose errors you
  *  handle. */
 export function parseName(name: string): { label: string; namespace: string } {
+  if (typeof name !== "string" || /[^\x00-\x7f]/.test(name)) throw new SoranError("name must contain ASCII characters only", "INVALID_INPUT");
   const parts = name.toLowerCase().split(".");
   if (parts.length !== 2)
     throw new SoranError(`expected "label.namespace", got "${name}"`, "INVALID_INPUT");
@@ -1354,6 +1405,14 @@ export function parseName(name: string): { label: string; namespace: string } {
   assertLabel(label);
   assertLabel(namespace);
   return { label, namespace };
+}
+
+/** Normalize ASCII case only; Unicode lookalikes are never aliases. */
+export function normalizeLabel(value: string): string {
+  if (typeof value !== "string" || /[^\x00-\x7f]/.test(value)) throw new SoranError("label must contain ASCII characters only", "INVALID_INPUT");
+  const normalized = value.toLowerCase();
+  assertLabel(normalized);
+  return normalized;
 }
 
 function assertLabel(l: string) {
@@ -1384,4 +1443,34 @@ function bytes(b: Uint8Array): xdr.ScVal {
  *  bundlers need no polyfills for this package. */
 async function sha256(data: Uint8Array): Promise<Uint8Array> {
   return new Uint8Array(hash(data as Buffer));
+}
+
+/** Numeric Lookup ABI names; unknown/future errors remain unclassified. */
+export const LOOKUP_ERRORS: Readonly<Record<number, string>> = Object.freeze({
+  1: "InvalidRegistry", 2: "InvalidGovernance", 3: "NotInitialized", 4: "MalformedName", 5: "NamespaceNotFound",
+  6: "RegistrarMissing", 7: "NameInactive", 8: "ContextMismatch", 9: "UnsupportedImplementation", 10: "DependencyUnavailable",
+  11: "InvalidPayment", 12: "LegacyMemoUnknown", 13: "MemoRequired", 14: "UpgradePending", 15: "NoPendingUpgrade",
+  16: "UpgradeNotReady", 17: "UpgradeHashMismatch", 18: "TimestampOverflow", 19: "PrimaryNotConfigured", 20: "InvalidPrimary", 21: "ReadTooLarge",
+});
+function lookupError(detail: string): { code: number; name: string } | null {
+  // Match only the RPC's leading contract failure, never an inner trace/log.
+  const match = /^(?:HostError: )?Error\(Contract, #(\d+)\)(?:\s|$)/.exec(detail);
+  const code = match ? Number(match[1]) : NaN;
+  return Number.isSafeInteger(code) && LOOKUP_ERRORS[code] ? { code, name: LOOKUP_ERRORS[code] } : null;
+}
+
+function decodeCoverage(raw: unknown): IndexCoverage | null {
+  if (!raw || typeof raw !== "object") return null;
+  const c = raw as Record<string, unknown>;
+  const ledger = (v: unknown): v is number | null => v === null || (typeof v === "number" && Number.isSafeInteger(v) && v >= 0);
+  if (c.source !== "indexed" || typeof c.complete !== "boolean" || !ledger(c.processedLedger) || !ledger(c.headLedger) || !Array.isArray(c.gaps) || c.gaps.length > 1000) return null;
+  const gaps: IndexCoverage["gaps"] = [];
+  for (const item of c.gaps) {
+    const g = item as Record<string, unknown> | null;
+    if (!g || typeof g.contractId !== "string" || g.contractId.length > 128 || typeof g.reason !== "string" || g.reason.length > 512 ||
+      typeof g.fromLedger !== "number" || !ledger(g.fromLedger) || typeof g.toLedger !== "number" || !ledger(g.toLedger) || g.toLedger < g.fromLedger) return null;
+    gaps.push({ contractId: g.contractId, fromLedger: g.fromLedger, toLedger: g.toLedger, reason: g.reason });
+  }
+  return { source: "indexed", complete: c.complete && gaps.length === 0 && c.processedLedger !== null && c.headLedger !== null && c.processedLedger >= c.headLedger,
+    processedLedger: c.processedLedger, headLedger: c.headLedger, gaps };
 }

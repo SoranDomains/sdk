@@ -15,17 +15,32 @@
  */
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { createRequire } from "node:module";
 import { registerReadTools, registerWriteTools } from "./tools.js";
 
-const server = new McpServer({ name: "soran", version: "0.3.0" });
+// serverInfo.version derives from package.json so it can never drift from the
+// published version again (the hardcoded string sat at 0.3.0 through the
+// 0.4.0 release). Resolves from dist/ and from src/ (tsx dev) alike.
+const { version } = createRequire(import.meta.url)("../package.json") as { version: string };
+
+const server = new McpServer({ name: "soran", version });
+const deploymentVersionText = process.env.SORAN_REGISTRY_DEPLOYMENT_SALT_VERSION;
+if (deploymentVersionText !== undefined && deploymentVersionText !== "0" && deploymentVersionText !== "1")
+  throw new Error("SORAN_REGISTRY_DEPLOYMENT_SALT_VERSION must be 0 or 1");
+const registryDeploymentSaltVersion = deploymentVersionText === undefined ? undefined : Number(deploymentVersionText) as 0 | 1;
 const opts = {
   hintUrl: process.env.SORAN_HINT_URL,
   rpcUrl: process.env.SORAN_RPC_URL,
   passphrase: process.env.SORAN_PASSPHRASE,
+  registryId: process.env.SORAN_REGISTRY_ID,
+  allocatorId: process.env.SORAN_ALLOCATOR_ID,
+  lookupId: process.env.SORAN_LOOKUP_ID,
+  primaryId: process.env.SORAN_PRIMARY_ID === "none" ? null : process.env.SORAN_PRIMARY_ID,
+  resolutionMode: process.env.SORAN_RESOLUTION_MODE as "universal" | "direct" | undefined,
 };
 registerReadTools(server, opts);
 try {
-  await registerWriteTools(server, { ...opts, secret: process.env.SORAN_SECRET });
+  await registerWriteTools(server, { ...opts, secret: process.env.SORAN_SECRET, registryDeploymentSaltVersion });
 } catch (e) {
   console.error(`soran MCP: write tools unavailable — ${e instanceof Error ? e.message : e}. Serving read tools only.`);
 }
