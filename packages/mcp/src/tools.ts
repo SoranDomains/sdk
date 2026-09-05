@@ -26,7 +26,8 @@
 import { z } from "zod";
 import { Soran, SoranError, DEPLOYMENTS, normalizeLabel, parseName } from "@sorandomains/lookup";
 import { validateClaimFee, validateClaimTransaction, sameFee } from "./prepared.js";
-export const MCP_VERSION = "0.5.0";
+import { predictRegistrar } from "./deployment.js";
+export const MCP_VERSION = "0.5.1";
 
 /** The only server capability used by this package. Keep the callback limited
  * to parsed arguments: importing MCP's full callback type also imports its
@@ -318,6 +319,9 @@ export function registerReadTools(server: ToolRegistrar, opts: ReadToolOptions =
 }
 
 export type WriteToolOptions = ReadToolOptions & {
+  /** Trusted local Registry deployment scheme: 0 legacy raw salt, 1 namespace-bound.
+   * New testnet defaults to 1; activation on a custom Registry requires this option. */
+  registryDeploymentSaltVersion?: 0 | 1;
   /** The agent's own Stellar secret key (S…). Never transmitted anywhere. */
   secret?: string;
   /** Network passphrase, PINNED locally for signing (default testnet).
@@ -646,32 +650,63 @@ export async function registerWriteTools(server: ToolRegistrar, opts: WriteToolO
   );
 
   server.tool(
+    "cancel_namespace_activation",
+    "Cancel or clear the off-chain vanity-address generation job for this wallet's selected namespace and contract role. This submits no on-chain transaction, does not withdraw a namespace claim, and does not undo an already deployed contract. After cancellation, retry activation or Resolver setup to start a fresh search.",
+    { namespace: labelSchema, role: z.enum(["registrar", "resolver"]) },
+    async ({ namespace, role }) => {
+      try {
+        refreshSession();
+        const result = await authPost(`/console/deployment/vanity/${role}/cancel`, { namespace }) as { ok?: boolean };
+        if (result.ok !== true) throw new Error("vanity cancellation was not confirmed");
+        return text({ cancelled: true, namespace, role, onchainTransactionSubmitted: false });
+      } catch (e) { return errText(e); }
+    },
+  );
+
+  server.tool(
     "activate_namespace",
-    "OWNER power: ACTIVATE this wallet's namespace by deploying its Registrar — the one-time step required before you can issue names. Names the exact namespace this wallet intends to activate; the API session must select that same namespace. Choose the issuance policy: 'reclaimable' (you can take names back) or 'permanent' (names are the holder's forever, and the namespace can later go fully permanent) — this is IMMUTABLE once deployed. Do this once after claim_namespace executes.",
+    "OWNER power: ACTIVATE this wallet's namespace by deploying its Registrar — the one-time step required before you can issue names. Names the exact namespace this wallet intends to activate; the API session must select that same namespace. Choose 'reclaimable' issuance or 'permanent' for a non-reclaimable, zero-term policy. Policy has no ordinary setter, but an eligible upgrade can change behavior while the namespace is unlocked. Final permanence requires the separate irreversible make_permanent step. Do this once after claim_namespace executes.",
     {
       namespace: labelSchema.describe("Exact namespace to activate; must match the API session namespace"),
       maxNetworkFeeStroops: z.string().regex(/^[1-9][0-9]*$/),
       policy: z
         .enum(["reclaimable", "permanent"])
         .default("reclaimable")
-        .describe("Issuance policy for every name in this namespace — immutable once deployed"),
+        .describe("Initial issuance policy; permanent selects non-reclaimable zero-term issuance, while final permanence requires make_permanent"),
     },
     async ({ namespace, policy, maxNetworkFeeStroops }) => {
       try {
+        const registry = opts.registryId ?? DEPLOYMENTS.testnet.registryId;
+        if (opts.passphrase && opts.passphrase !== DEPLOYMENTS.testnet.passphrase && !opts.registryId) throw new Error("custom signing network requires an explicit Registry");
+        const saltVersion = opts.registryDeploymentSaltVersion ?? (
+          registry === DEPLOYMENTS.testnet.registryId && PASSPHRASE === DEPLOYMENTS.testnet.passphrase ? 1 : undefined
+        );
+        if (saltVersion !== 0 && saltVersion !== 1) throw new Error("custom Registry activation requires a locally pinned registryDeploymentSaltVersion (0 legacy or 1 namespace-bound)");
         refreshSession(); // reflect ownership as of now, not server start
-        const prep = (await authPost("/console/registrar/deploy/prepare", { policy })) as {
+        const prep = (await authPost("/console/registrar/deploy/prepare", { namespace, policy })) as {
           xdr?: string;
           predictedId?: string;
+          namespace?: string;
+          pending?: boolean;
+          retryAfterMs?: number;
+          vanity?: { status?: string; attempts?: number };
           network?: string;
           error?: string;
           detail?: string;
         };
+        if (prep.pending === true) {
+          if (prep.namespace !== namespace || prep.xdr || prep.predictedId || !["queued", "mining"].includes(prep.vanity?.status ?? ""))
+            throw new Error("invalid namespace address-generation response");
+          return text({ activated: false, pending: true, namespace, status: prep.vanity!.status,
+            retryAfterMs: typeof prep.retryAfterMs === "number" && Number.isFinite(prep.retryAfterMs) ? Math.max(1000, Math.min(10000, prep.retryAfterMs)) : 2000,
+            next: "The vanity address is being generated. Call activate_namespace again with the same namespace, policy and fee limit after the retry interval. No deployment transaction has been signed or submitted.",
+          });
+        }
         if (!prep.xdr || !prep.predictedId)
           return errText(new Error(prep.detail ?? prep.error ?? "prepare failed — does this wallet own a namespace? (claim_namespace + wait for the window)"));
         if (prep.network && prep.network !== PASSPHRASE)
           return errText(new Error(`network mismatch: server prepared for ${prep.network}, pinned to ${PASSPHRASE}`));
-        const registry = opts.registryId ?? DEPLOYMENTS.testnet.registryId;
-        if (opts.passphrase && opts.passphrase !== DEPLOYMENTS.testnet.passphrase && !opts.registryId) throw new Error("custom signing network requires an explicit Registry");
+        if (prep.namespace !== undefined && prep.namespace !== namespace) throw new Error("prepared namespace differs from selected namespace");
         const namespaceNode = await soran.namehash(namespace);
         let constructorIntent: { id: string; args: import("@stellar/stellar-sdk").xdr.ScVal[] };
         const signed = checkedSign(prep.xdr, { fn: "deploy_registrar", contractId: registry, maxFee: maxNetworkFeeStroops, deploymentAuthorization: () => constructorIntent, args: (args) => {
@@ -686,8 +721,9 @@ export async function registerWriteTools(server: ToolRegistrar, opts: WriteToolO
             field("trade_fee_bps", sx.ScVal.scvU32(0)), field("tradeable", sx.ScVal.scvBool(false)), field("transferable", sx.ScVal.scvBool(true)),
           ]);
           equalArgs(args, [sx.ScVal.scvBytes(namespaceNode), new Address(me).toScVal(), selectedPolicy, sx.ScVal.scvBytes(salt)]);
-          const preimage = sx.HashIdPreimage.envelopeTypeContractId(new sx.HashIdPreimageContractId({ networkId: stellar.hash(new TextEncoder().encode(PASSPHRASE)), contractIdPreimage: sx.ContractIdPreimage.contractIdPreimageFromAddress(new sx.ContractIdPreimageFromAddress({ address: new Address(registry).toScAddress(), salt })) }));
-          const predicted = stellar.StrKey.encodeContract(stellar.hash(preimage.toXDR()));
+          const predicted = predictRegistrar(registry, namespaceNode, salt, PASSPHRASE, saltVersion);
+          if (saltVersion === 1 && !/^C[A-D]SORAN[A-Z2-7]{49}$/.test(predicted))
+            throw new Error("Registrar deployment does not have the required Soran vanity prefix");
           if (predicted !== prep.predictedId) throw new Error("Registrar predicted ID differs from selected deployment");
           constructorIntent = { id: predicted, args: [new Address(registry).toScVal(), sx.ScVal.scvBytes(namespaceNode), new Address(me).toScVal(), new Address(me).toScVal(), selectedPolicy, sx.ScVal.scvBool(true)] };
         } });
@@ -839,7 +875,7 @@ export async function registerWriteTools(server: ToolRegistrar, opts: WriteToolO
 
   server.tool(
     "namespace_status",
-    "OWNER read: a namespace's owner, resolver, immutable policy, permanence, and any pending namespace transfer — the state behind the owner powers.",
+    "OWNER read: a namespace's owner, resolver, current issuance policy, permanence, and any pending namespace transfer — the state behind the owner powers.",
     { namespace: labelSchema },
     async ({ namespace }) => {
       try {

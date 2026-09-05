@@ -1,6 +1,6 @@
 {
   "name": "@sorandomains/mcp",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "MCP server for Soran \u2014 AI agents resolve, verify, own, and manage names on Stellar.",
   "type": "module",
   "bin": {
@@ -44,9 +44,9 @@
   ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
-    "@sorandomains/holder": "0.3.0",
-    "@sorandomains/lookup": "0.5.0",
-    "@sorandomains/owner": "0.5.0",
+    "@sorandomains/holder": "0.3.1",
+    "@sorandomains/lookup": "0.5.2",
+    "@sorandomains/owner": "0.5.1",
     "zod": "^3.24.0"
   },
   "peerDependencies": {

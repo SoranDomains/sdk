@@ -116,7 +116,7 @@ export const DEPLOYMENTS = {
     passphrase: Networks.TESTNET as string,
     // The immutable Registry. The Registrar for a namespace is discovered on
     // chain via `registrar_of(node)` — never configured by hand.
-    registryId: "CBSORANXTUFKBZK74AAM2ZM5OX2V7PIXUADM3HGP6WU3IDN7M3YEEDLU",
+    registryId: "CDSORANCV3IFF3MKHJ7KI4MKEJOJZFMTDVAZCD5XFOR4WTGNXJJNOKQE",
   },
 } as const;
 

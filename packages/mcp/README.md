@@ -15,7 +15,7 @@ Two transports, one tool set:
   read tools — what hosted agents (claude.ai connectors and friends) reach
   with no install.
 
-Version 0.5.0 targets the verified **Stellar testnet** deployment from 2026-09-05.
+Version 0.5.1 targets the namespace-bound **Stellar testnet** deployment from 2026-09-05.
 The default Registry, Lookup, Primary and Allocator pins belong to that deployment.
 
 ## Install
@@ -77,7 +77,8 @@ https://mcp.soran.domains/mcp
 | `my_wallet` | own address, balance, names, primary |
 | `claim_namespace` | **announce a claim** on a top-level namespace for this wallet (opens the objection window; unopposed claims become eligible for permissionless execution) |
 | `claim_status` · `withdraw_claim` | watch a claim's window · cancel it before it elapses |
-| `activate_namespace` | deploy the Registrar for a claimed namespace (one-time; required before issuing) — pick reclaimable/permanent policy |
+| `activate_namespace` | deploy the Registrar for a claimed namespace; `permanent` selects non-reclaimable zero-term issuance, with final permanence requiring a separate lock |
+| `cancel_namespace_activation` | clear a namespace/role vanity-generation job without withdrawing a claim or undoing a contract |
 | `issue_name` · `issue_batch` · `reclaim_name` · `renew_name` | issue (single/bulk ≤23), reclaim, and renew names in a namespace this wallet OWNS |
 | `set_treasury` · `set_resolver` · `make_permanent` | route reclaim custody · point at a resolver · **the irreversible one-way door** (guarded) |
 | `transfer_namespace` · `accept_namespace_transfer` · `cancel_namespace_transfer` · `namespace_status` | hand the whole namespace to another wallet (two-step) · read owner/policy/permanence |
@@ -133,9 +134,9 @@ import { registerReadTools, registerWriteTools } from "@sorandomains/mcp";
 Source: <https://github.com/SoranDomains/sdk> · Docs: <https://github.com/SoranDomains/docs> · License: MIT
 
 
-Version 0.5.0 uses Stellar SDK17 and the matching lookup 0.5.0,
-holder 0.3.0 and owner 0.5.0 packages. Both transports pass the same universal
-configuration and export the same MCP version. The deployment was verified at ledger 4515471; custom Registry or passphrase
+Version 0.5.1 uses Stellar SDK17 and the matching lookup 0.5.2,
+holder 0.3.1 and owner 0.5.1 packages. Both transports pass the same universal
+configuration and export the same MCP version. The deployment was verified at ledger 4520986; custom Registry or passphrase
 settings require their own Allocator pin and do not inherit testnet fee routing.
 
 Namespace claims require the exact reviewed `expectedFee` from `claim_fee_quote`
@@ -170,15 +171,41 @@ quote; the tool never substitutes a hardcoded amount for the on-chain policy.
 
 ## Verified testnet deployment
 
-Verified on 2026-09-05 at ledger 4515471. Network passphrase: `Test SDF Network ; September 2015`.
+Verified on 2026-09-05 at ledger 4520986. Network passphrase: `Test SDF Network ; September 2015`.
 
 | Contract | Address |
 |---|---|
-| Registry | `CBSORANXTUFKBZK74AAM2ZM5OX2V7PIXUADM3HGP6WU3IDN7M3YEEDLU` |
-| Lookup | `CCSORANKMVVF5GCHCJAMB6M2FTF7KC53F7WN6V6ZD255TQY3IZCQPDRS` |
-| Primary | `CBSORANQVSWYBYGKRZ7RAUGOXDAXMXDXQWJSE42DQZOL4BK75BIEBUQK` |
-| Allocator | `CBSORANERRWAG5YT4DNQSCYJMOQ7M7UO5AHIAHVNF5ZLKK4JNK7FSKEE` |
+| Registry | `CDSORANCV3IFF3MKHJ7KI4MKEJOJZFMTDVAZCD5XFOR4WTGNXJJNOKQE` |
+| Lookup | `CDSORANO7K4FSBR2MLV4PNELJ6UXCDNG4MJZSH6HCVZZZQN5B5GMOP64` |
+| Primary | `CCSORANOADXKLSW5CUANBW5WZFVCNZ5KZ4KNMIUWOZOES3LXYRUYZ56X` |
+| Allocator | `CASORANSKKNXDJYXPZK7OJFIJQL5EMVO7VLYJJSWTCZLT26WWATBI4HY` |
 
 Mainnet has no deployment preset. Custom networks must supply their own verified
 addresses. Universal Lookup upgrades remain immediately executable; an address
 and ABI version do not pin the code that will execute after a governance upgrade.
+
+
+### Namespace activation and vanity addresses
+
+The new testnet Registry derives Registrar and Resolver addresses from the
+namespace, contract role and caller nonce on chain. MCP validates the predicted
+Registrar independently before signing; an API-supplied version or address is
+never sufficient authorization.
+
+`activate_namespace` can return `{ pending: true, activated: false }` while the
+service generates a branded address. Retry the same namespace, policy and fee
+limit after `retryAfterMs`. A pending response signs and submits no deployment.
+
+The packaged testnet deployment defaults to salt version `1`. For a custom
+Registry, locally configure `registryDeploymentSaltVersion: 1` (namespace-bound)
+or `0` (legacy raw salt); stdio uses `SORAN_REGISTRY_DEPLOYMENT_SALT_VERSION`.
+Unknown custom schemes fail closed. This setting changes address prediction,
+not the Registry contract ABI or the destination address types supported by
+payment resolution.
+
+The MCP v1 activation flow also requires a `C?SORAN…` address, derived from
+signed namespace and nonce, before signing. Direct Registry callers remain free
+to choose ordinary addresses. To abandon or restart a queued, failed or ready
+search, call `cancel_namespace_activation` with the exact `namespace` and
+`role: "registrar"` or `"resolver"`. Cancellation only clears the service's
+address-generation job; it does not withdraw a claim or undo a contract.

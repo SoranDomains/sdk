@@ -2,47 +2,48 @@
   "network": "testnet",
   "networkPassphrase": "Test SDF Network ; September 2015",
   "rpcUrl": "https://soroban-testnet.stellar.org",
-  "verifiedAt": "2026-09-05T09:35:45.939Z",
-  "verifiedLedger": 4515471,
+  "verifiedAt": "2026-09-05T17:15:21.603Z",
+  "verifiedLedger": 4520986,
   "contracts": {
     "registry": {
-      "id": "CBSORANXTUFKBZK74AAM2ZM5OX2V7PIXUADM3HGP6WU3IDN7M3YEEDLU",
-      "wasmHash": "7ea8cadb8739c354fd20408e1ecbef6a2b30611603ee830cdf8ead163d6ba653",
-      "deploymentTransaction": "6220d23c9b76abecd26701de82c45d7b814252d7ad056609437a46702c46d0d3",
-      "deploymentLedger": 4515438
+      "id": "CDSORANCV3IFF3MKHJ7KI4MKEJOJZFMTDVAZCD5XFOR4WTGNXJJNOKQE",
+      "wasmHash": "430f296cdf389bef7d13c957eb1bbd3379f326fe617ccec548ea5c927f202776",
+      "deploymentTransaction": "70eaa410ef5c9bd428df3506eb8ec114d1530e07520ea6ce9e9bd3292730f816",
+      "deploymentLedger": 4520979
     },
     "allocator": {
-      "id": "CBSORANERRWAG5YT4DNQSCYJMOQ7M7UO5AHIAHVNF5ZLKK4JNK7FSKEE",
+      "id": "CASORANSKKNXDJYXPZK7OJFIJQL5EMVO7VLYJJSWTCZLT26WWATBI4HY",
       "wasmHash": "584d5dc1d82e34655d4130f4f0e93ae7b5cd75d6465484efb51b8525f13c3db0",
-      "deploymentTransaction": "c2dcd8e33a7ee14241b504a7d49d49a7072c8367f8a531b676b743d6c3d28299",
-      "deploymentLedger": 4515439
+      "deploymentTransaction": "b503f0b3c1d8d23a917c26adc6aec3f14057995490152bd7a1e77f8789dd615f",
+      "deploymentLedger": 4520980
     },
     "registrar": {
-      "id": "CBSORANTKP3SYFX4LOVKEHNONKTLNPRISRLGX2VP3BQJVS7IOJCNDDF7",
+      "id": "CCSORANUM6CHXIOLOTA65NNZK6PJNCY44354SXKIANFUY2VVKOPZUYSP",
       "wasmHash": "ed06b3374ff4342b4a2316fc546505132cd8fd35be6666571cf088710af9bbc6",
-      "deploymentTransaction": "46dd5151978476f33b3c23d8842cdfe6962932f70d590ec5e8ffd9ed61fe07ca",
-      "deploymentLedger": 4515468
+      "deploymentTransaction": "901152399a62e63192db20c38e4d6ad8fc48c864c901bd98ed5b899aaec61617",
+      "deploymentLedger": 4520983
     },
     "resolver": {
-      "id": "CASORANTDLWVRVAVZHRVHULP6SJMVL5RQIBYM2CCY4T4VFNSA6SU4C3C",
+      "id": "CCSORANQSCWQXIVDGERI4QRNQS2OB4RRDR7AHABNOJ57Z23JUFQOVCDU",
       "wasmHash": "7e7a65a6260a2145095c52eb3466db50d0e669f10618a718f07b9badfeca874f",
-      "deploymentTransaction": "8ba1c4e286bc9da541b450b7ea739b602d1ba43326faef776fa96914c986e9d5",
-      "deploymentLedger": 4515469
+      "deploymentTransaction": "1cd2aeb1a255ec04bb68e07f1eea12ddaf4a3aff2225f912d5e06c42e9f6be23",
+      "deploymentLedger": 4520984
     },
     "primary": {
-      "id": "CBSORANQVSWYBYGKRZ7RAUGOXDAXMXDXQWJSE42DQZOL4BK75BIEBUQK",
+      "id": "CCSORANOADXKLSW5CUANBW5WZFVCNZ5KZ4KNMIUWOZOES3LXYRUYZ56X",
       "wasmHash": "bd17f0cf0b5066a925941afe11766a3fb933faf55564462844c36f749ec79b7d",
-      "deploymentTransaction": "0b6d442c004ed59fcd99ad100fcbca1c2a35a86c6292f2e6ae11911fdd3774a9",
-      "deploymentLedger": 4515470
+      "deploymentTransaction": "aaf3023cdaf6b601e2bad4970335ebae879d4c70e0035068681be44b2c4be70f",
+      "deploymentLedger": 4520985
     },
     "lookup": {
-      "id": "CCSORANKMVVF5GCHCJAMB6M2FTF7KC53F7WN6V6ZD255TQY3IZCQPDRS",
+      "id": "CDSORANO7K4FSBR2MLV4PNELJ6UXCDNG4MJZSH6HCVZZZQN5B5GMOP64",
       "wasmHash": "cc12257fc5bd5fc03bc72f925073fee94ea16001d1174f91c73ca1164d3e486f",
-      "deploymentTransaction": "5caa1391c9e3cef8ab2aa0f2addbf667b1a4b7daf2c1c20836a790712ca3ab47",
-      "deploymentLedger": 4515471
+      "deploymentTransaction": "7e46a3f0787c34d3bf074742e83592599a2493027edfb56a04a6e6407e901a1c",
+      "deploymentLedger": 4520986
     }
   },
   "governance": "GAJCWWNMBKCSTQQISDFTHFTCEOGXYA37YTP3U3ZW7Q5CYQPHSW6TB4QX",
+  "namespaceDeploymentSaltVersion": 1,
   "namespace": {
     "label": "nova",
     "owner": "GAAHFS7CISNAJOQK5VS447NS6ZFPRLLQQP6IM2EA4W7XZWGJNMXZ4VLK",
@@ -59,8 +60,8 @@
     "recipient": "GAJCWWNMBKCSTQQISDFTHFTCEOGXYA37YTP3U3ZW7Q5CYQPHSW6TB4QX",
     "asset": "XLM",
     "decimals": 7,
-    "configurationTransaction": "0ad5b54e20c84e2699a5d57a87f68ad17d929dd3fe601521decb1476efdecc12",
-    "configurationLedger": 4515464,
+    "configurationTransaction": "22742519dda80bd60bb71d9790f6d243c2baebe0832d7e241c55cf68cc42a6ce",
+    "configurationLedger": 4520981,
     "refundBps": {
       "Awarded": 0,
       "Rejected": 10000,
@@ -69,5 +70,5 @@
       "Expired": 8000
     }
   },
-  "verificationScope": "Contract code hashes and configuration, SDK read-only anchors, namespace metadata and expected unissued-name failure. No live payment, name-issuance or refund smoke is claimed."
+  "verificationScope": "Contract code hashes and deployment receipts, Registry deployment-salt version and predictions, namespace routing and policy, Lookup configuration and claim-fee policy. No live payment, name-issuance or refund smoke test is claimed."
 }

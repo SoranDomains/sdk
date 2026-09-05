@@ -1,6 +1,6 @@
-# Universal Lookup SDK release
+# Namespace-bound deployment SDK release
 
-The release contains lookup 0.5.0, holder 0.3.0, owner 0.5.0 and MCP 0.5.0,
+The published release contains lookup 0.5.2, holder 0.3.1, owner 0.5.1 and MCP 0.5.1,
 with Stellar SDK17 compatibility and verified testnet defaults. See
 [deployments/testnet.json](deployments/testnet.json) for deployment and code proof.
 
@@ -33,3 +33,25 @@ Validation includes all package builds, type checks and tests, browser bundles f
 the three client SDKs, exact tarball contents, clean installed runtime/type checks,
 and read-only testnet anchors, namespace metadata, fee policy and expected
 unissued-name rejection. It does not claim a live payment or refund smoke test.
+
+
+This patch release updates all testnet defaults to the namespace-bound Registry
+release verified at ledger 4520986. Lookup, Registrar, Resolver, Primary and
+Allocator ABIs remain unchanged. MCP activation now derives the Registrar address
+from the namespace, Registrar role and nonce, independently of the API's predicted
+address or version. It requires a Soran-branded address in its v1 flow. Custom
+Registries require a locally selected deployment salt version; explicit legacy v0
+keeps its prior address derivation.
+
+MCP returns a pending result while vanity generation runs and provides scoped
+`cancel_namespace_activation` for restarting a queued, failed or ready search.
+Cancellation changes only the service's generation job. Initial non-reclaimable,
+zero-term issuance is not the final permanence commitment; `make_permanent`
+performs the separate irreversible lock.
+
+All four packages are published, with npm's latest tags pointing to these versions.
+Downloaded package archives match the reviewed release files byte for byte.
+MCP's registry lockfile uses the exact published client SDK versions; its clean
+install, vulnerability audit, build, typecheck and tests pass with those dependencies.
+The hosted MCP service also reports 0.5.1 and has passed handshake, tool discovery
+and read-only on-chain fee checks against this deployment.

@@ -17,7 +17,7 @@ This release uses Universal Lookup **by default**. The testnet preset pins the v
 `CONFIG`; it never silently uses direct Resolver calls. Mainnet has no preset until
 its reviewed deployment exists. A custom Registry or passphrase does not inherit
 Lookup or Primary pins from another deployment. The deployment anchors, Lookup version and code hashes were verified at ledger
-4515471. Older testnet clients require this package update to follow the new Registry.
+4520986. Older testnet clients require this package update to follow the new Registry.
 
 Explicit compatibility mode remains available with `resolutionMode: "direct"`
 (or `lookupId: null`). Direct mode discovers native Resolvers from Registry and
@@ -171,14 +171,14 @@ and declares peer `>=17 <18`. It does not claim untested SDK14–16 compatibilit
 
 ## Verified testnet deployment
 
-Verified on 2026-09-05 at ledger 4515471. Network passphrase: `Test SDF Network ; September 2015`.
+Verified on 2026-09-05 at ledger 4520986. Network passphrase: `Test SDF Network ; September 2015`.
 
 | Contract | Address |
 |---|---|
-| Registry | `CBSORANXTUFKBZK74AAM2ZM5OX2V7PIXUADM3HGP6WU3IDN7M3YEEDLU` |
-| Lookup | `CCSORANKMVVF5GCHCJAMB6M2FTF7KC53F7WN6V6ZD255TQY3IZCQPDRS` |
-| Primary | `CBSORANQVSWYBYGKRZ7RAUGOXDAXMXDXQWJSE42DQZOL4BK75BIEBUQK` |
-| Allocator | `CBSORANERRWAG5YT4DNQSCYJMOQ7M7UO5AHIAHVNF5ZLKK4JNK7FSKEE` |
+| Registry | `CDSORANCV3IFF3MKHJ7KI4MKEJOJZFMTDVAZCD5XFOR4WTGNXJJNOKQE` |
+| Lookup | `CDSORANO7K4FSBR2MLV4PNELJ6UXCDNG4MJZSH6HCVZZZQN5B5GMOP64` |
+| Primary | `CCSORANOADXKLSW5CUANBW5WZFVCNZ5KZ4KNMIUWOZOES3LXYRUYZ56X` |
+| Allocator | `CASORANSKKNXDJYXPZK7OJFIJQL5EMVO7VLYJJSWTCZLT26WWATBI4HY` |
 
 Mainnet has no deployment preset. Custom networks must supply their own verified
 addresses. Universal Lookup upgrades remain immediately executable; an address

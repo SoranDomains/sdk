@@ -2,7 +2,7 @@
 
 This historical example exposes the earlier, unpaginated discovery format. It does
 not implement the cursor and coverage contract required for complete holdings in
-lookup 0.5.0. Use a compatible current indexer for `namesOfPage` and do not treat
+lookup 0.5.1. Use a compatible current indexer for `namesOfPage` and do not treat
 this example's holdings response as a complete inventory.
 
 The [self-hostable hint server](../hint-server/), adapted to Cloudflare — with

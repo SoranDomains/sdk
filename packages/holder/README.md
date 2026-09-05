@@ -1,9 +1,9 @@
 # @sorandomains/holder
 
-Version 0.3.0 targets Stellar SDK17 (`>=17 <18`). ASCII names
+Version 0.3.1 targets Stellar SDK17 (`>=17 <18`). ASCII names
 and labels are validated before lowercase normalization; Unicode lookalikes are
 rejected. Writes continue to target the owning Registry/Registrar/Resolver. Universal
-Lookup is the read entry point in `@sorandomains/lookup` 0.5.0.
+Lookup is the read entry point in `@sorandomains/lookup` 0.5.1.
 
 Your Soran name, managed with your own key. The third piece of the SDK
 trilogy: [`@sorandomains/lookup`](https://www.npmjs.com/package/@sorandomains/lookup)
@@ -115,12 +115,12 @@ supply the matching `primaryId` explicitly.
 
 ## Verified testnet deployment
 
-Verified on 2026-09-05 at ledger 4515471. Network passphrase: `Test SDF Network ; September 2015`.
+Verified on 2026-09-05 at ledger 4520986. Network passphrase: `Test SDF Network ; September 2015`.
 
 | Contract | Address |
 |---|---|
-| Registry | `CBSORANXTUFKBZK74AAM2ZM5OX2V7PIXUADM3HGP6WU3IDN7M3YEEDLU` |
-| Primary | `CBSORANQVSWYBYGKRZ7RAUGOXDAXMXDXQWJSE42DQZOL4BK75BIEBUQK` |
+| Registry | `CDSORANCV3IFF3MKHJ7KI4MKEJOJZFMTDVAZCD5XFOR4WTGNXJJNOKQE` |
+| Primary | `CCSORANOADXKLSW5CUANBW5WZFVCNZ5KZ4KNMIUWOZOES3LXYRUYZ56X` |
 
 Mainnet has no deployment preset. Custom networks must supply their own verified
 addresses. Universal Lookup upgrades remain immediately executable; an address

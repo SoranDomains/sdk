@@ -24,6 +24,10 @@ import { registerReadTools, registerWriteTools } from "./tools.js";
 const { version } = createRequire(import.meta.url)("../package.json") as { version: string };
 
 const server = new McpServer({ name: "soran", version });
+const deploymentVersionText = process.env.SORAN_REGISTRY_DEPLOYMENT_SALT_VERSION;
+if (deploymentVersionText !== undefined && deploymentVersionText !== "0" && deploymentVersionText !== "1")
+  throw new Error("SORAN_REGISTRY_DEPLOYMENT_SALT_VERSION must be 0 or 1");
+const registryDeploymentSaltVersion = deploymentVersionText === undefined ? undefined : Number(deploymentVersionText) as 0 | 1;
 const opts = {
   hintUrl: process.env.SORAN_HINT_URL,
   rpcUrl: process.env.SORAN_RPC_URL,
@@ -36,7 +40,7 @@ const opts = {
 };
 registerReadTools(server, opts);
 try {
-  await registerWriteTools(server, { ...opts, secret: process.env.SORAN_SECRET });
+  await registerWriteTools(server, { ...opts, secret: process.env.SORAN_SECRET, registryDeploymentSaltVersion });
 } catch (e) {
   console.error(`soran MCP: write tools unavailable — ${e instanceof Error ? e.message : e}. Serving read tools only.`);
 }
