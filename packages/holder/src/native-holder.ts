@@ -1,7 +1,7 @@
 import { hash, scValToNative, xdr } from "@stellar/stellar-sdk";
 import { NativeClaimError, address, bytes32, exactObject, hex, hex32, label, namespaceNode, sc, u64, unhex, utf8 } from "./native-codec.js";
 import { authorizedInvocation, type NativeAuthorizationPlan, type NativeInvocation } from "./native-auth.js";
-import { nativeCapability, requireNative, verifyRegistrarProvenance, prepareNative, sendNative, type NativeContext, type NativeWriteOptions, type NativePrepared } from "./native-transport.js";
+import { nativeCapability, requireNative, requireReadLedger, verifyRegistrarProvenance, prepareNative, sendNative, type NativeContext, type NativeWriteOptions, type NativePrepared } from "./native-transport.js";
 import { claimIntentToScVal, claimIntentFromNative, claimQuoteFromNative, claimReceiptFromNative, claimResultFromNative, destinationPreviewFromNative, transferIntentToScVal, renewIntentToScVal, nativeIntentHash, claimLabelToScVal, type ClaimIntent, type ClaimQuote, type ClaimReceipt, type ClaimResult, type RequestContext, type TransferIntent, type RenewIntent, type DestinationPreview } from "./native-types.js";
 import { paymentDestinationToScVal } from "./native-codec.js";
 import { validatePaymentDestination, type PaymentDestination } from "./payment.js";
@@ -26,6 +26,7 @@ function initialization(resolver:string,nameLabel:string,holder:string,generatio
 function receiptMatches(receipt:ClaimReceipt,method:Parameters<typeof nativeIntentHash>[0],intent:xdr.ScVal,holder:string):void{
  if(receipt.intentHash!==nativeIntentHash(method,intent)||receipt.holder!==holder)throw new NativeClaimError("request ID already belongs to a different immutable intent");
  const raw=scValToNative(intent), expectedOperation=({claim:"claim",issue_reserved_with_destination:"reserved",accept_transfer_with_destination:"transfer",renew_holder:"renew"} as const)[method];
+ if(receipt.timestamp<raw.context.valid_after||receipt.timestamp>raw.context.deadline)throw new NativeClaimError("receipt timestamp is outside the original request window");
  const nodeBytes=new Uint8Array(64);nodeBytes.set(raw.context.namespace);nodeBytes.set(hash(raw.label),32);
  if(receipt.operation!==expectedOperation||receipt.node!==hex(hash(nodeBytes)))throw new NativeClaimError("receipt operation/name differs from intent");
  const generation=method==="renew_holder"?raw.expected_generation:raw.expected_generation===null||raw.expected_generation===undefined?0n:raw.expected_generation+1n;
@@ -35,12 +36,33 @@ function receiptMatches(receipt:ClaimReceipt,method:Parameters<typeof nativeInte
   if(receipt.expiresAt!==(raw.term_secs===0n?0n:receipt.timestamp+raw.term_secs))throw new NativeClaimError("receipt lease differs from intent");
  }else{
   if(receipt.feeAmount!==0n||receipt.feeRecipient!==null)throw new NativeClaimError("lifecycle receipt unexpectedly contains a username fee");
-  if(method==="accept_transfer_with_destination"&&receipt.expiresAt!==raw.expected_expiry)throw new NativeClaimError("transfer receipt changed the lease");
+  if(method==="accept_transfer_with_destination"&&(receipt.expiresAt!==raw.expected_expiry||receipt.timestamp>raw.proposal_expires))throw new NativeClaimError("transfer receipt changed the lease or exceeded the proposal window");
   if(method==="renew_holder"&&(receipt.expiresAt<raw.min_new_expiry||receipt.expiresAt>raw.max_new_expiry||receipt.expiresAt!==(receipt.timestamp>raw.expected_expiry?receipt.timestamp:raw.expected_expiry)+raw.term_secs))throw new NativeClaimError("renewal receipt differs from signed lease bounds");
  }
 }
 
-function confirmedResult(result:{hash:string;ledger:number;value:unknown},method:Parameters<typeof nativeIntentHash>[0],encoded:xdr.ScVal,holder:string):NativeClaimSubmission{try{const decoded=claimResultFromNative(result.value);receiptMatches(decoded.receipt,method,encoded,holder);return{...decoded,transaction:{hash:result.hash,ledger:result.ledger}};}catch(error){throw new NativeClaimError(`transaction confirmed but result could not be verified: ${String(error)}; recover the original request`,"pending",result.hash);}}
+function receiptReadMatches(receipt:ClaimReceipt,holder:string,observedLedger:number):void{
+ requireReadLedger(receipt.ledger);
+ if(receipt.holder!==holder||receipt.ledger>observedLedger)throw new NativeClaimError("receipt holder or inclusion ledger differs from the requested snapshot","unavailable");
+}
+async function confirmedResult(
+ context:NativeContext,result:{hash:string;ledger:number;value:unknown},
+ method:Parameters<typeof nativeIntentHash>[0],encoded:xdr.ScVal,holder:string,
+):Promise<NativeClaimSubmission>{
+ try{
+  // Inclusion proves the reviewed transaction ran, not that an owner left the
+  // Registrar on its trusted implementation until it ran. Recheck after it.
+  const raw=scValToNative(encoded);
+  await verifyRegistrarProvenance(context,raw.context.registrar,hex(raw.context.namespace),result.ledger);
+  const decoded=claimResultFromNative(result.value);
+  receiptReadMatches(decoded.receipt,holder,result.ledger);
+  if(decoded.status==="fresh"&&decoded.receipt.ledger!==result.ledger)throw new NativeClaimError("fresh receipt does not belong to the confirmed ledger");
+  receiptMatches(decoded.receipt,method,encoded,holder);
+  return{...decoded,transaction:{hash:result.hash,ledger:result.ledger}};
+ }catch(error){
+  throw new NativeClaimError(`transaction confirmed but result could not be verified: ${String(error)}; recover the original request`,"pending",result.hash);
+ }
+}
 
 export class NativeHolderClient {
  constructor(private context:NativeContext){}
@@ -70,12 +92,29 @@ export class NativeHolderClient {
   const bytes=new Uint8Array(64);bytes.set(unhex(node));bytes.set(hash(utf8(nameLabel)),32);
   if(quote.node!==hex(hash(bytes)))throw new NativeClaimError("quote name node is invalid","unavailable");
  }
- async claimReceipt(namespace:string,claimant:string,requestId:string):Promise<ClaimReceipt|null>{return this.receiptAt(await this.registrar(canonicalNamespace(namespace)),claimant,requestId);}
- private async receiptAt(registrar:string,claimant:string,requestId:string):Promise<ClaimReceipt|null>{
-  const raw=await this.context.read(registrar,"claim_receipt",[sc.address(address(claimant,"identity","receipt holder")),sc.bytes(unhex(requestId))]);
-  return raw===null?null:claimReceiptFromNative(raw);
+ async claimReceipt(namespace:string,claimant:string,requestId:string):Promise<ClaimReceipt|null>{
+  const canonical=canonicalNamespace(namespace);
+  return this.receiptAt(await this.registrar(canonical),hex(namespaceNode(canonical)),claimant,requestId);
  }
- async recoverClaim(intent:ClaimIntent):Promise<ClaimReceipt|null>{const encoded=claimIntentToScVal(intent);scoped(this.context,intent.context);await verifyRegistrarProvenance(this.context,intent.context.registrar,intent.context.namespace);if(await this.context.read(this.context.registryId,"registrar_of",[sc.bytes(unhex(intent.context.namespace))])!==intent.context.registrar)throw new NativeClaimError("recovery Registrar is not the Registry attestation","unavailable");const receipt=await this.receiptAt(intent.context.registrar,intent.claimant,intent.context.requestId);if(receipt)receiptMatches(receipt,"claim",encoded,intent.claimant);return receipt;}
+ private async receiptAt(registrar:string,namespace:string,claimant:string,requestId:string):Promise<ClaimReceipt|null>{
+  const holder=address(claimant,"identity","receipt holder");
+  const snapshot=await this.context.readWithLedger(registrar,"claim_receipt",[sc.address(holder),sc.bytes(unhex(hex32(requestId,"request ID")))]);
+  const ledger=requireReadLedger(snapshot?.ledger);
+  // Validate both Some and None before they can drive a recovery/replay decision.
+  await verifyRegistrarProvenance(this.context,registrar,namespace,ledger);
+  if(snapshot.value===null)return null;
+  const receipt=claimReceiptFromNative(snapshot.value);
+  receiptReadMatches(receipt,holder,ledger);
+  return receipt;
+ }
+ async recoverClaim(input:ClaimIntent):Promise<ClaimReceipt|null>{
+  const encoded=claimIntentToScVal(input),intent=claimIntentFromNative(scValToNative(encoded));
+  scoped(this.context,intent.context);
+  await verifyRegistrarProvenance(this.context,intent.context.registrar,intent.context.namespace);
+  const receipt=await this.receiptAt(intent.context.registrar,intent.context.namespace,intent.claimant,intent.context.requestId);
+  if(receipt)receiptMatches(receipt,"claim",encoded,intent.claimant);
+  return receipt;
+ }
  private async planClaim(input:ClaimIntent,proof:readonly string[]=[]):Promise<{intent:ClaimIntent;plan:NativeAuthorizationPlan}>{
   const encoded=claimIntentToScVal(input);const intent=claimIntentFromNative(scValToNative(encoded));scoped(this.context,intent.context);
   const wallet=address(await this.context.signer.publicKey(),"account","claimant");if(intent.claimant!==wallet)throw new NativeClaimError("intent claimant is not the connected wallet","authorization");
@@ -114,7 +153,7 @@ export class NativeHolderClient {
  async claim(intent:ClaimIntent,options:ClaimSubmitOptions={}):Promise<NativeClaimSubmission>{
   // Snapshot before any awaits: callers cannot mutate reviewed destination/amount mid-flow.
   const snapshot=claimIntentFromNative(scValToNative(claimIntentToScVal(intent)));
-  return this.context.serialize(async()=>{const old=await this.recoverClaim(snapshot);if(old)return{status:"replayed",receipt:old,transaction:null};const {plan}=await this.planClaim(snapshot,options.proof);const result=await sendNative(this.context,plan,options);return confirmedResult(result,"claim",claimIntentToScVal(snapshot),snapshot.claimant);});
+  return this.context.serialize(async()=>{const old=await this.recoverClaim(snapshot);if(old)return{status:"replayed",receipt:old,transaction:null};const {plan}=await this.planClaim(snapshot,options.proof);const result=await sendNative(this.context,plan,options);return confirmedResult(this.context,result,"claim",claimIntentToScVal(snapshot),snapshot.claimant);});
  }
  async renewalPreview(name:string):Promise<DestinationPreview>{
   const parsed=names(name),registrar=await this.registrar(parsed.namespace);const raw=exactObject(await this.context.read(registrar,"record_of",[claimLabelToScVal(parsed.label)]),["holder","address","expires_at","generation"],"name record");
@@ -127,7 +166,7 @@ export class NativeHolderClient {
  }
  async renewName(input:RenewIntent,options:NativeWriteOptions={}):Promise<NativeClaimSubmission>{return this.lifecycle("renew_holder",input.context,input.holder,renewIntentToScVal(input),input.label,null,options);}
  private async lifecycle(method:"accept_transfer_with_destination"|"renew_holder",request:RequestContext,holder:string,intent:xdr.ScVal,nameLabel:string,child:NativeInvocation|null,options:NativeWriteOptions):Promise<NativeClaimSubmission>{
-  request={...request};scoped(this.context,request);return this.context.serialize(async()=>{await verifyRegistrarProvenance(this.context,request.registrar,request.namespace);if(await this.context.read(this.context.registryId,"registrar_of",[sc.bytes(unhex(request.namespace))])!==request.registrar)throw new NativeClaimError("recovery Registrar is not the Registry attestation","unavailable");const old=await this.receiptAt(request.registrar,holder,request.requestId);if(old){receiptMatches(old,method,intent,holder);return{status:"replayed",receipt:old,transaction:null};}await this.checkRegistrar(request.registrar,request.namespace);if(child){const pair=await this.context.read(this.context.registryId,"native_contracts",[sc.bytes(unhex(request.namespace))]);if(!Array.isArray(pair)||pair.length!==2||pair[0]!==request.registrar||pair[1]!==child.contract)throw new NativeClaimError("transfer initializer differs from clean native bindings","unavailable");}const source=address(await this.context.signer.publicKey(),"account","holder source");if(source!==holder)throw new NativeClaimError("connected wallet is not the intended holder/recipient","authorization");
-   const result=await sendNative(this.context,{source,contract:request.registrar,method,args:[intent],sourceInvocation:{contract:request.registrar,method,args:[intent],children:child?[child]:[]},maxFeeStroops:this.context.maxFeeStroops},options);return confirmedResult(result,method,intent,holder);});
+  request={...request};scoped(this.context,request);return this.context.serialize(async()=>{await verifyRegistrarProvenance(this.context,request.registrar,request.namespace);const old=await this.receiptAt(request.registrar,request.namespace,holder,request.requestId);if(old){receiptMatches(old,method,intent,holder);return{status:"replayed",receipt:old,transaction:null};}await this.checkRegistrar(request.registrar,request.namespace);if(child){const pair=await this.context.read(this.context.registryId,"native_contracts",[sc.bytes(unhex(request.namespace))]);if(!Array.isArray(pair)||pair.length!==2||pair[0]!==request.registrar||pair[1]!==child.contract)throw new NativeClaimError("transfer initializer differs from clean native bindings","unavailable");}const source=address(await this.context.signer.publicKey(),"account","holder source");if(source!==holder)throw new NativeClaimError("connected wallet is not the intended holder/recipient","authorization");
+   const result=await sendNative(this.context,{source,contract:request.registrar,method,args:[intent],sourceInvocation:{contract:request.registrar,method,args:[intent],children:child?[child]:[]},maxFeeStroops:this.context.maxFeeStroops},options);return confirmedResult(this.context,result,method,intent,holder);});
  }
 }

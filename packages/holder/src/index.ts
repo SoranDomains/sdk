@@ -55,7 +55,7 @@ export { encodeMuxedAddress, decodeMuxedAddress, PAYMENT_RECORD_KEY, encodePayme
 import { NativeHolderClient, type ClaimSubmitOptions } from "./native-holder.js";
 import { NativeClaimError } from "./native-codec.js";
 import type { ClaimIntent, TransferIntent, RenewIntent } from "./native-types.js";
-import type { NativeWriteOptions } from "./native-transport.js";
+import { requireReadLedger, type NativeRead, type NativeWriteOptions } from "./native-transport.js";
 export * from "./native-types.js";
 export * from "./native-allowlist.js";
 export * from "./native-approver.js";
@@ -374,7 +374,8 @@ export class SoranHolder {
 
   private nativeClient(): NativeHolderClient {
     return new NativeHolderClient({ registryId: this.registryId, passphrase: this.passphrase, server: this.server, signer: this.signer, fee: this.fee, timeoutSecs: this.timeoutSecs, maxFeeStroops: this.maxNativeFeeStroops,
-      read: (id, method, args) => this.read(id, method, args), serialize: work => this.serialize(work) });
+      read: (id, method, args) => this.read(id, method, args),
+      readWithLedger: (id, method, args) => this.readWithLedger(id, method, args), serialize: work => this.serialize(work) });
   }
   nativeClaimCapability(namespace: string) { return this.nativeClient().nativeClaimCapability(namespace); }
   claimQuote(name: string, claimant?: string) { return this.nativeClient().claimQuote(name, claimant); }
@@ -774,6 +775,15 @@ export class SoranHolder {
   }
 
   private async read(contractId: string, fn: string, args: xdr.ScVal[]): Promise<unknown> {
+    return (await this.simulateRead(contractId, fn, args)).value;
+  }
+
+  private async readWithLedger(contractId: string, fn: string, args: xdr.ScVal[]): Promise<NativeRead> {
+    const result = await this.simulateRead(contractId, fn, args);
+    return { value: result.value, ledger: requireReadLedger(result.ledger) };
+  }
+
+  private async simulateRead(contractId: string, fn: string, args: xdr.ScVal[]): Promise<{ value: unknown; ledger: unknown }> {
     const tx = new TransactionBuilder(new Account(SIM_SOURCE, "0"), {
       fee: BASE_FEE,
       networkPassphrase: this.passphrase,
@@ -793,7 +803,7 @@ export class SoranHolder {
     if (!rpc.Api.isSimulationSuccess(sim) || !sim.result?.retval)
       throw new HolderError(`${fn}: missing simulation return value`, contractId, fn);
     const v = scValToNative(sim.result.retval);
-    return v === undefined ? null : v;
+    return { value: v === undefined ? null : v, ledger: sim.latestLedger };
   }
 
   private async signEnvelope(xdrBase64: string): Promise<string> {

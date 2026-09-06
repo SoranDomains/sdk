@@ -3,16 +3,55 @@ import { NativeClaimError, address, bytes32, hex, namespaceNode, sc, unhex } fro
 import { assertSignedBodyUnchanged, validateEligibilityAuthorization, validateNativeTransaction, type NativeAuthorizationPlan } from "./native-auth.js";
 
 export type NativeSigner = { publicKey(): string | Promise<string>; signTransaction(encoded: string, opts: { networkPassphrase: string }): Promise<string | { signedTxXdr: string }> };
+export type NativeRead = { value: unknown; ledger: number };
 export type NativeContext = {
   registryId: string; passphrase: string; server: rpc.Server; signer: NativeSigner; fee: string; timeoutSecs: number; maxFeeStroops: bigint;
   read(contract: string, method: string, args: xdr.ScVal[]): Promise<unknown>;
+  readWithLedger(contract: string, method: string, args: xdr.ScVal[]): Promise<NativeRead>;
   serialize<T>(work: () => Promise<T>): Promise<T>;
 };
 export type NativeCapability = { supported: false; registrar: string; reason: "legacy-template" | "unsupported-version" } | { supported: true; version: 1; registrar: string; resolver: string; registry: string; namespace: string; owner: string; ownerEpoch: bigint };
 /** This published legacy code has owner-only issuance. Missing RPC data is never legacy detection. */
 const LEGACY_REGISTRAR_HASH = "ed06b3374ff4342b4a2316fc546505132cd8fd35be6666571cf088710af9bbc6";
+/** A missing context is not evidence that an RPC observation is fresh. */
+export function requireReadLedger(value: unknown, minimum = 1): number {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < minimum || value < 1 || value > 0xffff_ffff)
+    throw new NativeClaimError("RPC read has missing, invalid or stale ledger context", "unavailable");
+  return value;
+}
+
+/** Every post-receipt observation must be at least as new as that simulation.
+ * Registry taint is irreversible: clean at/after the receipt rules out an
+ * upgrade before it, even when these truthful RPC snapshots differ in ledger.
+ * The RPC remains trusted to report its ledger and returned state honestly.
+ */
+async function verifyProvenanceAfter(context: NativeContext, registrar: string, namespace: string, minimumLedger: number): Promise<void> {
+  requireReadLedger(minimumLedger);
+  const node = sc.bytes(unhex(namespace));
+  const key = new Contract(registrar).getFootprint();
+  const [attestation, taint, templates, executable] = await Promise.all([
+    context.readWithLedger(context.registryId, "registrar_of", [node]),
+    context.readWithLedger(context.registryId, "registrar_tainted", [node]),
+    context.readWithLedger(context.registryId, "template_hashes", []),
+    context.server.getLedgerEntries(key),
+  ]);
+  for (const observation of [attestation, taint, templates]) requireReadLedger(observation?.ledger, minimumLedger);
+  requireReadLedger(executable?.latestLedger, minimumLedger);
+  if (attestation.value !== registrar || taint.value !== false || !Array.isArray(templates.value) || templates.value.length !== 2)
+    throw new NativeClaimError("Registrar provenance changed or is unavailable after receipt read", "unavailable");
+  // getContractInstance discards latestLedger; read and bind the exact entry.
+  const entry = executable.entries?.[0];
+  if (executable.entries?.length !== 1 || !entry || entry.key.toXDR("base64") !== key.toXDR("base64") || entry.val.type !== "contractData")
+    throw new NativeClaimError("Registrar executable proof is missing or mismatched", "unavailable");
+  const data = entry.val.value;
+  if (data.contract.toXDR("base64") !== new Contract(registrar).address().toScAddress().toXDR("base64") || data.key.type !== "scvLedgerKeyContractInstance" || data.durability !== xdr.ContractDataDurability.persistent || data.val.type !== "scvContractInstance" || data.val.value.executable.type !== "contractExecutableWasm")
+    throw new NativeClaimError("Registrar executable proof is not the requested Wasm instance", "unavailable");
+  if (hex(bytes32(templates.value[0], "Registry Registrar template")) !== hex(data.val.value.executable.wasmHash.value))
+    throw new NativeClaimError("Registrar executable differs from immutable Registry template after receipt read", "unavailable");
+}
 /** Historical reads must not trust an upgraded Registrar that can fabricate receipts. Resolver changes do not block this Registrar-only check. */
-export async function verifyRegistrarProvenance(context: NativeContext, registrar: string, namespace: string): Promise<void> {
+export async function verifyRegistrarProvenance(context: NativeContext, registrar: string, namespace: string, minimumLedger?: number): Promise<void> {
+  if (minimumLedger !== undefined) return verifyProvenanceAfter(context, registrar, namespace, minimumLedger);
   const node=sc.bytes(unhex(namespace));
   const [attested,tainted,templates,instance]=await Promise.all([
     context.read(context.registryId,"registrar_of",[node]),context.read(context.registryId,"registrar_tainted",[node]),
