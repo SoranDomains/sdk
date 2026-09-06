@@ -1,7 +1,7 @@
 # @sorandomains/mcp
 
-> Native muxed release. The testnet deployment below was verified on chain at
-> ledger 4521644 on 5 September 2026 (18:10 UTC). See the
+
+> Native claim testnet deployment verified at ledger 4534629 on 6 September 2026 (12:12 UTC). See the
 > [release status](https://docs.soran.domains/reference/release-status) for package and service availability.
 
 
@@ -20,7 +20,7 @@ Two transports, one tool set:
   read tools — what hosted agents (claude.ai connectors and friends) reach
   with no install.
 
-Version 0.6.0 targets the namespace-bound **Stellar testnet** deployment from 2026-09-05.
+Version 0.7.0 targets the native-claim **Stellar testnet** successor deployment.
 The default Registry, Lookup, Primary and Allocator pins belong to that deployment.
 
 ## Install
@@ -139,9 +139,9 @@ import { registerReadTools, registerWriteTools } from "@sorandomains/mcp";
 Source: <https://github.com/SoranDomains/sdk> · Docs: <https://github.com/SoranDomains/docs> · License: MIT
 
 
-Version 0.6.0 uses Stellar SDK17 and the matching lookup 0.6.0,
-holder 0.4.0 and owner 0.6.0 packages. Both transports pass the same universal
-configuration and export the same MCP version. The v2 deployment was verified at ledger 4521644; custom Registry or passphrase
+Version 0.7.0 uses Stellar SDK17 and the matching lookup 0.7.0,
+holder 0.5.0 and owner 0.7.0 packages. Both transports pass the same universal
+configuration and export the same MCP version. The successor deployment retains Lookup V2; custom Registry or passphrase
 settings require their own Allocator pin and do not inherit testnet fee routing.
 
 `resolve_payment`, `lookup_name`, `verify_payment` and `set_payment` accept or return
@@ -193,16 +193,23 @@ The current testnet public-window claim fee is **5,000 XLM** (50,000,000,000 str
 separate from network fees and objection bonds. Always fetch and review the live
 quote; the tool never substitutes a hardcoded amount for the on-chain policy.
 
+
+## Native username claiming
+
+Local signer tools add native username quote/preparation/claim/recovery, policy configuration, reservations, reserved assignment, transfer acceptance and holder renewal. These use the current contracts directly; top-level namespace application and activation remain separate API-prepared flows. Hosted MCP does not receive these write tools or an operator signing key.
+
+Read the [native claim APIs, security boundaries and complete signup flow](https://github.com/SoranDomains/sdk/blob/main/NATIVE-CLAIMS.md). G/no memo, G with ID/Text/Hash, full M/no separate memo and C/no memo remain supported payment destinations. Current transaction-signing adapters use classic G accounts.
+
 ## Verified testnet deployment
 
-Verified on 5 September 2026 at ledger **4521644** (18:10 UTC). Network passphrase: `Test SDF Network ; September 2015`.
+Verified on 6 September 2026 at ledger **4534629** (12:12 UTC). Network passphrase: `Test SDF Network ; September 2015`.
 
 | Contract | Address |
 |---|---|
-| Registry | `CASORANI5CN2NJFEO2MGTRDA35AOEF3D3OCVBWN3FS6B6FXNQ74RTJ7H` |
-| Lookup | `CDSORANKG77YZITKWCLWGPKLB2R3HPTP4D6KKZZ7X3R5HLXLMNOTGCDD` |
-| Primary | `CCSORANJZOR5ZYTI4KAW34ESAQFMJAO4NKMTIVOVJOI2VDKCDK3RICXZ` |
-| Allocator | `CDSORANPTRS2EYHN57OZEXTW23P2HPDM3WEAC754B7GNHRB5V6FTJ2EE` |
+| Registry | `CBSORANPM664QXYMYRZKLQDQE2TXFSK4GBMC6EIRSRTAUZRZCRZRFNMK` |
+| Lookup | `CDSORANQAJK35UV2HR63CMB6M5NYISHMUBTB6EQY2CZ3Y7HJDIOHRJWA` |
+| Primary | `CASORAN755O3GCQTRAHKDXLLCSDLNKAQWAP6MWABRSFVSHLJOEKAC7AB` |
+| Allocator | `CCSORANYFHUJUWETEQ7UWIDN4JTPV7NN5G6YUSSBZI57X7EQWVA63VMJ` |
 
 Mainnet has no deployment preset. Custom networks must supply their own verified
 addresses. Universal Lookup upgrades remain immediately executable; an address
@@ -233,3 +240,7 @@ to choose ordinary addresses. To abandon or restart a queued, failed or ready
 search, call `cancel_namespace_activation` with the exact `namespace` and
 `role: "registrar"` or `"resolver"`. Cancellation only clears the service's
 address-generation job; it does not withdraw a claim or undo a contract.
+
+### Local native claim network fee cap
+
+Native username methods retain the 5 XLM total network fee cap. The local operator may configure `SORAN_MAX_NATIVE_FEE_STROOPS` (canonical integer 1–4294967295), or `WriteToolOptions.maxNativeFeeStroops`, after reviewing deployment/storage estimates. Agent tool arguments cannot increase that setting. This is separate from the namespace owner's username treasury price and does not change older methods' existing fee guards. Initial storage rent may exceed the default, in which case signing stops. See [native claim behavior and limitations](https://github.com/SoranDomains/sdk/blob/main/NATIVE-CLAIMS.md).

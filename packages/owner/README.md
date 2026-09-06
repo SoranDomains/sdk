@@ -1,14 +1,14 @@
 # @sorandomains/owner
 
-> Native muxed release. The testnet deployment below was verified on chain at
-> ledger 4521644 on 5 September 2026 (18:10 UTC). See the
+
+> Native claim testnet deployment verified at ledger 4534629 on 6 September 2026 (12:12 UTC). See the
 > [release status](https://docs.soran.domains/reference/release-status) for package and service availability.
 
 
-Version 0.6.0 targets Stellar SDK17 (`>=17 <18`). ASCII names
+Version 0.7.0 targets Stellar SDK17 (`>=17 <18`). ASCII names
 and labels are validated before lowercase normalization; Unicode lookalikes are
 rejected. Writes continue to target the owning Registry/Registrar/Resolver. Universal
-Lookup is the read entry point in `@sorandomains/lookup` 0.6.0.
+Lookup is the read entry point in `@sorandomains/lookup` 0.7.0.
 
 Ownership, issuer, holder and treasury inputs remain G/C account or contract
 addresses. Muxed M addresses are payment destinations only: issue the name to its
@@ -83,13 +83,20 @@ code at all.
 
 Docs: <https://github.com/SoranDomains/docs> · License: MIT
 
+
+## Native username claiming
+
+`claimPolicy` and `nativeClaimCapability` read the current on-chain setup. Configure it with `configureClaims`, `setClaimsEnabled`/`pauseClaims`, `reserveNames`, `releaseReservations` and `assignReserved`. Manual mode retains ordinary owner issuance; Public mode routes ordinary issuance through the public claim rules, while explicit reserved assignment remains an owner power. The default disabled policy is not an open registration service.
+
+Read the [native claim APIs, security boundaries and complete signup flow](https://github.com/SoranDomains/sdk/blob/main/NATIVE-CLAIMS.md). G/no memo, G with ID/Text/Hash, full M/no separate memo and C/no memo remain supported payment destinations. Current transaction-signing adapters use classic G accounts.
+
 ## Verified testnet deployment
 
-Verified on 5 September 2026 at ledger **4521644** (18:10 UTC). Network passphrase: `Test SDF Network ; September 2015`.
+Verified on 6 September 2026 at ledger **4534629** (12:12 UTC). Network passphrase: `Test SDF Network ; September 2015`.
 
 | Contract | Address |
 |---|---|
-| Registry | `CASORANI5CN2NJFEO2MGTRDA35AOEF3D3OCVBWN3FS6B6FXNQ74RTJ7H` |
+| Registry | `CBSORANPM664QXYMYRZKLQDQE2TXFSK4GBMC6EIRSRTAUZRZCRZRFNMK` |
 
 Mainnet has no deployment preset. Custom networks must supply their own verified
 addresses. Universal Lookup upgrades remain immediately executable; an address

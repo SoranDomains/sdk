@@ -28,6 +28,20 @@ export const DEPLOYMENTS = {
   testnet: {
     rpcUrl: "https://soroban-testnet.stellar.org",
     passphrase: Networks.TESTNET as string,
+    // Native-claim successor on Stellar testnet; see the deployment manifest for verified ledger and code hashes.
+    registryId: "CBSORANPM664QXYMYRZKLQDQE2TXFSK4GBMC6EIRSRTAUZRZCRZRFNMK",
+    lookupId: "CDSORANQAJK35UV2HR63CMB6M5NYISHMUBTB6EQY2CZ3Y7HJDIOHRJWA",
+    primaryId: "CASORAN755O3GCQTRAHKDXLLCSDLNKAQWAP6MWABRSFVSHLJOEKAC7AB",
+    allocatorId: "CCSORANYFHUJUWETEQ7UWIDN4JTPV7NN5G6YUSSBZI57X7EQWVA63VMJ",
+  },
+  // mainnet: populated at mainnet launch
+} as const;
+
+/** Explicit historical deployment access. Names in different Registries are separate identities; never a fallback. */
+export const LEGACY_DEPLOYMENTS = {
+  testnet20260905: {
+    rpcUrl: "https://soroban-testnet.stellar.org",
+    passphrase: Networks.TESTNET as string,
     // Native muxed testnet deployment verified at ledger 4521644 (2026-09-05 18:10 UTC).
     registryId: "CASORANI5CN2NJFEO2MGTRDA35AOEF3D3OCVBWN3FS6B6FXNQ74RTJ7H",
     lookupId: "CDSORANKG77YZITKWCLWGPKLB2R3HPTP4D6KKZZ7X3R5HLXLMNOTGCDD",

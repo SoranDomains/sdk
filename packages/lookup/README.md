@@ -1,7 +1,6 @@
 # @sorandomains/lookup
 
-> Native muxed release. The testnet deployment below was verified on chain at
-> ledger 4521644 on 5 September 2026 (18:10 UTC). See the
+> Native claim testnet deployment verified at ledger 4534629 on 6 September 2026 (12:12 UTC). See the
 > [release status](https://docs.soran.domains/reference/release-status) for package and service availability.
 
 
@@ -211,16 +210,23 @@ not promoted to top-level errors. Do not branch on prose messages.
 Supports Node, browsers and workers. This release is tested against Stellar SDK17
 and declares peer `>=17 <18`. It does not claim untested SDK14–16 compatibility.
 
+
+## Native username claiming
+
+Version 0.7.0 selects the native-claim successor testnet deployment while retaining the existing Universal Lookup V2 payment API. Ownership, payment routes and account identity remain distinct. A username with the same spelling in another Registry is a separate record.
+
+Read the [native claim APIs, security boundaries and complete signup flow](https://github.com/SoranDomains/sdk/blob/main/NATIVE-CLAIMS.md). G/no memo, G with ID/Text/Hash, full M/no separate memo and C/no memo remain supported payment destinations. Current transaction-signing adapters use classic G accounts.
+
 ## Verified testnet deployment
 
-Verified on 5 September 2026 at ledger **4521644** (18:10 UTC). Network passphrase: `Test SDF Network ; September 2015`.
+Verified on 6 September 2026 at ledger **4534629** (12:12 UTC). Network passphrase: `Test SDF Network ; September 2015`.
 
 | Contract | Address |
 |---|---|
-| Registry | `CASORANI5CN2NJFEO2MGTRDA35AOEF3D3OCVBWN3FS6B6FXNQ74RTJ7H` |
-| Lookup | `CDSORANKG77YZITKWCLWGPKLB2R3HPTP4D6KKZZ7X3R5HLXLMNOTGCDD` |
-| Primary | `CCSORANJZOR5ZYTI4KAW34ESAQFMJAO4NKMTIVOVJOI2VDKCDK3RICXZ` |
-| Allocator | `CDSORANPTRS2EYHN57OZEXTW23P2HPDM3WEAC754B7GNHRB5V6FTJ2EE` |
+| Registry | `CBSORANPM664QXYMYRZKLQDQE2TXFSK4GBMC6EIRSRTAUZRZCRZRFNMK` |
+| Lookup | `CDSORANQAJK35UV2HR63CMB6M5NYISHMUBTB6EQY2CZ3Y7HJDIOHRJWA` |
+| Primary | `CASORAN755O3GCQTRAHKDXLLCSDLNKAQWAP6MWABRSFVSHLJOEKAC7AB` |
+| Allocator | `CCSORANYFHUJUWETEQ7UWIDN4JTPV7NN5G6YUSSBZI57X7EQWVA63VMJ` |
 
 Mainnet has no deployment preset. Custom networks must supply their own verified
 addresses. Universal Lookup upgrades remain immediately executable; an address
