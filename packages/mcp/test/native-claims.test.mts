@@ -26,3 +26,12 @@ test('stdio refuses malformed native fee limits before registering a signing too
  assert.notEqual(result.status,0);assert.match(result.stderr,/SORAN_MAX_NATIVE_FEE_STROOPS must be canonical decimal/);
  }
 });
+
+test('native receipt tool surfaces unavailable provenance instead of completion or empty history',async()=>{
+ const previous=SoranHolder.prototype.claimReceipt;
+ try{
+  SoranHolder.prototype.claimReceipt=async()=>{throw new NativeClaimError('RPC read has missing, invalid or stale ledger context','unavailable');};
+  const ready=await tools();const result=await ready.handlers.get('native_claim_receipt')!({namespace:'nova',claimant:Keypair.random().publicKey(),requestId:'ab'.repeat(32)});
+  assert.equal(result.isError,true);const body=JSON.parse(result.content[0].text);assert.equal(body.outcome,'unavailable');assert.match(body.message,/ledger context/);
+ }finally{SoranHolder.prototype.claimReceipt=previous;}
+});
