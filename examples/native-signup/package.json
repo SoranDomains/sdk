@@ -1,0 +1,19 @@
+{
+  "name": "soran-native-signup-reference",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit --strict --target es2022 --module nodenext --moduleResolution nodenext --skipLibCheck flow.ts",
+    "test": "node --import tsx --test flow.test.mts"
+  },
+  "dependencies": {
+    "@sorandomains/holder": "0.5.0",
+    "@sorandomains/lookup": "0.7.0",
+    "@stellar/stellar-sdk": "17.0.1"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

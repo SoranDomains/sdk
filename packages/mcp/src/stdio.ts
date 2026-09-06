@@ -8,6 +8,7 @@
  *   SORAN_HINT_URL  discovery/API base (default https://api.soran.domains)
  *   SORAN_RPC_URL   Soroban RPC override (default: testnet public RPC)
  *   SORAN_PASSPHRASE network passphrase, pinned for signing (default testnet)
+ *   SORAN_MAX_NATIVE_FEE_STROOPS native username network fee ceiling (default 50000000; explicit local operator setting)
  *   NOTE: SORAN_HINT_URL is trusted to prepare the claim/activate transactions
  *   the agent signs — point it only at an API you trust (default is the
  *   canonical api.soran.domains). The signer validates each prepared tx
@@ -28,6 +29,10 @@ const deploymentVersionText = process.env.SORAN_REGISTRY_DEPLOYMENT_SALT_VERSION
 if (deploymentVersionText !== undefined && deploymentVersionText !== "0" && deploymentVersionText !== "1")
   throw new Error("SORAN_REGISTRY_DEPLOYMENT_SALT_VERSION must be 0 or 1");
 const registryDeploymentSaltVersion = deploymentVersionText === undefined ? undefined : Number(deploymentVersionText) as 0 | 1;
+const nativeFeeText = process.env.SORAN_MAX_NATIVE_FEE_STROOPS;
+if (nativeFeeText !== undefined && (!/^[1-9][0-9]{0,9}$/.test(nativeFeeText) || BigInt(nativeFeeText) > 4_294_967_295n))
+  throw new Error("SORAN_MAX_NATIVE_FEE_STROOPS must be canonical decimal stroops between 1 and 4294967295");
+const maxNativeFeeStroops = nativeFeeText === undefined ? undefined : BigInt(nativeFeeText);
 const opts = {
   hintUrl: process.env.SORAN_HINT_URL,
   rpcUrl: process.env.SORAN_RPC_URL,
@@ -40,7 +45,7 @@ const opts = {
 };
 registerReadTools(server, opts);
 try {
-  await registerWriteTools(server, { ...opts, secret: process.env.SORAN_SECRET, registryDeploymentSaltVersion });
+  await registerWriteTools(server, { ...opts, secret: process.env.SORAN_SECRET, registryDeploymentSaltVersion, maxNativeFeeStroops });
 } catch (e) {
   console.error(`soran MCP: write tools unavailable — ${e instanceof Error ? e.message : e}. Serving read tools only.`);
 }

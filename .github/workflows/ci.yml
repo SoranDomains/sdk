@@ -32,3 +32,22 @@ jobs:
       - name: Browser compatibility
         if: matrix.pkg != 'mcp'
         run: npm run check:browser
+
+  signup-example:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/native-signup
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: examples/native-signup/package-lock.json
+      - name: Install published dependencies
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Recovery tests
+        run: npm test

@@ -74,7 +74,7 @@ test("MCP sign-in rejects real sequence or different authentication domain befor
 test("MCP namespace-bound activation requires branded address and ignores API scheme", async () => {
   const selectedRegistry = "CASORANI5CN2NJFEO2MGTRDA35AOEF3D3OCVBWN3FS6B6FXNQ74RTJ7H";
   const node = await new Soran({ registryId: selectedRegistry }).namehash("nova");
-  // Known public nonce from the new release's namespace-bound vanity search.
+  // Historical public nonce; explicit legacy Registry requires its locally selected scheme.
   const nonce = Uint8Array.from("420ba0c7f5481a816479cd1471a9c28f29170f664730b79a1e1cfb0100000000".match(/../g)!, byte => Number.parseInt(byte, 16));
   const field = (key: string, val: xdr.ScVal) => new xdr.ScMapEntry({ key: xdr.ScVal.scvSymbol(key), val });
   const policy = xdr.ScVal.scvMap([field("default_term_secs", nativeToScVal(0n, { type: "u64" })), field("reclaimable", xdr.ScVal.scvBool(true)), field("trade_fee_bps", xdr.ScVal.scvU32(0)), field("tradeable", xdr.ScVal.scvBool(false)), field("transferable", xdr.ScVal.scvBool(true))]);
@@ -85,7 +85,7 @@ test("MCP namespace-bound activation requires branded address and ignores API sc
   const bound = address(hash(encoded)), raw = address(nonce);
   assert.equal(bound, "CDSORANZHOVD6EO345UWC23BNEXSPNFWCYJD4X35HXFC2S3GWQ3S64YX");
   const args = [xdr.ScVal.scvBytes(node), new Address(wallet).toScVal(), policy, xdr.ScVal.scvBytes(nonce)];
-  for (const [predictedId, configuredVersion, succeeds] of [[bound, 1, true], [raw, 1, false], [bound, 0, false], [bound, null, true]] as const) {
+  for (const [predictedId, configuredVersion, succeeds] of [[bound, 1, true], [raw, 1, false], [bound, 0, false], [bound, null, false]] as const) {
     const child = inv(predictedId, "__constructor", [new Address(selectedRegistry).toScVal(), args[0], new Address(wallet).toScVal(), args[1], policy, xdr.ScVal.scvBool(true)]);
     const state = await setup({ xdr: prepared(selectedRegistry, "deploy_registrar", args, [child]), predictedId, namespace: "nova", deploymentSaltVersion: 0 }, challenge(), configuredVersion, selectedRegistry);
     try {

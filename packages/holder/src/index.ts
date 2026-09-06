@@ -17,8 +17,9 @@
  * checks you hold the name (generation-gated) before accepting records, the
  * reverse and primary claims are authorized by the ADDRESS itself, and name
  * transfers move only when the recipient accepts. Namespace-owner powers
- * (issue, reclaim, renew, permanence) live in `@sorandomains/owner` and this
- * package deliberately cannot exercise them.
+ * (issue, reclaim, owner renewal, permanence) live in `@sorandomains/owner` and this
+ * package deliberately cannot exercise them. Native successor holders can
+ * independently renew an eligible lease through the separately authorized renewName.
  *
  * SIGNING. Same `TxSigner` contract as the owner SDK: `keypairSigner(secret)`
  * for scripts, or wrap a browser wallet:
@@ -51,6 +52,18 @@ import {
 import { decodeMuxedAddress, destinationFromNative, paymentFromNative, paymentMemoToScVal, validatePaymentDestination, type PaymentDestination } from "./payment.js";
 export { encodeMuxedAddress, decodeMuxedAddress, PAYMENT_RECORD_KEY, encodePaymentRecord, parsePaymentRecord, validatePaymentDestination, type PaymentMemo, type PaymentDestination } from "./payment.js";
 
+import { NativeHolderClient, type ClaimSubmitOptions } from "./native-holder.js";
+import { NativeClaimError } from "./native-codec.js";
+import type { ClaimIntent, TransferIntent, RenewIntent } from "./native-types.js";
+import type { NativeWriteOptions } from "./native-transport.js";
+export * from "./native-types.js";
+export * from "./native-allowlist.js";
+export * from "./native-approver.js";
+export { NativeClaimError, paymentDestinationToScVal, namespaceNode as nativeNamespaceNode } from "./native-codec.js";
+export { createClaimIntent, type ClaimRequestOptions, type ClaimSubmitOptions, type NativeClaimSubmission, type PreparedClaim } from "./native-holder.js";
+export { signEligibilityAuthorization, validateEligibilityAuthorization, validateNativeTransaction, authorizedInvocation, type NativeAuthorizationPlan, type EligibilitySigner } from "./native-auth.js";
+export type { NativeCapability, NativePrepared, NativeWriteOptions } from "./native-transport.js";
+
 type Invoked = { hash: string; ledger: number; returnValue: unknown };
 
 // ---------------------------------------------------------------------------
@@ -60,6 +73,16 @@ type Invoked = { hash: string; ledger: number; returnValue: unknown };
 /** Known public deployments. Pass explicit options for anything else. */
 export const DEPLOYMENTS = {
   testnet: {
+    rpcUrl: "https://soroban-testnet.stellar.org",
+    passphrase: Networks.TESTNET as string,
+    registryId: "CBSORANPM664QXYMYRZKLQDQE2TXFSK4GBMC6EIRSRTAUZRZCRZRFNMK",
+    primaryId: "CASORAN755O3GCQTRAHKDXLLCSDLNKAQWAP6MWABRSFVSHLJOEKAC7AB",
+  },
+} as const;
+
+/** Explicit historical deployment access. Names in different Registries are separate identities; never a fallback. */
+export const LEGACY_DEPLOYMENTS = {
+  testnet20260905: {
     rpcUrl: "https://soroban-testnet.stellar.org",
     passphrase: Networks.TESTNET as string,
     registryId: "CASORANI5CN2NJFEO2MGTRDA35AOEF3D3OCVBWN3FS6B6FXNQ74RTJ7H",
@@ -118,6 +141,7 @@ const REGISTRAR_ERRORS: Record<number, string> = {
   18: "InvalidPolicy",
   19: "ExpiryOverflow",
   20: "InvalidRegistry",
+  21:"InvalidClaimConfig",22:"ClaimsNotConfigured",23:"ClaimsPaused",24:"StaleClaimPolicy",25:"ClaimIntentMismatch",26:"ClaimIntentExpired",27:"ReservedName",28:"NameNotReserved",29:"PublicIssuanceRequired",30:"WalletClaimLimit",31:"InvalidEligibility",32:"ApprovalAllowanceReached",33:"ApprovalRateReached",34:"RequestIdConflict",35:"CounterOverflow",36:"InvalidNativeBinding",37:"UnsupportedClaimant",38:"DuplicateLabel",39:"RenewalTooEarly",40:"RenewalLeaseLimit",41:"DestinationInitializationFailed",42:"FeeSettlementFailed",
 };
 
 const RESOLVER_ERRORS: Record<number, string> = {
@@ -287,6 +311,8 @@ export const PROFILE_KEYS = [
 ] as const;
 
 export type HolderOptions = {
+  /** Upper total network fee for successor native operations; default 5 XLM. */
+  maxNativeFeeStroops?: bigint;
   /** Signs every transaction: the name HOLDER's account (or, for
    *  `acceptNameTransfer`, the proposed new holder's). */
   signer: TxSigner;
@@ -311,6 +337,7 @@ export type HolderOptions = {
 // ---------------------------------------------------------------------------
 
 export class SoranHolder {
+  private maxNativeFeeStroops: bigint;
   private server: rpc.Server;
   private passphrase: string;
   private registryId: string;
@@ -324,6 +351,8 @@ export class SoranHolder {
   private static POINTER_TTL_MS = 30_000;
 
   constructor(opts: HolderOptions) {
+    this.maxNativeFeeStroops = opts?.maxNativeFeeStroops ?? 50_000_000n;
+    if (typeof this.maxNativeFeeStroops !== "bigint" || this.maxNativeFeeStroops <= 0n || this.maxNativeFeeStroops > 4_294_967_295n) throw new NativeClaimError("maximum native network fee must be positive");
     if (!opts?.signer) throw new HolderError("HolderOptions.signer is required");
     const d = DEPLOYMENTS[opts.network ?? "testnet"];
     if (!d) throw new HolderError(`unknown network "${opts.network}"`);
@@ -342,6 +371,20 @@ export class SoranHolder {
     this.timeoutSecs = t;
     this.fee = opts.fee ?? BASE_FEE;
   }
+
+  private nativeClient(): NativeHolderClient {
+    return new NativeHolderClient({ registryId: this.registryId, passphrase: this.passphrase, server: this.server, signer: this.signer, fee: this.fee, timeoutSecs: this.timeoutSecs, maxFeeStroops: this.maxNativeFeeStroops,
+      read: (id, method, args) => this.read(id, method, args), serialize: work => this.serialize(work) });
+  }
+  nativeClaimCapability(namespace: string) { return this.nativeClient().nativeClaimCapability(namespace); }
+  claimQuote(name: string, claimant?: string) { return this.nativeClient().claimQuote(name, claimant); }
+  claimReceipt(namespace: string, claimant: string, requestId: string) { return this.nativeClient().claimReceipt(namespace, claimant, requestId); }
+  recoverClaim(intent: ClaimIntent) { return this.nativeClient().recoverClaim(intent); }
+  buildClaim(intent: ClaimIntent, options: ClaimSubmitOptions = {}) { return this.nativeClient().buildClaim(intent, options); }
+  claim(intent: ClaimIntent, options: ClaimSubmitOptions = {}) { return this.nativeClient().claim(intent, options); }
+  renewalPreview(name: string) { return this.nativeClient().renewalPreview(name); }
+  acceptNameTransferWithDestination(intent: TransferIntent, options: NativeWriteOptions = {}) { return this.nativeClient().acceptNameTransferWithDestination(intent, options); }
+  renewName(intent: RenewIntent, options: NativeWriteOptions = {}) { return this.nativeClient().renewName(intent, options); }
 
   // ---- resolution targets --------------------------------------------------
 

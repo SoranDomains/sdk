@@ -106,6 +106,15 @@ function decodeIssuedEvents(
   return out;
 }
 
+import { NativeClaimError, address as nativeAddress, bool as nativeBool, bytes32 as nativeBytes32, hex as nativeHex, sc as nativeSc, utf8 as nativeUtf8, namespaceNode as nativeNamespaceNode } from "./native-codec.js";
+import { requireNative, nativeCapability, sendNative, type NativeContext, type NativeWriteOptions, type NativeCapability } from "./native-transport.js";
+import { claimSettingsToScVal, claimConfigFromNative, claimLabelToScVal, claimUsageFromNative, approvalUsageFromNative, type ClaimSettings, type ClaimConfig, type ClaimUsage, type ApprovalUsage } from "./native-types.js";
+export * from "./native-types.js";
+export * from "./native-allowlist.js";
+export { NativeClaimError, namespaceNode as nativeNamespaceNode, paymentDestinationToScVal } from "./native-codec.js";
+export { validateNativeTransaction, authorizedInvocation, type NativeAuthorizationPlan } from "./native-auth.js";
+export type { NativeCapability, NativePrepared, NativeWriteOptions } from "./native-transport.js";
+
 // ---------------------------------------------------------------------------
 // Deployments
 // ---------------------------------------------------------------------------
@@ -113,6 +122,17 @@ function decodeIssuedEvents(
 /** Known public deployments. Pass explicit options for anything else. */
 export const DEPLOYMENTS = {
   testnet: {
+    rpcUrl: "https://soroban-testnet.stellar.org",
+    passphrase: Networks.TESTNET as string,
+    // The immutable Registry. The Registrar for a namespace is discovered on
+    // chain via `registrar_of(node)` — never configured by hand.
+    registryId: "CBSORANPM664QXYMYRZKLQDQE2TXFSK4GBMC6EIRSRTAUZRZCRZRFNMK",
+  },
+} as const;
+
+/** Explicit historical deployment access. Names in different Registries are separate identities; never a fallback. */
+export const LEGACY_DEPLOYMENTS = {
+  testnet20260905: {
     rpcUrl: "https://soroban-testnet.stellar.org",
     passphrase: Networks.TESTNET as string,
     // The immutable Registry. The Registrar for a namespace is discovered on
@@ -179,6 +199,7 @@ const REGISTRAR_ERRORS: Record<number, string> = {
   18: "InvalidPolicy",
   19: "ExpiryOverflow",
   20: "InvalidRegistry",
+  21:"InvalidClaimConfig",22:"ClaimsNotConfigured",23:"ClaimsPaused",24:"StaleClaimPolicy",25:"ClaimIntentMismatch",26:"ClaimIntentExpired",27:"ReservedName",28:"NameNotReserved",29:"PublicIssuanceRequired",30:"WalletClaimLimit",31:"InvalidEligibility",32:"ApprovalAllowanceReached",33:"ApprovalRateReached",34:"RequestIdConflict",35:"CounterOverflow",36:"InvalidNativeBinding",37:"UnsupportedClaimant",38:"DuplicateLabel",39:"RenewalTooEarly",40:"RenewalLeaseLimit",41:"DestinationInitializationFailed",42:"FeeSettlementFailed",
 };
 
 /** Registry contract error codes, by number. */
@@ -384,6 +405,8 @@ export type NameState = {
 };
 
 export type OwnerOptions = {
+  /** Upper total network fee for successor native operations; default 5 XLM. */
+  maxNativeFeeStroops?: bigint;
   /** Signs every transaction. The namespace owner's account — or, for
    *  `acceptNamespaceTransfer`, the proposed new owner's. */
   signer: TxSigner;
@@ -409,6 +432,7 @@ export type OwnerOptions = {
 // ---------------------------------------------------------------------------
 
 export class SoranOwner {
+  private maxNativeFeeStroops: bigint;
   private server: rpc.Server;
   private passphrase: string;
   private registryId: string;
@@ -425,6 +449,8 @@ export class SoranOwner {
   private static REGISTRAR_TTL_MS = 30_000;
 
   constructor(opts: OwnerOptions) {
+    this.maxNativeFeeStroops = opts?.maxNativeFeeStroops ?? 50_000_000n;
+    if (typeof this.maxNativeFeeStroops !== "bigint" || this.maxNativeFeeStroops <= 0n || this.maxNativeFeeStroops > 4_294_967_295n) throw new NativeClaimError("maximum native network fee must be positive");
     if (!opts?.signer) throw new OwnerError("OwnerOptions.signer is required");
     const d = DEPLOYMENTS[opts.network ?? "testnet"];
     if (!d) throw new OwnerError(`unknown network "${opts.network}"`);
@@ -446,6 +472,76 @@ export class SoranOwner {
   // ---- discovery -----------------------------------------------------------
 
   /** The namespace's on-chain attested Registrar id. Cached per instance. */
+  private nativeConfirmed<T>(result: {hash:string;value:unknown}, decode:(raw:unknown)=>T): T {
+    try { return decode(result.value); } catch(error) { throw new NativeClaimError(`transaction confirmed but its result could not be verified: ${String(error)}`, "pending", result.hash); }
+  }
+  private nativeContext(): NativeContext {
+    return { registryId: this.registryId, passphrase: this.passphrase, server: this.server, signer: this.signer, fee: this.fee, timeoutSecs: this.timeoutSecs, maxFeeStroops: this.maxNativeFeeStroops,
+      read: (id, method, args) => this.read(id, method, args), serialize: work => this.serialize(work) };
+  }
+
+  /** Native successor capability. A failed RPC read never means open or legacy. */
+  nativeClaimCapability(namespace: string): Promise<NativeCapability> { return nativeCapability(this.nativeContext(), normalizeLabel(namespace)); }
+  async claimPolicy(namespace: string): Promise<ClaimConfig | null> {
+    const cap = await requireNative(this.nativeContext(), normalizeLabel(namespace));
+    const raw = await this.read(cap.registrar, "claim_config", []);
+    return raw === null ? null : claimConfigFromNative(raw);
+  }
+  async nativeClaimFeeToken(namespace: string): Promise<string> {
+    const cap = await requireNative(this.nativeContext(), normalizeLabel(namespace));
+    return nativeAddress(await this.read(cap.registrar, "native_fee_token", []), "contract", "native XLM token");
+  }
+  private async nativeOwnerWrite(namespace: string, method: string, args: xdr.ScVal[], options: NativeWriteOptions = {}) {
+    return this.serialize(async () => {
+      const context = this.nativeContext();
+      const cap = await requireNative(context, normalizeLabel(namespace));
+      const source = nativeAddress(await this.signer.publicKey(), "account", "owner transaction source");
+      if (cap.owner !== source) throw new NativeClaimError("the current namespace owner must authorize this change", "authorization");
+      return sendNative(context, { source, contract: cap.registrar, method, args, sourceInvocation: { contract: cap.registrar, method, args }, maxFeeStroops: context.maxFeeStroops }, options);
+    });
+  }
+  async configureClaims(namespace: string, settings: ClaimSettings, options: NativeWriteOptions = {}): Promise<Submitted & { config: ClaimConfig }> {
+    const encoded = claimSettingsToScVal(settings);
+    const cap = await requireNative(this.nativeContext(), normalizeLabel(namespace));
+    const token = nativeAddress(await this.read(cap.registrar, "native_fee_token", []), "contract", "native fee token");
+    if (settings.feeToken !== token) throw new NativeClaimError("username fee must use this network's canonical XLM token");
+    if (settings.admission.type === "approval" && settings.admission.account === cap.owner) throw new NativeClaimError("eligibility account must be separate from namespace owner");
+    const result = await this.nativeOwnerWrite(namespace, "configure_claims", [encoded], options);
+    return { hash: result.hash, ledger: result.ledger, config: this.nativeConfirmed(result, claimConfigFromNative) };
+  }
+  async setClaimsEnabled(namespace: string, enabled: boolean, options: NativeWriteOptions = {}): Promise<Submitted & { config: ClaimConfig }> {
+    const result = await this.nativeOwnerWrite(namespace, "set_claim_enabled", [nativeSc.bool(nativeBool(enabled,"claim enabled"))], options);
+    return { hash: result.hash, ledger: result.ledger, config: this.nativeConfirmed(result, claimConfigFromNative) };
+  }
+  pauseClaims(namespace: string, options: NativeWriteOptions = {}) { return this.setClaimsEnabled(namespace, false, options); }
+  private async updateReservations(namespace: string, labels: readonly string[], reserved: boolean, options: NativeWriteOptions) {
+    if (!Array.isArray(labels) || labels.length < 1 || labels.length > 23) throw new NativeClaimError("reservation batches must contain 1–23 labels");
+    const normalized = labels.map(normalizeLabel);
+    if (new Set(normalized).size !== normalized.length) throw new NativeClaimError("duplicate reservation label");
+    const result = await this.nativeOwnerWrite(namespace, "set_reserved", [xdr.ScVal.scvVec(normalized.map(claimLabelToScVal)), nativeSc.bool(reserved)], options);
+    if (typeof result.value !== "number" || result.value !== normalized.length) throw new NativeClaimError("confirmed reservation result differs from batch; inspect the transaction before retrying", "pending", result.hash);
+    return { hash: result.hash, ledger: result.ledger, updated: result.value };
+  }
+  reserveNames(namespace: string, labels: readonly string[], options: NativeWriteOptions = {}) { return this.updateReservations(namespace, labels, true, options); }
+  releaseReservations(namespace: string, labels: readonly string[], options: NativeWriteOptions = {}) { return this.updateReservations(namespace, labels, false, options); }
+  async isReserved(namespace: string, label: string): Promise<boolean> {
+    const cap = await requireNative(this.nativeContext(), normalizeLabel(namespace));
+    return nativeBool(await this.read(cap.registrar,"is_reserved",[claimLabelToScVal(normalizeLabel(label))]),"reservation");
+  }
+  /** Privileged reserved assignment publishes the holder's default route; no custom destination is implied. */
+  async assignReserved(namespace: string, label: string, holder: string, options: NativeWriteOptions = {}): Promise<IssueResult> {
+    const result = await this.nativeOwnerWrite(namespace,"issue_reserved",[claimLabelToScVal(normalizeLabel(label)),nativeSc.address(nativeAddress(holder,"identity","reserved holder"))],options);
+    return { hash: result.hash, ledger: result.ledger, node: this.nativeConfirmed(result, raw => nativeHex(nativeBytes32(raw,"issued name node"))) };
+  }
+  async nativeClaimUsage(namespace: string, holder: string): Promise<ClaimUsage> {
+    const cap = await requireNative(this.nativeContext(),normalizeLabel(namespace));
+    return claimUsageFromNative(await this.read(cap.registrar,"claim_usage",[nativeSc.address(nativeAddress(holder,"identity","holder"))]));
+  }
+  async nativeApprovalUsage(namespace: string): Promise<ApprovalUsage> {
+    const cap = await requireNative(this.nativeContext(),normalizeLabel(namespace));
+    return approvalUsageFromNative(await this.read(cap.registrar,"approval_usage",[]));
+  }
+
   async registrarOf(namespace: string): Promise<string> {
     namespace = normalizeLabel(namespace);
     const hit = this.registrars.get(namespace);
@@ -818,7 +914,7 @@ export class SoranOwner {
         fn,
       );
     }
-    if (!rpc.Api.isSimulationSuccess(sim) || !sim.result?.retval) return null;
+    if (!rpc.Api.isSimulationSuccess(sim) || !sim.result?.retval) throw new OwnerError(`${fn}: missing simulation return value`, contractId, fn);
     const v = scValToNative(sim.result.retval);
     return v === undefined ? null : v;
   }

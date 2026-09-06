@@ -2,21 +2,21 @@
 
 Read and manage Soran names on Stellar. Payment and identity reads use the
 configured on-chain contracts through Soroban RPC. Optional API discovery can
-omit results; its coverage reports are not proof of completeness. MCP claim
-preparation uses the API, with locally pinned transaction and fee validation
+omit results; its coverage reports are not proof of completeness. MCP namespace application and activation
+preparation use the API, with locally pinned transaction and fee validation
 before signing. Hosted API and MCP responses are service-mediated; integrators
 can call Universal Lookup directly for their own on-chain reads.
 
 | Package | Release version | Audience and surface |
 | --- | --- | --- |
-| [`@sorandomains/lookup`](packages/lookup/) | 0.6.0 | Wallets and apps: Universal Lookup, complete payment instructions, identity metadata and verified holdings pages |
-| [`@sorandomains/owner`](packages/owner/) | 0.6.0 | Namespace operators: issuance, lifecycle, policy and owner-authorized operations |
-| [`@sorandomains/holder`](packages/holder/) | 0.4.0 | Name holders: records, payment memos, reverse/Primary and transfers |
-| [`@sorandomains/mcp`](packages/mcp/) | 0.6.0 | AI agents: hosted read tools and locally signed management tools |
+| [`@sorandomains/lookup`](packages/lookup/) | 0.7.0 | Wallets and apps: Universal Lookup, complete payment instructions, identity metadata and verified holdings pages |
+| [`@sorandomains/owner`](packages/owner/) | 0.7.0 | Namespace operators: issuance, lifecycle, policy and owner-authorized operations |
+| [`@sorandomains/holder`](packages/holder/) | 0.5.0 | Name holders: records, payment memos, reverse/Primary and transfers |
+| [`@sorandomains/mcp`](packages/mcp/) | 0.7.0 | AI agents: hosted read tools and locally signed management tools |
 
 All four packages target `@stellar/stellar-sdk >=17 <18`, tested with 17.0.1.
-The native muxed testnet deployment was verified on chain at ledger **4521644**
-on 5 September 2026 (18:10 UTC). Package presets and address tables pin that
+The native-claim testnet successor was verified on chain at ledger **4534629**
+on 6 September 2026 (12:12 UTC). Package presets and address tables pin that
 deployment. The [release status](https://docs.soran.domains/reference/release-status)
 tracks package and service availability separately.
 Mainnet has no preset.
@@ -32,6 +32,8 @@ and the [public release status](https://docs.soran.domains/reference/release-sta
 The packages share conventions and deployment presets. Install only the surfaces
 your application needs. The public mirror is [SoranDomains/sdk](https://github.com/SoranDomains/sdk).
 
-See the [deployment manifest](deployments/testnet.json) for contract IDs, code hashes, and verification evidence, and [release notes](RELEASE-0.6.md) for compatibility details.
+Namespace owners configure native public admission once, then claimants authorize their own exact claims without the owner approving each user. The owner's application embeds the SDK in its own signup/account settings UI. Optional app approval is a separate bounded admission role. See [native claims and recovery](NATIVE-CLAIMS.md) and the [signup reference](examples/native-signup/README.md). Owner 0.7.0 and Holder 0.5.0 provide these writes; Lookup 0.7.0 keeps Universal Lookup as the read entry point.
 
-Run `npm ci`, `npm run build`, `npm run typecheck`, and `npm test` in each package. Lookup, holder, and owner also provide `npm run check:browser`. MCP uses exact matching registry package versions.
+The testnet default is a successor Registry. Existing state is not migrated, and identical name spellings in different Registries are separate identities. No automatic fallback is performed. There is no mainnet preset.
+
+See the [current deployment manifest](deployments/testnet.json) and [0.7 release notes](RELEASE-0.7.md). Run `npm ci`, `npm run build`, `npm run typecheck` and `npm test` in each package; Lookup, Owner and Holder also provide `npm run check:browser`.
