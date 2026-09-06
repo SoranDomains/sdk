@@ -1,6 +1,6 @@
 # Native username claims
 
-Stable SDK versions: Holder `0.5.0`, Owner/MCP `0.7.0`, Lookup `0.7.0`. The release uses the native-claim successor Registry/Resolver/Registrar; its exact verified deployment is recorded in the package preset and [release manifest](https://github.com/SoranDomains/sdk/blob/main/deployments/testnet.json). Public package and service availability is recorded separately in the [release status](https://docs.soran.domains/reference/release-status).
+SDK versions in this source: Holder `0.5.1`, Owner/MCP `0.7.0`, Lookup `0.7.0`. The release uses the native-claim successor Registry/Resolver/Registrar; its exact verified deployment is recorded in the package preset and [release manifest](https://github.com/SoranDomains/sdk/blob/main/deployments/testnet.json). Public package and service availability is recorded separately in the [release status](https://docs.soran.domains/reference/release-status).
 
 ## Application-owned signup
 
@@ -47,7 +47,9 @@ Credential nonces/ledger expiry and business request IDs/timestamp deadlines are
 
 ## Recovery, transfer and renewal
 
-`recoverClaim(intent)` or `claimReceipt(namespace,claimant,requestId)` reads an authoritative historical receipt. Matching history returns `status:"replayed"` and `transaction:null`; it does not charge, issue or overwrite a later route. The SDK validates commitment, operation, holder, name node, generation, fee and lease semantics. History is distinct from current ownership; use Universal Lookup to check that before linking a name to a private app account.
+`recoverClaim(intent)` or `claimReceipt(namespace,claimant,requestId)` reads an authoritative historical receipt. Matching history returns `status:"replayed"` and `transaction:null`; it does not charge, issue or overwrite a later route. Intent-based recovery validates commitment, operation, holder, name node, generation, fee, lease and original request time bounds. Direct `claimReceipt` reads authenticate the Registrar, requested holder and inclusion ledger; without the original intent they cannot validate that intent’s commitment or terms. History is distinct from current ownership; use Universal Lookup to check that before linking a name to a private app account.
+
+Holder `0.5.1` retains the ledger of each receipt read and checks Registrar attestation, irreversible taint and executable provenance afterward. Every proof observation must be at that ledger or later. The same protection covers null receipts, replay decisions and confirmed transaction results. Missing or stale ledger context is an error, not evidence of successful recovery. These checks trust the selected RPC to report its state and ledger honestly; they are not a cryptographic proof from an untrusted RPC. Later owner or Resolver changes alone do not invalidate clean Registrar history.
 
 Native methods never automatically retry an uncertain transaction or silently sign a restoration. `onPrepared` runs before wallet signing/broadcast for public journaling. Error `txHash` survives submission/confirmation interruption and malformed confirmed results. SUCCESS/FAILED classification requires the RPC hash, included envelope hash and positive confirmed ledger to match the reviewed transaction; mismatched or incomplete terminal replies remain pending. A null receipt, RPC timeout or empty local history is not proof of failure. Reconcile original receipt plus transaction before replacing an operation. Archived state fails with an explicit restoration requirement; review that separate transaction and cost.
 
