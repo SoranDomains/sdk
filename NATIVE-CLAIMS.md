@@ -1,6 +1,6 @@
 # Native username claims
 
-SDK versions in this source: Holder `0.5.1`, Owner/MCP `0.7.0`, Lookup `0.7.0`. The release uses the native-claim successor Registry/Resolver/Registrar; its exact verified deployment is recorded in the package preset and [release manifest](https://github.com/SoranDomains/sdk/blob/main/deployments/testnet.json). Public package and service availability is recorded separately in the [release status](https://docs.soran.domains/reference/release-status).
+SDK versions in this source: Holder `0.5.1`, Owner `0.7.0`, MCP `0.7.1`, Lookup `0.7.0`. The release uses the native-claim successor Registry/Resolver/Registrar; its exact verified deployment is recorded in the package preset and [release manifest](https://github.com/SoranDomains/sdk/blob/main/deployments/testnet.json). Public package and service availability is recorded separately in the [release status](https://docs.soran.domains/reference/release-status).
 
 ## Application-owned signup
 

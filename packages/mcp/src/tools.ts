@@ -27,7 +27,7 @@ import { z } from "zod";
 import { Soran, SoranError, DEPLOYMENTS, normalizeLabel, parseName, validatePaymentDestination } from "@sorandomains/lookup";
 import { validateClaimFee, validateClaimTransaction, sameFee } from "./prepared.js";
 import { predictRegistrar } from "./deployment.js";
-export const MCP_VERSION = "0.7.0";
+export const MCP_VERSION = "0.7.1";
 
 /** The only server capability used by this package. Keep the callback limited
  * to parsed arguments: importing MCP's full callback type also imports its

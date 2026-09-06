@@ -1,6 +1,6 @@
 /** Reference handlers for an application's OWN UI. No widget, account database, keys or hidden claims. */
 import { SoranHolder, createClaimIntent, parseNativeClaimIntent, stringifyNativeIntent, type PaymentDestination, type NativeClaimSubmission, type ClaimReceipt } from "@sorandomains/holder";
-import { Soran } from "@sorandomains/lookup";
+import { Soran, parseName } from "@sorandomains/lookup";
 export type PublicPendingClaim = { intentJson: string; transactionHash: string | null };
 export type RecoveryStore = {
  save(value: PublicPendingClaim): Promise<void>; load(): Promise<PublicPendingClaim | null>;
@@ -68,9 +68,14 @@ export class SignupNames {
  }
  /** Existing holders are linked assets, not private app account IDs. The app separately proves wallet control. */
  async verifyExistingName(name: string, linkedWallet: string) {
-  const metadata = await this.lookup.nameMetadata(name);
+  const parsed = parseName(name), canonical = `${parsed.label}.${parsed.namespace}`;
+  const [metadata, resolution] = await Promise.all([this.lookup.nameMetadata(canonical), this.lookup.lookup(canonical)]);
   if (!metadata || metadata.holder !== linkedWallet || !metadata.active) throw new Error("Linked wallet does not currently hold an active name");
-  const payment = await this.lookup.resolvePayment(name);
-  return { name, holder: linkedWallet, generation: metadata.generation, payment };
+  // A payment-only convenience read drops its generation. Keep the full native
+  // result so a transfer between reads cannot attach a new holder's route to an old holder.
+  if (metadata.name !== canonical || resolution.kind !== "nativePayment" || resolution.name !== canonical ||
+      resolution.registrar !== metadata.registrar || resolution.generation !== metadata.generation)
+   throw new Error("Ownership and payment snapshots differ; refresh before linking this name");
+  return { name, holder: linkedWallet, generation: metadata.generation, payment: resolution.payment };
  }
 }
