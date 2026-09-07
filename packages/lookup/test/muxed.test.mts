@@ -121,9 +121,10 @@ test("muxed payment survives an actual Stellar payment operation without becomin
  const decoded=TransactionBuilder.fromXDR(tx.toXDR(),Networks.TESTNET);
  assert.equal(decoded.memo.type,"none");assert.equal((decoded.operations[0] as {destination:string}).destination,M);
 });
-test("muxed destination never becomes an account-level reverse or holdings input",async()=>{
- const {s,calls}=client("universal",matrix.at(-1)![1]);const M=matrix.at(-1)![1].address;
- await assert.rejects(s.reverse("nova",M));assert.equal(await s.primaryOf(M),null);await assert.rejects(s.namesOfPage(M));assert.equal(calls.length,0);
+test("muxed identity requires its capability and never becomes a holder input",async()=>{
+ const {s,calls}=client("universal",matrix.at(-1)![1],{muxed_identity_version:0});const M=matrix.at(-1)![1].address;
+ await assert.rejects(s.reverse("nova",M),/muxed identity/);await assert.rejects(s.primaryOf(M),/muxed identity/);
+ calls.length=0;await assert.rejects(s.namesOfPage(M));assert.equal(calls.length,0);
 });
 
 for(const mode of ["universal","direct"] as const)test(`${mode} details/identity keep muxed destination separate from holder metadata`,async()=>{

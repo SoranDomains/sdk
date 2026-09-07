@@ -40,3 +40,27 @@ test("MCP surfaces a v1 muxed failure, without an address-shaped result",async()
  const saved=Soran.prototype.resolvePayment;
  try{Soran.prototype.resolvePayment=async()=>{throw new SoranError("muxed requires v2","SIMULATION",22,"MuxedDestination");};const f=fake();registerReadTools(f.server as never);const result=await f.handlers.get("resolve_payment")!({name:"alice.nova"});assert.equal(result.isError,true);const value=JSON.parse(result.content[0].text);assert.equal(value.contractError,"MuxedDestination");assert(!Object.hasOwn(value,"address"));}finally{Soran.prototype.resolvePayment=saved;}
 });
+test("MCP M identity tools retain the exact destination and keep elections separate", async () => {
+ const M=encodeMuxedAddress(G,"18446744073709551615");
+ const saved={reverse:Soran.prototype.reverseLookup,setReverse:SoranHolder.prototype.setReverseMuxed,setPrimary:SoranHolder.prototype.setPrimaryMuxed,clearReverse:SoranHolder.prototype.clearReverseMuxed,clearPrimary:SoranHolder.prototype.clearPrimaryMuxed};
+ const calls:unknown[][]=[];
+ try{
+  Soran.prototype.reverseLookup=async(address)=>{assert.equal(address,M);return "alice.nova";};
+  SoranHolder.prototype.setReverseMuxed=async(...args)=>{calls.push(["reverse",...args]);return{hash:"r",ledger:1};};
+  SoranHolder.prototype.setPrimaryMuxed=async(...args)=>{calls.push(["primary",...args]);return{hash:"p",ledger:1};};
+  SoranHolder.prototype.clearReverseMuxed=async(...args)=>{calls.push(["clearReverse",...args]);return{hash:"cr",ledger:1};};
+  SoranHolder.prototype.clearPrimaryMuxed=async(...args)=>{calls.push(["clearPrimary",...args]);return{hash:"cp",ledger:1};};
+  const f=fake();registerReadTools(f.server as never);await registerWriteTools(f.server as never,{secret:kp.secret()});
+  assert.equal(JSON.parse((await f.handlers.get("reverse_lookup")!({address:M})).content[0].text).address,M);
+  for(const kind of ["reverse","primary"]){
+   const set=await f.handlers.get("set_muxed_display_name")!({name:"alice.nova",destination:M,kind});assert.equal(set.isError,undefined);
+   const clear=await f.handlers.get("clear_muxed_display_name")!({destination:M,kind,namespace:"nova"});assert.equal(clear.isError,undefined);
+  }
+  assert.deepEqual(calls,[["reverse","alice.nova",M],["clearReverse","nova",M],["primary","alice.nova",M],["clearPrimary",M]]);
+  const bad=await f.handlers.get("clear_muxed_display_name")!({destination:M,kind:"reverse"});assert.equal(bad.isError,true);assert.equal(calls.length,4);
+  for(const tool of ["set_muxed_display_name","clear_muxed_display_name"]){
+   assert.equal(f.schemas.get(tool).destination.parse(M),M);
+   for(const invalid of [G,M.toLowerCase(),M.slice(0,-1)])assert.throws(()=>f.schemas.get(tool).destination.parse(invalid));
+  }
+ }finally{Soran.prototype.reverseLookup=saved.reverse;SoranHolder.prototype.setReverseMuxed=saved.setReverse;SoranHolder.prototype.setPrimaryMuxed=saved.setPrimary;SoranHolder.prototype.clearReverseMuxed=saved.clearReverse;SoranHolder.prototype.clearPrimaryMuxed=saved.clearPrimary;}
+});

@@ -24,10 +24,10 @@
  * The API remains a discovery/preparation dependency; configure a trusted host.
  */
 import { z } from "zod";
-import { Soran, SoranError, DEPLOYMENTS, normalizeLabel, parseName, validatePaymentDestination } from "@sorandomains/lookup";
+import { Soran, SoranError, DEPLOYMENTS, normalizeLabel, parseName, validatePaymentDestination, decodeMuxedAddress } from "@sorandomains/lookup";
 import { validateClaimFee, validateClaimTransaction, sameFee } from "./prepared.js";
 import { predictRegistrar } from "./deployment.js";
-export const MCP_VERSION = "0.7.1";
+export const MCP_VERSION = "0.8.0";
 
 /** The only server capability used by this package. Keep the callback limited
  * to parsed arguments: importing MCP's full callback type also imports its
@@ -65,6 +65,9 @@ const nameSchema = z.string().transform((value, ctx) => {
   try { const p = parseName(value); return `${p.label}.${p.namespace}`; } catch { ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Expected ASCII label.namespace" }); return z.NEVER; }
 });
 
+const muxedIdentitySchema = z.string().max(69).refine(value => {
+  try { decodeMuxedAddress(value); return true; } catch { return false; }
+}, "a canonical full M destination is required");
 const expectedFeeSchema = z.object({ allocatorId: z.string(), token: z.string(), amount: z.string().regex(/^[1-9][0-9]*$/), recipient: z.string(), network: z.string() }).strict();
 
 const paymentMemoSchema = z.discriminatedUnion("type", [
@@ -239,7 +242,7 @@ export function registerReadTools(server: ToolRegistrar, opts: ReadToolOptions =
 
   server.tool(
     "reverse_lookup",
-    "The display name for an address (primary name first, then per-namespace reverse records) — verified against the configured on-chain contracts. Null means no verified name was returned; Primary may also hide downstream proof failures.",
+    "The display name for a G/C address or exact full M destination including its routing ID (primary name first, then per-namespace reverse records) — verified against the configured on-chain contracts. Null means no verified name was returned; Primary may also hide downstream proof failures.",
     { address: z.string(), namespaces: z.array(labelSchema).max(12).optional().describe("Namespaces to probe (max 12); defaults to the deployment's list") },
     async ({ address, namespaces }) => {
       try {
@@ -389,7 +392,7 @@ export async function registerWriteTools(server: ToolRegistrar, opts: WriteToolO
   }
   const me = kp.publicKey();
   const rpc = { rpcUrl: opts.rpcUrl, passphrase: opts.passphrase, registryId: opts.registryId, maxNativeFeeStroops: opts.maxNativeFeeStroops };
-  const holder = new SoranHolder({ signer: keypairSigner(secret), ...rpc, primaryId: opts.primaryId });
+  const holder = new SoranHolder({ signer: keypairSigner(secret), ...rpc, primaryId: opts.primaryId, lookupId: opts.lookupId });
   const owner = new SoranOwner({ signer: ownerSigner(secret), ...rpc });
   // Local successor methods are capability-gated; deployed legacy presets remain unchanged.
   const nativeHolder = await import("@sorandomains/holder");
@@ -929,6 +932,27 @@ export async function registerWriteTools(server: ToolRegistrar, opts: WriteToolO
       } catch (e) {
         return errText(e);
       }
+    },
+  );
+
+  server.tool(
+    "set_muxed_display_name",
+    "Elect a name for an explicit full M destination. The M address's underlying G account must be this wallet; the exact M must already be the name's complete on-chain payment destination. Does not change payment routing. Set reverse first, then primary in a separate call. Uses Universal Lookup's exact G plus u64 identity.",
+    { name: nameSchema, destination: muxedIdentitySchema, kind: z.enum(["reverse", "primary"]) },
+    async ({ name, destination, kind }) => {
+      try { return text(await (kind === "reverse" ? holder.setReverseMuxed(name, destination) : holder.setPrimaryMuxed(name, destination))); }
+      catch (e) { return errText(e); }
+    },
+  );
+  server.tool(
+    "clear_muxed_display_name",
+    "Clear the election for one exact full M destination, signed by its underlying G account. A reverse clear requires its namespace. Does not clear the base G or other routing IDs.",
+    { destination: muxedIdentitySchema, kind: z.enum(["reverse", "primary"]), namespace: labelSchema.optional() },
+    async ({ destination, kind, namespace }) => {
+      try {
+        if (kind === "reverse" && !namespace) throw new Error("namespace is required to clear a muxed reverse name");
+        return text(await (kind === "reverse" ? holder.clearReverseMuxed(namespace!, destination) : holder.clearPrimaryMuxed(destination)));
+      } catch (e) { return errText(e); }
     },
   );
 

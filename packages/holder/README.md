@@ -5,10 +5,12 @@
 > [release status](https://docs.soran.domains/reference/release-status) for package and service availability.
 
 
-Version 0.5.0 targets Stellar SDK17 (`>=17 <18`). ASCII names
+Version 0.6.0 targets Stellar SDK17 (`>=17 <18`). ASCII names
 and labels are validated before lowercase normalization; Unicode lookalikes are
-rejected. Writes continue to target the owning Registry/Registrar/Resolver. Universal
-Lookup is the read entry point in `@sorandomains/lookup` 0.7.0.
+rejected. Payment and ownership writes target the owning Registry/Registrar/Resolver.
+Complete-M display-name writes target Universal Lookup; Lookup 0.8.0 provides
+the corresponding read interface. Check the release status before enabling the
+new capability on a deployment.
 
 Your Soran name, managed with your own key. The third piece of the SDK
 trilogy: [`@sorandomains/lookup`](https://www.npmjs.com/package/@sorandomains/lookup)
@@ -89,8 +91,52 @@ and ID 420. Publish only the actual route supplied by the recipient. No separate
 ID/text/hash memo is permitted. V1 Resolvers cannot store M and fail before signing.
 Use `setPayment` to explicitly replace or remove muxed routing; `setAddress` and
 `setRecord` remain G/C account-address operations. Namespace/name ownership,
-operator and signer addresses remain G/C. Muxed payment destinations do not act
-as separate reverse/Primary identities.
+operator and signer addresses remain G/C. Complete-M reverse and Primary elections
+use the dedicated methods below and are signed by the M address's base G account.
+
+## Elect a complete M display name
+
+Holder 0.6.0 adds these methods for a Lookup that successfully reports
+`muxed_identity_version() == 1`. Contract addresses remain unchanged; publication
+and deployment are tracked separately in the release status.
+
+```ts
+const me = new SoranHolder({
+  signer,
+  registryId: deployment.registryId,
+  lookupId: deployment.lookupId,
+  rpcUrl: deployment.rpcUrl,
+  passphrase: deployment.passphrase,
+});
+const mAddress = "MA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAAAAAABUTGI4";
+await me.setReverseMuxed("customer420.nova", mAddress);
+await me.setPrimaryMuxed("customer420.nova", mAddress); // optional second transaction
+```
+
+The name must already forward-resolve to the exact full M address. The signer
+must control its underlying G account. An exchange customer who only has a
+deposit address cannot sign for the exchange. Elections are keyed by G plus exact
+u64 ID; `0` does not alias G, and IDs through `18446744073709551615` retain their
+precision. The transaction authorization binds the name, account and ID. A M
+route is never replaced with G or a G-plus-memo route.
+
+`setPrimaryMuxed` requires the same current verified M reverse name. The two writes
+are separate: cancelling Primary leaves a successful reverse election intact.
+Changing/clearing reverse invalidates Primary while its required election does
+not match. Claiming or setting a payment destination does not elect either name.
+Payment instructions are not changed by any of these display-name methods.
+
+```ts
+await me.clearReverseMuxed("nova", mAddress);
+await me.clearPrimaryMuxed(mAddress);
+```
+
+The testnet preset supplies `lookupId`; changing Registry or passphrase prevents
+inheriting an unrelated pin. These calls use Lookup directly, independent of the
+older G/C `primaryId`. Existing `setReverse` / `setPrimary` remain G/C methods.
+A name transfer or reissue changes generation and requires fresh M elections.
+The contract also exposes permissionless `touch_reverse_muxed` and
+`touch_primary_muxed` for upkeep; they are not Holder SDK methods.
 
 ## What's in the box
 
@@ -101,12 +147,14 @@ as separate reverse/Primary identities.
 | `setAddress` | Re-point the built-in (Registrar) resolution target |
 | `setText` / `setProfile` / `clearText` | Publish text records; `setProfile` writes the standard `PROFILE_KEYS` (one transaction per key); records are overwrite-only on chain — `clearText` retracts by writing the empty value standard readers treat as unset |
 | `setReverse` / `clearReverse` | Claim your address→name reverse record — the contract refuses names that don't already resolve to you (`ForwardMismatch`) |
-| `setPrimary` / `clearPrimary` | Your one cross-namespace display name, re-verified on chain at every read |
+| `setPrimary` / `clearPrimary` | Your G/C cross-namespace display name, re-verified on chain at every read |
+| `setReverseMuxed` / `clearReverseMuxed` | Elect or clear a namespace name for the exact M destination |
+| `setPrimaryMuxed` / `clearPrimaryMuxed` | Elect or clear the exact M destination's cross-namespace name |
 | `proposeNameTransfer` / `acceptNameTransfer` / `cancelNameTransfer` | Two-step, accept-to-move name transfers (policy-gated) |
 | `pendingNameTransfer` | Read the pending proposal |
 | `registrarOf` / `resolverOf` | Discover the namespace's attested Registrar / resolver pointer |
 
-Everything is holder-authorized **on chain** — the Resolver checks you hold
+Authorization is enforced **on chain** — the Resolver checks you hold
 the name right now, reverse and primary claims are authorized by the address
 itself, and transfers move only when the recipient accepts. No Soran account,
 no hosted API in the path.
@@ -154,7 +202,8 @@ Verified on 6 September 2026 at ledger **4534629** (12:12 UTC). Network passphra
 | Contract | Address |
 |---|---|
 | Registry | `CBSORANPM664QXYMYRZKLQDQE2TXFSK4GBMC6EIRSRTAUZRZCRZRFNMK` |
-| Primary | `CASORAN755O3GCQTRAHKDXLLCSDLNKAQWAP6MWABRSFVSHLJOEKAC7AB` |
+| Primary (G/C) | `CASORAN755O3GCQTRAHKDXLLCSDLNKAQWAP6MWABRSFVSHLJOEKAC7AB` |
+| Universal Lookup (M elections) | `CDSORANQAJK35UV2HR63CMB6M5NYISHMUBTB6EQY2CZ3Y7HJDIOHRJWA` |
 
 Mainnet has no deployment preset. Custom networks must supply their own verified
 addresses. Universal Lookup upgrades remain immediately executable; an address
