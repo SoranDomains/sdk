@@ -90,10 +90,24 @@ const instruction = { address, memo: { type: "none" as const } };
 This is an illustrative destination, not a request to send funds. `resolve` and
 `record` return the full M address when no separate memo is required. A G-plus-ID
 memo is a different instruction even if its numeric value matches. Your payment
-transport and recipient must support muxed routing. Ownership, signer, reverse and
-Primary account inputs remain G/C. Changing a name's destination to M can invalidate
-its account-level reverse/Primary proof; payment support does not create a muxed
-customer identity or signing account.
+transport and recipient must support muxed routing. Ownership and signer inputs
+remain G/C. Lookup 0.8.0 adds separate complete-M reverse and Primary reads in
+universal mode, requiring `muxed_identity_version() == 1` on Lookup. Check
+[release status](https://docs.soran.domains/reference/release-status) for verified
+publication and deployment before using that extension.
+
+```ts
+const inNova = await soran.reverse("nova", address);
+const primary = await soran.primaryOf(address);
+```
+
+The underlying G account authorizes each M election through Holder
+`setReverseMuxed` / `setPrimaryMuxed`. If a custodian controls G, the custodian
+must sign; a deposit customer cannot sign merely because they received an M
+address. The exact u64 ID is part of the key, including `"0"` and
+`"18446744073709551615"`. No G, memo or other-ID fallback is performed.
+Changing a payment to M can invalidate its earlier G/C election. M does not
+become a separate signer or owner.
 
 ## Read API
 
@@ -106,7 +120,7 @@ customer identity or signing account.
 | `nameMetadata(name)` | Holder, built-in address, exact generation/expiry, active/no-expiry flags, or `null`; built-in address is metadata, not effective payment |
 | `text(name,key)` | Holder-authored text or `null`; Symbol key and 4096-byte response limits |
 | `reverse(namespace,address)` | One namespace's verified canonical display name or `null` |
-| `primaryOf(address)` | Universal Lookup's configured Primary result; `primaryId:null` disables it |
+| `primaryOf(address)` | G/C configured Primary result; complete-M Primary uses Lookup storage independently of `primaryId` |
 | `reverseVerify(address,name)` | Scoped reverse comparison |
 | `reverseLookup(address,namespaces?)` | Primary first, then ordered bounded namespace probes |
 | `reverseNames(address,namespaces?)` | Verified names among candidate namespaces; not global enumeration |
@@ -116,13 +130,13 @@ customer identity or signing account.
 | `profile(name)` / `identity(name)` | Standard text fields / full identity view; text is untrusted content |
 | `namesOfPage(address,{cursor?,limit?})` | Bounded verified holdings page, continuation and completeness details |
 | `namesOf(address)` | Compatibility aggregate, up to 1000 candidates; throws `INCOMPLETE` when partial |
-| `walletProfile(address)` | Primary, reverse names, first holdings page and profile; inspect `holdings` for continuation/coverage |
+| `walletProfile(address)` | Primary, reverse names and profile; G/C includes first holdings page, M returns `holdings:null` and no owned names |
 | `history(name)` | Bounded indexed, informational timeline with ledger/transaction references |
 | `namehash(namespace)` / `node(name)` | On-chain hashing helpers |
 
 Universal mode routes forward, metadata, text, scoped reverse and Primary reads
 through Lookup. Each invocation checks its Registry anchor and numeric ABI version
-`1`; decoded results have strict names, shapes, addresses, enums and exact bigint
+`1` or `2`; decoded results have strict names, shapes, addresses, enums and exact bigint
 u64s. Separate simulations are not an atomic snapshot of all metadata fields.
 
 Input names/labels must be ASCII before case conversion. ASCII uppercase is
@@ -130,12 +144,19 @@ canonicalized to lowercase. Unicode lookalikes, including characters that would
 lowercase into ASCII, are rejected. Leading/trailing whitespace is not removed.
 On-chain reverse/Primary answers must already be canonical lowercase names.
 
-A successful `primaryOf` returning `null` means Primary supplied no verified name.
+For G/C, a successful `primaryOf` returning `null` means Primary supplied no verified name.
 The existing Primary ABI also collapses failed dependent proof reads into `None`,
 so this cannot distinguish absence from every downstream failure. Lookup errors
 such as `PrimaryNotConfigured` still throw. `reverseLookup` and `reverseNames`
 can recover from a Primary failure by probing the candidate namespaces through
-Lookup. Direct mode verifies the configured Primary's Registry anchor before reading.
+Lookup. Direct mode verifies the configured G/C Primary's Registry anchor before reading.
+
+M reads use `reverse_muxed` / `primary_name_muxed` on Lookup with the exact decoded
+G and u64 ID. Direct mode rejects M identity with `CONFIG`. Missing or proven stale
+M elections return null; malformed records, unknown capabilities and unavailable
+dependencies fail. An M Primary must match a valid current M reverse snapshot,
+including Registrar, Resolver and generation. A transferred/reissued name needs
+a new election. `primaryId` affects only G/C Primary; M needs the matching Lookup.
 
 ## Discovery and completeness
 
@@ -157,7 +178,9 @@ report, not a proof it omitted nothing. `complete` is true only for a final page
 whose indexer reports complete coverage and whose candidate checks did not fail.
 `namesOf` refuses partial aggregates instead of silently claiming all holdings.
 `walletProfile.names` is the first verified page; use `walletProfile.holdings` to
-continue. Indexer history remains informational and is not on-chain ownership proof.
+continue. `namesOf` and `namesOfPage` accept G/C holder addresses, not M routing
+IDs. An M wallet profile does not return the base G account's holdings. Indexer
+history remains informational and is not on-chain ownership proof.
 
 ## Configuration and trust
 

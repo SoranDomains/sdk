@@ -16,7 +16,7 @@ import {
   xdr,
 } from "@stellar/stellar-sdk";
 
-import { destinationFromNative, paymentFromNative, validatePaymentDestination, type PaymentDestination } from "./payment.js";
+import { decodeMuxedAddress, destinationFromNative, paymentFromNative, validatePaymentDestination, type PaymentDestination } from "./payment.js";
 import { lookupFromNative, type LookupResult } from "./lookup.js";
 import { nameFromNative, namespaceFromNative, type NameMetadata, type NamespaceMetadata } from "./views.js";
 export type { NameMetadata, NamespaceMetadata, NamespacePolicy } from "./views.js";
@@ -443,10 +443,26 @@ export class Soran {
     catch (e) { throw new SoranError(`invalid name metadata: ${String(e)}`, "ABI"); }
   }
 
-  /** A verified account display name scoped to one namespace. */
+  private isIdentityAddress(address: string): boolean {
+    return StrKey.isValidEd25519PublicKey(address) || StrKey.isValidContract(address) || StrKey.isValidMed25519PublicKey(address);
+  }
+
+  /** M identities live in Universal Lookup and never fall back to their base G account. */
+  private async muxedIdentityRead(fn: string, address: string, prefix: xdr.ScVal[] = []): Promise<unknown> {
+    if (this.resolutionMode !== "universal") throw new SoranError("muxed identity requires Universal Lookup", "CONFIG");
+    let muxed: { account: string; id: string };
+    try { muxed = decodeMuxedAddress(address); } catch { throw new SoranError("invalid muxed address", "INVALID_INPUT"); }
+    const { id, version } = await this.universalContext();
+    if (version !== 2 || await this.read(id, "muxed_identity_version", []) !== 1)
+      throw new SoranError("Lookup does not support muxed identity", "ABI");
+    return this.read(id, fn, [...prefix, nativeToScVal(muxed.account, { type: "address" }), nativeToScVal(BigInt(muxed.id), { type: "u64" })]);
+  }
+
+  /** A verified full destination display name scoped to one namespace. */
   async reverse(namespace: string, address: string): Promise<string | null> {
     namespace = normalizeLabel(namespace);
-    if (!StrKey.isValidEd25519PublicKey(address) && !StrKey.isValidContract(address)) throw new SoranError("invalid address", "INVALID_INPUT");
+    if (!this.isIdentityAddress(address)) throw new SoranError("invalid address", "INVALID_INPUT");
+    if (StrKey.isValidMed25519PublicKey(address)) return this.canonicalResult(await this.muxedIdentityRead("reverse_muxed", address, [nativeToScVal(namespace, { type: "string" })]), namespace);
     if (this.resolutionMode === "universal") {
       const raw = await this.universalRead("reverse", [nativeToScVal(namespace, { type: "string" }), nativeToScVal(address, { type: "address" })]);
       return this.canonicalResult(raw, namespace);
@@ -634,7 +650,7 @@ export class Soran {
    * This is what a wallet shows a checkmark on.
    */
   async reverseVerify(address: string, name: string): Promise<boolean> {
-    if (!StrKey.isValidEd25519PublicKey(address) && !StrKey.isValidContract(address)) return false;
+    if (!this.isIdentityAddress(address)) return false;
     // Cheap client-side shape check (throws SoranError on malformed names).
     const { namespace } = parseName(name);
     const claimed = await this.reverse(namespace, address);
@@ -681,14 +697,16 @@ export class Soran {
    * silently reported as "no reverse record").
    */
   async reverseLookup(address: string, namespaces?: string[]): Promise<string | null> {
-    if (!StrKey.isValidEd25519PublicKey(address) && !StrKey.isValidContract(address)) return null;
+    if (!this.isIdentityAddress(address)) return null;
+    if (StrKey.isValidMed25519PublicKey(address) && this.resolutionMode !== "universal") throw new SoranError("muxed identity requires Universal Lookup", "CONFIG");
     // 1. Primary name first (optional cross-namespace feature). A failed read
     //    falls through to the namespace probes by design — see the doc comment.
-    if (!this.primaryDisabled && (this.resolutionMode === "universal" || this.primaryId)) {
+    if (StrKey.isValidMed25519PublicKey(address) || (!this.primaryDisabled && (this.resolutionMode === "universal" || this.primaryId))) {
       try {
         const primary = await this.primaryOf(address);
         if (primary) return primary;
-      } catch {
+      } catch (error) {
+        if (StrKey.isValidMed25519PublicKey(address)) throw error;
         // PrimaryName unreachable or ABI-mismatched → degrade to the
         // pre-feature baseline (namespace probes), never fail the lookup.
       }
@@ -698,7 +716,7 @@ export class Soran {
       namespaces === undefined &&
       this.reverseNamespaces.length === 0 &&
       !this.hintUrl &&
-      (this.primaryDisabled || (this.resolutionMode === "direct" && !this.primaryId))
+      ((this.primaryDisabled && !StrKey.isValidMed25519PublicKey(address)) || (this.resolutionMode === "direct" && !this.primaryId))
     ) {
       throw new SoranError(
         "reverseLookup has no way to answer: configure primaryId, reverseNamespaces, or hintUrl — or pass `namespaces` per call",
@@ -760,8 +778,9 @@ export class Soran {
    * on any cache: the contract re-verifies on every read.
    */
   async primaryOf(address: string): Promise<string | null> {
+    if (!this.isIdentityAddress(address)) return null;
+    if (StrKey.isValidMed25519PublicKey(address)) return this.canonicalResult(await this.muxedIdentityRead("primary_name_muxed", address));
     if (this.primaryDisabled) return null;
-    if (!StrKey.isValidEd25519PublicKey(address) && !StrKey.isValidContract(address)) return null;
     if (this.resolutionMode === "universal") {
       if (this.explicitPrimaryId) {
         const selected = await this.universalRead("primary", []);
@@ -948,12 +967,13 @@ export class Soran {
    * return [].
    */
   async reverseNames(address: string, namespaces?: string[]): Promise<ReverseName[]> {
-    if (!StrKey.isValidEd25519PublicKey(address) && !StrKey.isValidContract(address)) return [];
+    if (!this.isIdentityAddress(address)) return [];
+    if (StrKey.isValidMed25519PublicKey(address) && this.resolutionMode !== "universal") throw new SoranError("muxed identity requires Universal Lookup", "CONFIG");
     if (
       namespaces === undefined &&
       this.reverseNamespaces.length === 0 &&
       !this.hintUrl &&
-      (this.primaryDisabled || (this.resolutionMode === "direct" && !this.primaryId))
+      ((this.primaryDisabled && !StrKey.isValidMed25519PublicKey(address)) || (this.resolutionMode === "direct" && !this.primaryId))
     ) {
       throw new SoranError(
         "reverseNames has no way to answer: configure primaryId, reverseNamespaces, or hintUrl — or pass `namespaces` per call",
@@ -963,7 +983,8 @@ export class Soran {
     let primary: string | null = null;
     try {
       primary = await this.primaryOf(address);
-    } catch {
+    } catch (error) {
+      if (StrKey.isValidMed25519PublicKey(address)) throw error;
       /* degrade to probes-only, like reverseLookup's primary step */
     }
     let candidates: string[];
@@ -1169,7 +1190,7 @@ export class Soran {
    * is the first page with explicit continuation/coverage, not all holdings.
    */
   async walletProfile(address: string): Promise<WalletProfile> {
-    if (!StrKey.isValidEd25519PublicKey(address) && !StrKey.isValidContract(address)) {
+    if (!this.isIdentityAddress(address)) {
       throw new SoranError(`invalid address "${address}"`, "INVALID_INPUT");
     }
     const [primary, reverseNames, holdings] = await Promise.all([
@@ -1178,7 +1199,7 @@ export class Soran {
         if (e instanceof SoranError && e.code === "CONFIG") return [] as ReverseName[];
         throw e;
       }),
-      this.hintUrl ? this.namesOfPage(address) : Promise.resolve(null),
+      this.hintUrl && !StrKey.isValidMed25519PublicKey(address) ? this.namesOfPage(address) : Promise.resolve(null),
     ]);
     const profile = primary ? await this.profile(primary) : {};
     return { address, primary, reverseNames, names: holdings?.names ?? null, holdings, profile };
@@ -1474,7 +1495,7 @@ export const LOOKUP_ERRORS: Readonly<Record<number, string>> = Object.freeze({
   1: "InvalidRegistry", 2: "InvalidGovernance", 3: "NotInitialized", 4: "MalformedName", 5: "NamespaceNotFound",
   6: "RegistrarMissing", 7: "NameInactive", 8: "ContextMismatch", 9: "UnsupportedImplementation", 10: "DependencyUnavailable",
   11: "InvalidPayment", 12: "LegacyMemoUnknown", 13: "MemoRequired", 14: "UpgradePending", 15: "NoPendingUpgrade",
-  16: "UpgradeNotReady", 17: "UpgradeHashMismatch", 18: "TimestampOverflow", 19: "PrimaryNotConfigured", 20: "InvalidPrimary", 21: "ReadTooLarge", 22: "MuxedDestination",
+  16: "UpgradeNotReady", 17: "UpgradeHashMismatch", 18: "TimestampOverflow", 19: "PrimaryNotConfigured", 20: "InvalidPrimary", 21: "ReadTooLarge", 22: "MuxedDestination", 23: "InvalidMuxedAccount", 24: "MuxedForwardMismatch", 25: "NotMuxedDisplayName", 26: "InvalidMuxedRecord",
 });
 function lookupError(detail: string): { code: number; name: string } | null {
   // Match only the RPC's leading contract failure, never an inner trace/log.

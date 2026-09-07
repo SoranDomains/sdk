@@ -52,6 +52,7 @@ import {
 import { decodeMuxedAddress, destinationFromNative, paymentFromNative, paymentMemoToScVal, validatePaymentDestination, type PaymentDestination } from "./payment.js";
 export { encodeMuxedAddress, decodeMuxedAddress, PAYMENT_RECORD_KEY, encodePaymentRecord, parsePaymentRecord, validatePaymentDestination, type PaymentMemo, type PaymentDestination } from "./payment.js";
 
+import { validateNativeTransaction, assertSignedBodyUnchanged } from "./native-auth.js";
 import { NativeHolderClient, type ClaimSubmitOptions } from "./native-holder.js";
 import { NativeClaimError } from "./native-codec.js";
 import type { ClaimIntent, TransferIntent, RenewIntent } from "./native-types.js";
@@ -76,6 +77,7 @@ export const DEPLOYMENTS = {
     rpcUrl: "https://soroban-testnet.stellar.org",
     passphrase: Networks.TESTNET as string,
     registryId: "CBSORANPM664QXYMYRZKLQDQE2TXFSK4GBMC6EIRSRTAUZRZCRZRFNMK",
+    lookupId: "CDSORANQAJK35UV2HR63CMB6M5NYISHMUBTB6EQY2CZ3Y7HJDIOHRJWA",
     primaryId: "CASORAN755O3GCQTRAHKDXLLCSDLNKAQWAP6MWABRSFVSHLJOEKAC7AB",
   },
 } as const;
@@ -166,6 +168,13 @@ const RESOLVER_ERRORS: Record<number, string> = {
   19: "PaymentContextMismatch",
   20: "PaymentUnavailable",
   21: "MuxedDestination",
+};
+
+const LOOKUP_IDENTITY_ERRORS: Record<number, string> = {
+  1: "InvalidRegistry", 2: "InvalidGovernance", 3: "NotInitialized", 4: "MalformedName", 5: "NamespaceNotFound",
+  6: "RegistrarMissing", 7: "NameInactive", 8: "ContextMismatch", 9: "UnsupportedImplementation", 10: "DependencyUnavailable",
+  11: "InvalidPayment", 12: "LegacyMemoUnknown", 13: "MemoRequired", 14: "UpgradePending", 15: "NoPendingUpgrade",
+  16: "UpgradeNotReady", 17: "UpgradeHashMismatch", 18: "TimestampOverflow", 19: "PrimaryNotConfigured", 20: "InvalidPrimary", 21: "ReadTooLarge", 22: "MuxedDestination", 23: "InvalidMuxedAccount", 24: "MuxedForwardMismatch", 25: "NotMuxedDisplayName", 26: "InvalidMuxedRecord",
 };
 
 const PRIMARY_ERRORS: Record<number, string> = {
@@ -325,6 +334,8 @@ export type HolderOptions = {
   /** PrimaryName contract; the preset supplies one. `null` disables
    *  setPrimary/clearPrimary. */
   primaryId?: string | null;
+  /** Universal Lookup storing exact muxed reverse/primary elections. null disables M writes. */
+  lookupId?: string | null;
   allowHttp?: boolean;
   /** Transaction time bound, seconds (integer 1-300, default 60). */
   timeoutSecs?: number;
@@ -342,6 +353,7 @@ export class SoranHolder {
   private passphrase: string;
   private registryId: string;
   private primaryId: string | null;
+  private lookupId: string | null;
   private signer: TxSigner;
   private timeoutSecs: number;
   private fee: string;
@@ -363,6 +375,9 @@ export class SoranHolder {
     // it leak onto a custom registryId, where it could only mis-verify.
     const presetPrimary = (opts.registryId && opts.registryId !== d.registryId) || (opts.passphrase && opts.passphrase !== d.passphrase) ? null : d.primaryId;
     this.primaryId = opts.primaryId === null ? null : (opts.primaryId ?? presetPrimary ?? null);
+    const presetLookup = (opts.registryId && opts.registryId !== d.registryId) || (opts.passphrase && opts.passphrase !== d.passphrase) ? null : d.lookupId;
+    this.lookupId = opts.lookupId === null ? null : (opts.lookupId ?? presetLookup ?? null);
+    if (this.lookupId && !StrKey.isValidContract(this.lookupId)) throw new HolderError("invalid Lookup contract address");
     this.signer = opts.signer;
     const t = opts.timeoutSecs ?? 60;
     if (!Number.isInteger(t) || t < 1 || t > 300) {
@@ -622,6 +637,37 @@ export class SoranHolder {
     if (await this.read(this.primaryId, "registry", []) !== this.registryId) throw new HolderError("Primary is anchored to a different Registry");
     const pub = await this.signer.publicKey();
     const r = await this.invoke(this.primaryId, "clear_primary", [addrArg(pub)], PRIMARY_ERRORS);
+    return { hash: r.hash, ledger: r.ledger };
+  }
+
+  /** Elect the exact M destination; its underlying G account must sign. */
+  async setReverseMuxed(name: string, muxedAddress: string): Promise<Submitted> {
+    const parsed = parseName(name);
+    return this.muxedIdentityWrite("set_reverse_muxed", muxedAddress, [], [nativeToScVal(`${parsed.label}.${parsed.namespace}`, { type: "string" })]);
+  }
+  async clearReverseMuxed(namespace: string, muxedAddress: string): Promise<Submitted> {
+    return this.muxedIdentityWrite("clear_reverse_muxed", muxedAddress, [nativeToScVal(normalizeLabel(namespace), { type: "string" })]);
+  }
+  /** Requires a current election for this exact M address in the name's namespace. */
+  async setPrimaryMuxed(name: string, muxedAddress: string): Promise<Submitted> {
+    const parsed = parseName(name);
+    return this.muxedIdentityWrite("set_primary_muxed", muxedAddress, [], [nativeToScVal(`${parsed.label}.${parsed.namespace}`, { type: "string" })]);
+  }
+  async clearPrimaryMuxed(muxedAddress: string): Promise<Submitted> {
+    return this.muxedIdentityWrite("clear_primary_muxed", muxedAddress);
+  }
+  private async muxedIdentityWrite(fn: string, address: string, prefix: xdr.ScVal[] = [], suffix: xdr.ScVal[] = []): Promise<Submitted> {
+    let muxed: { account: string; id: string };
+    try { muxed = decodeMuxedAddress(address); } catch { throw new HolderError("a canonical full M destination is required"); }
+    const pub = await this.signer.publicKey();
+    if (pub !== muxed.account) throw new HolderError("the muxed destination's underlying G account must sign");
+    if (!this.lookupId) throw new HolderError("muxed identity requires a configured Universal Lookup contract");
+    if (await this.read(this.lookupId, "registry", []) !== this.registryId) throw new HolderError("Lookup is anchored to a different Registry");
+    const [version, destination, identity] = await Promise.all([
+      this.read(this.lookupId, "version", []), this.read(this.lookupId, "destination_version", []), this.read(this.lookupId, "muxed_identity_version", []),
+    ]);
+    if (version !== 2 || destination !== 2 || identity !== 1) throw new HolderError("Lookup does not support muxed identity");
+    const r = await this.invoke(this.lookupId, fn, [...prefix, addrArg(muxed.account), nativeToScVal(BigInt(muxed.id), { type: "u64" }), ...suffix], LOOKUP_IDENTITY_ERRORS);
     return { hash: r.hash, ledger: r.ledger };
   }
 
@@ -891,12 +937,16 @@ export class SoranHolder {
       try {
         return await this.attempt(contractId, fn, args, errNames);
       } catch (e) {
-        if (/txBadSeq|bad_seq/i.test(String(e))) {
+        if (!this.isMuxedIdentityWrite(fn) && /txBadSeq|bad_seq/i.test(String(e))) {
           return await this.attempt(contractId, fn, args, errNames);
         }
         throw e;
       }
     });
+  }
+
+  private isMuxedIdentityWrite(fn: string): boolean {
+    return ["set_reverse_muxed", "clear_reverse_muxed", "set_primary_muxed", "clear_primary_muxed"].includes(fn);
   }
 
   private async attempt(
@@ -926,6 +976,7 @@ export class SoranHolder {
           fn,
         );
       }
+      if (this.isMuxedIdentityWrite(fn)) throw new HolderError("muxed identity storage needs restoration; restore it separately before retrying", contractId, fn);
       await this.restore(sim, pub);
       tx = build(await this.sourceAccount(pub, fn));
       sim = await this.server.simulateTransaction(tx, undefined, undefined, false);
@@ -936,9 +987,15 @@ export class SoranHolder {
     const prepared = rpc.assembleTransaction(tx, sim).build();
     this.assertSatisfiableAuth(prepared, pub, contractId, fn);
     this.assertPaymentIntent(prepared, pub, contractId, fn, args);
+    if (this.isMuxedIdentityWrite(fn)) {
+      const account = scValToNative(args[fn === "clear_reverse_muxed" ? 1 : 0]);
+      if (account !== pub || contractId !== this.lookupId) throw new HolderError("muxed identity signer or Lookup changed", contractId, fn);
+      validateNativeTransaction(prepared, { source: pub, contract: contractId, method: fn, args,
+        sourceInvocation: { contract: contractId, method: fn, args, children: [] }, maxFeeStroops: this.maxNativeFeeStroops });
+    }
     const txHash = toHex(prepared.hash()); // (SDK17) hash() is Uint8Array
     const signed = await this.signEnvelope(prepared.toXDR());
-    const envelope = TransactionBuilder.fromXDR(signed, this.passphrase);
+    const envelope = this.isMuxedIdentityWrite(fn) ? assertSignedBodyUnchanged(prepared, signed, this.passphrase) : TransactionBuilder.fromXDR(signed, this.passphrase);
     if ((fn === "set_payment" || fn === "set_muxed") && toHex(envelope.hash()) !== txHash) throw new HolderError("signer changed the reviewed transaction body", contractId, fn);
     let sent: Awaited<ReturnType<rpc.Server["sendTransaction"]>>;
     try {
