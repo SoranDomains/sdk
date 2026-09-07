@@ -1,8 +1,8 @@
 {
   "network": "testnet",
   "rpcUrl": "https://soroban-testnet.stellar.org",
-  "verifiedAt": "2026-09-06T12:12:11.925Z",
-  "verifiedLedger": 4534629,
+  "verifiedAt": "2026-09-07T08:37:00.175Z",
+  "verifiedLedger": 4549326,
   "governance": "GAJCWWNMBKCSTQQISDFTHFTCEOGXYA37YTP3U3ZW7Q5CYQPHSW6TB4QX",
   "namespaceDeploymentSaltVersion": 1,
   "lookupVersion": 2,
@@ -58,9 +58,13 @@
     },
     "lookup": {
       "id": "CDSORANQAJK35UV2HR63CMB6M5NYISHMUBTB6EQY2CZ3Y7HJDIOHRJWA",
-      "wasmHash": "67c2d2c7f9b80b2901426a31d4a85cf1cf56c4f70afd69d229dfe4b67db78041",
+      "wasmHash": "0d8ed0c9dd5f7ea4e8783ecb505f3da37ba643c632d85a52b3d9976fd11cea10",
       "deploymentTransaction": "d480c19edd9d101357432142a14e0d0e3e6b2c7706b01de8393cb94d6d6a63fc",
-      "deploymentLedger": 4534628
+      "deploymentLedger": 4534628,
+      "deploymentWasmHash": "67c2d2c7f9b80b2901426a31d4a85cf1cf56c4f70afd69d229dfe4b67db78041",
+      "upgradeTransaction": "0ad8700aee3c142330e6c02d7c8d3139663001bccc50ed2f3a40c1571e403f8a",
+      "upgradeLedger": 4549326,
+      "codeVerifiedAt": "2026-09-07T08:37:00.175Z"
     }
   },
   "status": "deployed",
@@ -73,7 +77,8 @@
     "version": 2,
     "destinationVersion": 2,
     "upgradeDelaySeconds": 0,
-    "governance": "GAJCWWNMBKCSTQQISDFTHFTCEOGXYA37YTP3U3ZW7Q5CYQPHSW6TB4QX"
+    "governance": "GAJCWWNMBKCSTQQISDFTHFTCEOGXYA37YTP3U3ZW7Q5CYQPHSW6TB4QX",
+    "muxedIdentityVersion": 1
   },
   "namespace": {
     "label": "nova",
@@ -83,5 +88,17 @@
     "permanent": false,
     "reclaimable": true
   },
-  "verificationScope": "Contract code hashes and deployment receipts, Registry namespace-bound deployment scheme, namespace owner/routing/immutable policy, Lookup/Resolver destination capabilities, Registrar native-claim and Resolver initialization version 1, initial absent claim configuration, and 5000 XLM namespace fee policy verified at the stated ledger. SDK package publication and hosted application availability are reported separately."
+  "verificationScope": "Original deployment and configuration verified at deploymentVerifiedLedger. Lookup in-place code upgrade and retained Registry/governance/Primary anchors verified at verifiedLedger; ABI/destination versions remain 2 and muxed identity version is 1. All other contract IDs and Wasm hashes were rechecked unchanged. Namespace configuration and fees retain their original dated verification; hosted services are verified separately.",
+  "deploymentVerifiedAt": "2026-09-06T12:12:11.925Z",
+  "deploymentVerifiedLedger": 4534629,
+  "lookupMuxedIdentityVersion": 1,
+  "lookupUpkeep": {
+    "transaction": "50c1c2506d3c0a123a5126f984dff66352bc58606428f68c8bec4acbd423ab82",
+    "ledger": 4549418,
+    "feeStroops": "1337205130",
+    "paidBy": "platform deployment account",
+    "instanceLiveUntilLedger": 7534628,
+    "codeLiveUntilLedger": 7549418,
+    "consumerFeeCapsChanged": false
+  }
 }
