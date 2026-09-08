@@ -18,9 +18,12 @@ All four packages target `@stellar/stellar-sdk >=17 <18`, tested with 17.0.1.
 The native-claim testnet deployment was verified on chain at ledger **4534629**
 on 6 September 2026 (12:12 UTC). Universal Lookup was upgraded in place at
 ledger **4549326** on 7 September 2026 (08:37 UTC) to add exact muxed reverse
-and primary identities. All contract addresses remain the same. The
+and primary identities. The Allocator was upgraded in place at ledger **4564382**
+on 8 September 2026 to fix native XLM payouts and allow immediate execution of
+new governance-approved code proposals. Namespace claim and objection windows
+remain unchanged. All contract addresses remain the same. The
 [current deployment manifest](deployments/testnet.json) records the original
-deployment and the subsequent Lookup code upgrade separately. The [release status](https://docs.soran.domains/reference/release-status)
+deployment and subsequent code upgrades separately. The [release status](https://docs.soran.domains/reference/release-status)
 tracks package and service availability separately.
 Mainnet has no preset.
 
