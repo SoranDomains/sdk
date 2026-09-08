@@ -1,8 +1,8 @@
 {
   "network": "testnet",
   "rpcUrl": "https://soroban-testnet.stellar.org",
-  "verifiedAt": "2026-09-07T08:37:00.175Z",
-  "verifiedLedger": 4549326,
+  "verifiedAt": "2026-09-08T05:31:39.329Z",
+  "verifiedLedger": 4564382,
   "governance": "GAJCWWNMBKCSTQQISDFTHFTCEOGXYA37YTP3U3ZW7Q5CYQPHSW6TB4QX",
   "namespaceDeploymentSaltVersion": 1,
   "lookupVersion": 2,
@@ -34,9 +34,13 @@
     },
     "allocator": {
       "id": "CCSORANYFHUJUWETEQ7UWIDN4JTPV7NN5G6YUSSBZI57X7EQWVA63VMJ",
-      "wasmHash": "584d5dc1d82e34655d4130f4f0e93ae7b5cd75d6465484efb51b8525f13c3db0",
+      "wasmHash": "9480a4f980de9df0a31652b0b64c54d5c5e1979745cc8c4fc486624b9c177e40",
       "deploymentTransaction": "6588ca3a8d09458e6aadeaf0173927dc10865b68c8531632d4368c109b85d46e",
-      "deploymentLedger": 4534622
+      "deploymentLedger": 4534622,
+      "deploymentWasmHash": "584d5dc1d82e34655d4130f4f0e93ae7b5cd75d6465484efb51b8525f13c3db0",
+      "upgradeTransaction": "8a25369b3a11676ea602a93f3830b0c22df47033726ab433367355072d2f0631",
+      "upgradeLedger": 4564382,
+      "codeVerifiedAt": "2026-09-08T05:31:39.329Z"
     },
     "registrar": {
       "id": "CBSORANHQRVZ7PEZ7VVFEQ7GQJ3M4RLBY2DNQ44MIVLU5C4J2DJ3DH3N",
@@ -88,7 +92,7 @@
     "permanent": false,
     "reclaimable": true
   },
-  "verificationScope": "Original deployment and configuration verified at deploymentVerifiedLedger. Lookup in-place code upgrade and retained Registry/governance/Primary anchors verified at verifiedLedger; ABI/destination versions remain 2 and muxed identity version is 1. All other contract IDs and Wasm hashes were rechecked unchanged. Namespace configuration and fees retain their original dated verification; hosted services are verified separately.",
+  "verificationScope": "Original deployment receipts and configuration were verified on 6 September at deploymentVerifiedLedger. The in-place Lookup upgrade and muxed identity ABI 1 were verified on 7 September at contracts.lookup.upgradeLedger. On 8 September at verifiedLedger, the in-place Allocator upgrade, consumed proposal, retained schema 4, configuration, fee policy and Registry Allocator anchor were verified. All six deployed Wasm hashes and retained instance storage were independently rechecked on 8 September at the per-contract ledgers in independentCodeVerification; this later check is separate from upgrade inclusion. Historical namespace claim configuration and package/service observations retain their own dated verification.",
   "deploymentVerifiedAt": "2026-09-06T12:12:11.925Z",
   "deploymentVerifiedLedger": 4534629,
   "lookupMuxedIdentityVersion": 1,
@@ -100,5 +104,28 @@
     "instanceLiveUntilLedger": 7534628,
     "codeLiveUntilLedger": 7549418,
     "consumerFeeCapsChanged": false
+  },
+  "allocatorUpgradeDelaySeconds": 0,
+  "allocatorSchemaVersion": 4,
+  "allocatorUpkeep": {
+    "transaction": "9980133f17fa679f6f941069a2b735bf1de02ae7c7020922cf5573944e8b0436",
+    "ledger": 4564393,
+    "feeStroops": "1504970268",
+    "paidBy": "platform deployment account",
+    "instanceLiveUntilLedger": 7534623,
+    "codeLiveUntilLedger": 7564393,
+    "consumerFeeCapsChanged": false
+  },
+  "independentCodeVerification": {
+    "verifiedAt": "2026-09-08T05:34:20.215Z",
+    "contractLedgers": {
+      "registry": 4564412,
+      "allocator": 4564412,
+      "registrar": 4564413,
+      "resolver": 4564413,
+      "primary": 4564413,
+      "lookup": 4564414
+    },
+    "scope": "Downloaded and verified all six deployed Wasm hashes. Compared every contract instance storage key with the pre-upgrade state; only the Allocator PendingUpgrade entry was removed. Configuration, fee policy, Registry Allocator anchor and Lookup interface reads were unchanged."
   }
 }
