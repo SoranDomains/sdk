@@ -29,6 +29,42 @@ checks their Registry, Registrar authority and payment API version. It has no
 old-address fallback. The universal-only `lookup`, `namespaceMetadata` and
 `nameMetadata` methods require universal mode.
 
+## Name status and history reads
+
+Lookup 0.9 adds capability-checked methods for the corresponding on-chain read extension:
+
+```ts
+const status = await soran.nameStatus("alice.nova");
+// status.state.kind: namespaceMissing | registrarMissing | unregistered | active | expired
+// Active/expired states include record.holder, generation and expiresAt.
+
+const rows = await soran.primaryNames([walletA, walletB]);
+const scoped = await soran.reverseMany("nova", [walletA, muxedWallet]);
+// Each row: { address, kind, ledger, timestamp, ... }
+// kind is name (with name), none, or error (with errorCode/errorName).
+```
+
+`nameStatus` describes registration, not claimability or payment readiness. Names
+can be reserved or restricted by policy, and active names can have unavailable
+payment instructions. The status is from the returned ledger and timestamp.
+
+`primaryBatch` and `reverseBatch` each make one contract batch read after checking
+deployment capabilities. The initial limit is **two identities**. The limit is an
+input bound, not a guarantee that every combination of dependency calls fits a
+transaction. Existing contracts can make even two populated rows exceed memory.
+
+For history screens, `primaryNames` and `reverseMany` accept up to **256 identities**.
+They try bounded batches and switch to individual reads after a leading host
+budget error. The individual reads still use the same on-chain batch methods.
+Each row retains its ledger/timestamp, because separate simulations can observe
+different ledgers. Order and duplicates are preserved. RPC, restoration, ABI and
+other errors reject; they never become `none`. A single read that exceeds budget
+also rejects. These helpers do not enumerate names owned by an address.
+
+G/C and full muxed identities remain distinct. A G address plus transaction memo
+does not identify a separate reverse-election identity. Disabling G/C Primary in
+client options rejects a mixed Primary batch; M-only Primary reads remain available.
+
 ## Payment instructions
 
 ```ts

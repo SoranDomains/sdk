@@ -19,6 +19,8 @@ import {
 import { decodeMuxedAddress, destinationFromNative, paymentFromNative, validatePaymentDestination, type PaymentDestination } from "./payment.js";
 import { lookupFromNative, type LookupResult } from "./lookup.js";
 import { nameFromNative, namespaceFromNative, type NameMetadata, type NamespaceMetadata } from "./views.js";
+import { batchNamesFromNative, identitiesToScVal, MAX_BATCH_READS, MAX_HISTORY_IDENTITIES, nameStatusFromNative, type BatchNames, type NameStatus, type ObservedIdentityName } from "./read-extensions.js";
+export { MAX_BATCH_READS, MAX_HISTORY_IDENTITIES, type BatchNames, type IdentityName, type NameState, type NameStatus, type RegisteredName, type ObservedIdentityName } from "./read-extensions.js";
 export type { NameMetadata, NamespaceMetadata, NamespacePolicy } from "./views.js";
 export { encodeMuxedAddress, decodeMuxedAddress, PAYMENT_RECORD_KEY, encodePaymentRecord, parsePaymentRecord, validatePaymentDestination, type PaymentMemo, type PaymentDestination } from "./payment.js";
 export type { LookupResult, NativePaymentResolution, LegacyAddressResolution } from "./lookup.js";
@@ -445,6 +447,110 @@ export class Soran {
 
   private isIdentityAddress(address: string): boolean {
     return StrKey.isValidEd25519PublicKey(address) || StrKey.isValidContract(address) || StrKey.isValidMed25519PublicKey(address);
+  }
+
+  /** Registration state from one ledger observation. This does not promise
+   * claimability or payment readiness. Requires name_status_version() == 1. */
+  async nameStatus(name: string): Promise<NameStatus> {
+    const { label, namespace } = parseName(name), canonical = `${label}.${namespace}`;
+    const { id, version } = await this.universalContext();
+    if (version !== 2 || await this.read(id, "name_status_version", []) !== 1) throw new SoranError("Lookup does not support name status", "ABI");
+    const raw = await this.read(id, "name_status", [nativeToScVal(canonical, { type: "string" })]);
+    try { return nameStatusFromNative(raw, canonical, hex(await this.node(canonical))); }
+    catch (e) { throw new SoranError(`invalid name status: ${String(e)}`, "ABI"); }
+  }
+
+  /** Maximum number of identities accepted by this SDK and Lookup capability. */
+  async batchReadLimit(): Promise<number> {
+    await this.batchContext();
+    return MAX_BATCH_READS;
+  }
+
+  /** One bounded on-chain reverse read, scoped to a namespace. Input order and
+   * duplicates are preserved; each result is a name, none, or contract error. */
+  async reverseBatch(namespace: string, addresses: readonly string[]): Promise<BatchNames> {
+    namespace = normalizeLabel(namespace);
+    return this.identityBatch("reverse_names", addresses, namespace);
+  }
+
+  /** One bounded on-chain Primary read. M identities preserve their routing ID.
+   * G/C entries require Primary to be enabled in this client configuration. */
+  async primaryBatch(addresses: readonly string[]): Promise<BatchNames> {
+    return this.identityBatch("primary_names", addresses);
+  }
+
+  /** History helper for up to 256 G/C/M identities. Uses bounded contract
+   * batches; after a simulation budget failure, retries those identities and
+   * remaining inputs individually. Each result retains its own observation.
+   * Restoration, transport and other failures reject instead of becoming None. */
+  async primaryNames(addresses: readonly string[]): Promise<ObservedIdentityName[]> {
+    return this.identityHistory("primary_names", addresses);
+  }
+
+  /** Bounded history helper for elected names in one namespace. See primaryNames. */
+  async reverseMany(namespace: string, addresses: readonly string[]): Promise<ObservedIdentityName[]> {
+    return this.identityHistory("reverse_names", addresses, normalizeLabel(namespace));
+  }
+
+  private async batchContext(): Promise<string> {
+    const { id, version } = await this.universalContext();
+    if (version !== 2 || await this.read(id, "batch_read_version", []) !== 1 || await this.read(id, "batch_read_limit", []) !== MAX_BATCH_READS)
+      throw new SoranError("Lookup has an unsupported batch capability or limit", "ABI");
+    return id;
+  }
+
+  private async identityBatch(method: "primary_names" | "reverse_names", addresses: readonly string[], namespace?: string): Promise<BatchNames> {
+    let encoded: xdr.ScVal;
+    try { encoded = identitiesToScVal(addresses); }
+    catch (e) { throw new SoranError(`invalid batch: ${String(e)}`, "INVALID_INPUT"); }
+    const requested = [...addresses];
+    const hasDirect = requested.some(value => !StrKey.isValidMed25519PublicKey(value));
+    if (method === "primary_names" && hasDirect && this.primaryDisabled) throw new SoranError("G/C Primary is disabled; enable it before a mixed Primary batch", "CONFIG");
+    const id = await this.batchContext();
+    if (method === "primary_names" && hasDirect && this.explicitPrimaryId && await this.read(id, "primary", []) !== this.explicitPrimaryId)
+      throw new SoranError("Lookup Primary does not match configured primaryId", "CONFIG");
+    return this.readIdentityBatch(id, method, requested, encoded, namespace);
+  }
+
+  private async readIdentityBatch(id: string, method: "primary_names" | "reverse_names", requested: readonly string[], encoded: xdr.ScVal, namespace?: string): Promise<BatchNames> {
+    const args = namespace === undefined ? [encoded] : [nativeToScVal(namespace, { type: "string" }), encoded];
+    const raw = await this.read(id, method, args);
+    try { return batchNamesFromNative(raw, requested, value => this.canonicalResult(value, namespace), LOOKUP_ERRORS); }
+    catch (e) { throw new SoranError(`invalid identity batch: ${String(e)}`, "ABI"); }
+  }
+
+  private async identityHistory(method: "primary_names" | "reverse_names", addresses: readonly string[], namespace?: string): Promise<ObservedIdentityName[]> {
+    if (!Array.isArray(addresses) || addresses.length > MAX_HISTORY_IDENTITIES) throw new SoranError(`provide at most ${MAX_HISTORY_IDENTITIES} identities`, "INVALID_INPUT");
+    const requested = [...addresses];
+    try { for (let i = 0; i < requested.length; i += MAX_BATCH_READS) identitiesToScVal(requested.slice(i, i + MAX_BATCH_READS)); }
+    catch (e) { throw new SoranError(`invalid history identities: ${String(e)}`, "INVALID_INPUT"); }
+    const hasDirect = requested.some(value => !StrKey.isValidMed25519PublicKey(value));
+    if (method === "primary_names" && hasDirect && this.primaryDisabled) throw new SoranError("G/C Primary is disabled", "CONFIG");
+    if (requested.length === 0) return [];
+    const id = await this.batchContext();
+    if (method === "primary_names" && hasDirect && this.explicitPrimaryId && await this.read(id, "primary", []) !== this.explicitPrimaryId)
+      throw new SoranError("Lookup Primary does not match configured primaryId", "CONFIG");
+    const results: ObservedIdentityName[] = [];
+    let size = MAX_BATCH_READS;
+    for (let offset = 0; offset < requested.length;) {
+      const part = requested.slice(offset, offset + size);
+      try {
+        const batch = await this.readIdentityBatch(id, method, part, identitiesToScVal(part), namespace);
+        results.push(...batch.results.map(row => ({ ...row, ledger: batch.ledger, timestamp: batch.timestamp })));
+        offset += part.length;
+      } catch (error) {
+        // Match the leading host error, never text embedded in dependency logs.
+        // This changes request size only; it preserves the exact contract path.
+        const prefix = `simulate ${method} on ${id} failed: `;
+        if (part.length > 1 && error instanceof SoranError && error.code === "SIMULATION" && error.message.startsWith(prefix)
+          && /^(?:HostError: )?Error\(Budget, ExceededLimit\)(?:\s|$)/.test(error.message.slice(prefix.length))) {
+          size = 1;
+          continue;
+        }
+        throw error;
+      }
+    }
+    return results;
   }
 
   /** M identities live in Universal Lookup and never fall back to their base G account. */
@@ -1495,7 +1601,7 @@ export const LOOKUP_ERRORS: Readonly<Record<number, string>> = Object.freeze({
   1: "InvalidRegistry", 2: "InvalidGovernance", 3: "NotInitialized", 4: "MalformedName", 5: "NamespaceNotFound",
   6: "RegistrarMissing", 7: "NameInactive", 8: "ContextMismatch", 9: "UnsupportedImplementation", 10: "DependencyUnavailable",
   11: "InvalidPayment", 12: "LegacyMemoUnknown", 13: "MemoRequired", 14: "UpgradePending", 15: "NoPendingUpgrade",
-  16: "UpgradeNotReady", 17: "UpgradeHashMismatch", 18: "TimestampOverflow", 19: "PrimaryNotConfigured", 20: "InvalidPrimary", 21: "ReadTooLarge", 22: "MuxedDestination", 23: "InvalidMuxedAccount", 24: "MuxedForwardMismatch", 25: "NotMuxedDisplayName", 26: "InvalidMuxedRecord",
+  16: "UpgradeNotReady", 17: "UpgradeHashMismatch", 18: "TimestampOverflow", 19: "PrimaryNotConfigured", 20: "InvalidPrimary", 21: "ReadTooLarge", 22: "MuxedDestination", 23: "InvalidMuxedAccount", 24: "MuxedForwardMismatch", 25: "NotMuxedDisplayName", 26: "InvalidMuxedRecord", 27: "BatchTooLarge",
 });
 function lookupError(detail: string): { code: number; name: string } | null {
   // Match only the RPC's leading contract failure, never an inner trace/log.
