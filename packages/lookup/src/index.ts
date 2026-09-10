@@ -19,8 +19,8 @@ import {
 import { decodeMuxedAddress, destinationFromNative, paymentFromNative, validatePaymentDestination, type PaymentDestination } from "./payment.js";
 import { lookupFromNative, type LookupResult } from "./lookup.js";
 import { nameFromNative, namespaceFromNative, type NameMetadata, type NamespaceMetadata } from "./views.js";
-import { batchNamesFromNative, identitiesToScVal, MAX_BATCH_READS, MAX_HISTORY_IDENTITIES, nameStatusFromNative, type BatchNames, type NameStatus, type ObservedIdentityName } from "./read-extensions.js";
-export { MAX_BATCH_READS, MAX_HISTORY_IDENTITIES, type BatchNames, type IdentityName, type NameState, type NameStatus, type RegisteredName, type ObservedIdentityName } from "./read-extensions.js";
+import { batchNamesFromNative, identitiesToScVal, MAX_BATCH_READS, MAX_PRIMARY_BATCH_READS, MAX_HISTORY_IDENTITIES, nameStatusFromNative, type BatchNames, type NameStatus, type ObservedIdentityName } from "./read-extensions.js";
+export { MAX_BATCH_READS, MAX_PRIMARY_BATCH_READS, MAX_HISTORY_IDENTITIES, type BatchNames, type IdentityName, type NameState, type NameStatus, type RegisteredName, type ObservedIdentityName } from "./read-extensions.js";
 export type { NameMetadata, NamespaceMetadata, NamespacePolicy } from "./views.js";
 export { encodeMuxedAddress, decodeMuxedAddress, PAYMENT_RECORD_KEY, encodePaymentRecord, parsePaymentRecord, validatePaymentDestination, type PaymentMemo, type PaymentDestination } from "./payment.js";
 export type { LookupResult, NativePaymentResolution, LegacyAddressResolution } from "./lookup.js";
@@ -462,8 +462,12 @@ export class Soran {
 
   /** Maximum number of identities accepted by this SDK and Lookup capability. */
   async batchReadLimit(): Promise<number> {
-    await this.batchContext();
-    return MAX_BATCH_READS;
+    return (await this.batchContext()).reverseLimit;
+  }
+
+  /** Maximum Primary identities for the deployed batch capability. */
+  async primaryBatchReadLimit(): Promise<number> {
+    return (await this.batchContext()).primaryLimit;
   }
 
   /** One bounded on-chain reverse read, scoped to a namespace. Input order and
@@ -480,8 +484,8 @@ export class Soran {
   }
 
   /** History helper for up to 256 G/C/M identities. Uses bounded contract
-   * batches; after a simulation budget failure, retries those identities and
-   * remaining inputs individually. Each result retains its own observation.
+   * batches; after a simulation budget failure, halves the batch size until
+   * it fits or one identity still fails. Each row retains its own observation.
    * Restoration, transport and other failures reject instead of becoming None. */
   async primaryNames(addresses: readonly string[]): Promise<ObservedIdentityName[]> {
     return this.identityHistory("primary_names", addresses);
@@ -492,21 +496,31 @@ export class Soran {
     return this.identityHistory("reverse_names", addresses, normalizeLabel(namespace));
   }
 
-  private async batchContext(): Promise<string> {
+  private async batchContext(): Promise<{ id: string; reverseLimit: number; primaryLimit: number }> {
     const { id, version } = await this.universalContext();
-    if (version !== 2 || await this.read(id, "batch_read_version", []) !== 1 || await this.read(id, "batch_read_limit", []) !== MAX_BATCH_READS)
+    if (version !== 2) throw new SoranError("Lookup has an unsupported batch capability", "ABI");
+    const capability = await this.read(id, "batch_read_version", []);
+    const reverseLimit = await this.read(id, "batch_read_limit", []);
+    // Supports the current deployment during a coordinated code rollout.
+    if (capability === 1 && reverseLimit === 2) return { id, reverseLimit: 2, primaryLimit: 2 };
+    if (capability !== 2 || typeof reverseLimit !== "number" || !Number.isInteger(reverseLimit) || reverseLimit < 1 || reverseLimit > MAX_BATCH_READS)
       throw new SoranError("Lookup has an unsupported batch capability or limit", "ABI");
-    return id;
+    const primaryLimit = await this.read(id, "primary_batch_limit", []);
+    if (typeof primaryLimit !== "number" || !Number.isInteger(primaryLimit) || primaryLimit < 1 || primaryLimit > MAX_PRIMARY_BATCH_READS || primaryLimit > reverseLimit)
+      throw new SoranError("Lookup has an unsupported Primary batch limit", "ABI");
+    return { id, reverseLimit, primaryLimit };
   }
 
   private async identityBatch(method: "primary_names" | "reverse_names", addresses: readonly string[], namespace?: string): Promise<BatchNames> {
     let encoded: xdr.ScVal;
-    try { encoded = identitiesToScVal(addresses); }
+    try { encoded = identitiesToScVal(addresses, method === "primary_names" ? MAX_PRIMARY_BATCH_READS : MAX_BATCH_READS); }
     catch (e) { throw new SoranError(`invalid batch: ${String(e)}`, "INVALID_INPUT"); }
     const requested = [...addresses];
     const hasDirect = requested.some(value => !StrKey.isValidMed25519PublicKey(value));
     if (method === "primary_names" && hasDirect && this.primaryDisabled) throw new SoranError("G/C Primary is disabled; enable it before a mixed Primary batch", "CONFIG");
-    const id = await this.batchContext();
+    const { id, reverseLimit, primaryLimit } = await this.batchContext();
+    const limit = method === "primary_names" ? primaryLimit : reverseLimit;
+    if (requested.length > limit) throw new SoranError(`provide at most ${limit} identities for this deployed method`, "INVALID_INPUT");
     if (method === "primary_names" && hasDirect && this.explicitPrimaryId && await this.read(id, "primary", []) !== this.explicitPrimaryId)
       throw new SoranError("Lookup Primary does not match configured primaryId", "CONFIG");
     return this.readIdentityBatch(id, method, requested, encoded, namespace);
@@ -527,11 +541,11 @@ export class Soran {
     const hasDirect = requested.some(value => !StrKey.isValidMed25519PublicKey(value));
     if (method === "primary_names" && hasDirect && this.primaryDisabled) throw new SoranError("G/C Primary is disabled", "CONFIG");
     if (requested.length === 0) return [];
-    const id = await this.batchContext();
+    const { id, reverseLimit, primaryLimit } = await this.batchContext();
     if (method === "primary_names" && hasDirect && this.explicitPrimaryId && await this.read(id, "primary", []) !== this.explicitPrimaryId)
       throw new SoranError("Lookup Primary does not match configured primaryId", "CONFIG");
     const results: ObservedIdentityName[] = [];
-    let size = MAX_BATCH_READS;
+    let size = method === "primary_names" ? primaryLimit : reverseLimit;
     for (let offset = 0; offset < requested.length;) {
       const part = requested.slice(offset, offset + size);
       try {
@@ -544,7 +558,7 @@ export class Soran {
         const prefix = `simulate ${method} on ${id} failed: `;
         if (part.length > 1 && error instanceof SoranError && error.code === "SIMULATION" && error.message.startsWith(prefix)
           && /^(?:HostError: )?Error\(Budget, ExceededLimit\)(?:\s|$)/.test(error.message.slice(prefix.length))) {
-          size = 1;
+          size = Math.max(1, Math.floor(part.length / 2));
           continue;
         }
         throw error;

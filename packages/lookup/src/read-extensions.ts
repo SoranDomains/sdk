@@ -2,7 +2,8 @@ import { nativeToScVal, StrKey, xdr } from "@stellar/stellar-sdk";
 import { decodeMuxedAddress } from "./payment.js";
 import { address, u64 } from "./views.js";
 
-export const MAX_BATCH_READS = 2;
+export const MAX_BATCH_READS = 16;
+export const MAX_PRIMARY_BATCH_READS = 8;
 export type RegisteredName = { registrar: string; node: string; holder: string; generation: bigint; expiresAt: bigint };
 export type NameState =
   | { kind: "namespaceMissing" | "registrarMissing" | "unregistered" }
@@ -49,8 +50,8 @@ export function nameStatusFromNative(raw: unknown, expectedName: string, expecte
   return { name: expectedName, ledger, timestamp, state };
 }
 
-export function identitiesToScVal(addresses: readonly string[]): xdr.ScVal {
-  if (!Array.isArray(addresses) || addresses.length > MAX_BATCH_READS) throw new Error(`provide at most ${MAX_BATCH_READS} identities`);
+export function identitiesToScVal(addresses: readonly string[], limit = MAX_BATCH_READS): xdr.ScVal {
+  if (!Array.isArray(addresses) || addresses.length > limit) throw new Error(`provide at most ${limit} identities`);
   return xdr.ScVal.scvVec(addresses.map(value => {
     if (typeof value !== "string") throw new Error("identity must be an address");
     if (StrKey.isValidMed25519PublicKey(value)) {
