@@ -5,7 +5,7 @@
 > [release status](https://docs.soran.domains/reference/release-status) for package and service availability.
 
 
-Version 0.7.0 targets Stellar SDK17 (`>=17 <18`). ASCII names
+Preview 0.7.0-migration.0 targets Stellar SDK17 (`>=17 <18`). ASCII names
 and labels are validated before lowercase normalization; Unicode lookalikes are
 rejected. Payment and ownership writes target the owning Registry/Registrar/Resolver.
 Complete-M display-name writes target Universal Lookup; Lookup 0.8.0 provides

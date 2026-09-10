@@ -1,6 +1,6 @@
 {
   "name": "@sorandomains/owner",
-  "version": "0.8.0",
+  "version": "0.8.0-migration.0",
   "description": "Run your Soran namespace on Stellar: configure claims, issue names and manage namespace policies.",
   "type": "module",
   "main": "./dist/index.js",

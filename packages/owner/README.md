@@ -5,7 +5,7 @@
 > [release status](https://docs.soran.domains/reference/release-status) for package and service availability.
 
 
-Version 0.8.0 targets Stellar SDK17 (`>=17 <18`). ASCII names
+Preview 0.8.0-migration.0 targets Stellar SDK17 (`>=17 <18`). ASCII names
 and labels are validated before lowercase normalization; Unicode lookalikes are
 rejected. Writes continue to target the owning Registry/Registrar/Resolver. Universal
 Lookup is the read entry point in `@sorandomains/lookup` 0.8.0.
