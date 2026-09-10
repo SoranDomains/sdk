@@ -13,7 +13,7 @@ function fixture(overrides: Record<string, unknown> = {}, options: Record<string
     calls.push({ id, fn, args: args.map(scValToNative) });
     const values: Record<string, unknown> = {
       registry: DEPLOYMENTS.testnet.registryId, version: 2, destination_version: 2,
-      name_status_version: 1, batch_read_version: 2, batch_read_limit: MAX_BATCH_READS, primary_batch_limit: MAX_PRIMARY_BATCH_READS,
+      name_status_version: 1, batch_read_version: 3, batch_read_limit: MAX_BATCH_READS, primary_batch_limit: MAX_PRIMARY_BATCH_READS,
       name_status: { name: "alice.nova", ledger: 42, timestamp: 77n, state: ["Unregistered"] },
       primary_names: { ledger: 42, timestamp: 77n, results: [["Name", "alice.nova"], ["None"]] },
       reverse_names: { ledger: 42, timestamp: 77n, results: [["Name", "alice.nova"], ["Failed", 10]] },
@@ -143,12 +143,12 @@ test("history batches split only leading budget failures and retain per-row obse
       return { ledger: ledger++, timestamp: BigInt(ledger), results: [["Name", "alice.nova"]] };
     } });
     const input = [G, M, C, M, G, C];
-    const rows = method === "primary_names" ? await s.primaryNames(input) : await s.reverseMany("nova", input);
+    const rows = method === "primary_names" ? await s.primaryNames(input, { concurrency: 1 }) : await s.reverseMany("nova", input, { concurrency: 1 });
     assert.deepEqual(rows.map(row => row.address), input);
-    assert.deepEqual(rows.map(row => row.ledger), [100, 101, 102, 103, 104, 105]);
+    assert.deepEqual(rows.map(row => row.ledger), [100, 101, 102, 101, 100, 102]);
     assert.ok(rows.every(row => row.kind === "name"));
     const reads = calls.filter(call => call.fn === method);
-    assert.equal(reads.length, input.length + 2, "failed sizes six and three, then single reads");
+    assert.equal(reads.length, 4, "three distinct identities: failed size three, then single reads");
     assert.ok(calls.every(call => call.id === LOOKUP));
   }
 });
@@ -177,12 +177,12 @@ test("history helper does not split restoration, contract or incidental log erro
 
 test("reverse and Primary enforce separate published capacities", async () => {
   const none = (count: number) => ({ ledger: 42, timestamp: 77n, results: Array.from({ length: count }, () => ["None"]) });
-  const { s, calls } = fixture({ primary_names: none(8), reverse_names: none(16) });
-  assert.equal((await s.reverseBatch("nova", Array(16).fill(M))).results.length, 16);
-  assert.equal((await s.primaryBatch(Array(8).fill(G))).results.length, 8);
+  const { s, calls } = fixture({ primary_names: none(MAX_PRIMARY_BATCH_READS), reverse_names: none(MAX_BATCH_READS) });
+  assert.equal((await s.reverseBatch("nova", Array(MAX_BATCH_READS).fill(M))).results.length, MAX_BATCH_READS);
+  assert.equal((await s.primaryBatch(Array(MAX_PRIMARY_BATCH_READS).fill(G))).results.length, MAX_PRIMARY_BATCH_READS);
   const before = calls.length;
-  await assert.rejects(s.primaryBatch(Array(9).fill(G)), errorCode("INVALID_INPUT"));
-  await assert.rejects(s.reverseBatch("nova", Array(17).fill(G)), errorCode("INVALID_INPUT"));
+  await assert.rejects(s.primaryBatch(Array(MAX_PRIMARY_BATCH_READS + 1).fill(G)), errorCode("INVALID_INPUT"));
+  await assert.rejects(s.reverseBatch("nova", Array(MAX_BATCH_READS + 1).fill(G)), errorCode("INVALID_INPUT"));
   assert.equal(calls.length, before);
 });
 
@@ -192,7 +192,7 @@ test("method limits are read from the deployed capability and validated", async 
   assert.equal(await older.s.primaryBatchReadLimit(), 2);
   await assert.rejects(older.s.reverseBatch("nova", [G, C, M]), errorCode("INVALID_INPUT"));
   assert.ok(!older.calls.some(call => call.fn === "reverse_names"));
-  for (const primary_batch_limit of [0, -1, 9, 8n, 1.5, null, new Error("missing")]) {
+  for (const primary_batch_limit of [0, -1, MAX_PRIMARY_BATCH_READS + 1, 8n, 1.5, null, new Error("missing")]) {
     const { s, calls } = fixture({ primary_batch_limit });
     await assert.rejects(s.primaryBatch([G]));
     assert.ok(!calls.some(call => call.fn === "primary_names"));
@@ -214,9 +214,101 @@ test("history uses advertised capacities and halves only exhausted batches", asy
       return { ledger: ledger++, timestamp: 77n, results: identities.map(() => ["None"]) };
     } });
     const input = Array.from({ length: 20 }, (_, i) => encodeMuxedAddress(G, String(i)));
-    const results = method === "primary_names" ? await s.primaryNames(input) : await s.reverseMany("nova", input);
+    const results = method === "primary_names" ? await s.primaryNames(input, { concurrency: 1 }) : await s.reverseMany("nova", input, { concurrency: 1 });
     assert.deepEqual(results.map(row => row.address), input);
-    assert.deepEqual(sizes, method === "primary_names" ? [8, 4, 4, 4, 4, 4] : [16, 8, 4, 4, 4, 4, 4]);
-    assert.deepEqual(results.map(row => row.ledger), Array.from({ length: 20 }, (_, i) => 10 + Math.floor(i / 4)));
+    assert.deepEqual(sizes, method === "primary_names" ? [16, 8, 4, 4, 4, 4, 4] : [20, 10, 5, ...Array(10).fill(2)]);
+    assert.deepEqual(results.map(row => row.ledger), Array.from({ length: 20 }, (_, i) => 10 + Math.floor(i / (method === "primary_names" ? 4 : 2))));
   }
+});
+
+
+test("version 2 remains bounded at its qualified 16/8 capacities", async () => {
+  const old = fixture({ batch_read_version: 2, batch_read_limit: 16, primary_batch_limit: 8 });
+  assert.equal(await old.s.batchReadLimit(), 16);
+  assert.equal(await old.s.primaryBatchReadLimit(), 8);
+  for (const values of [{ batch_read_limit: 32, primary_batch_limit: 8 }, { batch_read_limit: 16, primary_batch_limit: 16 }]) {
+    await assert.rejects(fixture({ batch_read_version: 2, ...values }).s.primaryBatch([G]), errorCode("ABI"));
+  }
+});
+
+test("history validates concurrency before any RPC calls", async () => {
+  for (const concurrency of [0, -1, 5, 1.5, "2", NaN, Infinity]) {
+    const { s, calls } = fixture();
+    await assert.rejects(s.primaryNames([G], { concurrency } as any), errorCode("INVALID_INPUT"));
+    assert.equal(calls.length, 0);
+  }
+});
+
+test("history overlaps bounded reads and preserves order when replies arrive out of order", async () => {
+  const { s } = fixture({ batch_read_limit: 2, primary_batch_limit: 2 });
+  const original = (s as any).read.bind(s);
+  let active = 0, peak = 0;
+  const pending: Array<() => void> = [];
+  Object.assign(s, { read: async (id: string, fn: string, args: xdr.ScVal[]) => {
+    if (fn !== "primary_names") return original(id, fn, args);
+    const count = (scValToNative(args[0]) as unknown[]).length;
+    const ledger = 100 + pending.length;
+    peak = Math.max(peak, ++active);
+    await new Promise<void>(resolve => pending.push(resolve));
+    active--;
+    return { ledger, timestamp: BigInt(ledger), results: Array.from({ length: count }, () => ["None"]) };
+  } });
+  const input = [G, M, C, encodeMuxedAddress(G, "0"), M, G];
+  const answer = s.primaryNames(input);
+  for (let i = 0; i < 30 && pending.length < 2; i++) await new Promise(resolve => setImmediate(resolve));
+  assert.equal(pending.length, 2);
+  pending[1]();
+  pending[0]();
+  const result = await answer;
+  assert.equal(peak, 2);
+  assert.equal(active, 0);
+  assert.deepEqual(result.map(row => row.address), input);
+  assert.deepEqual(result.map(row => row.ledger), [100, 100, 101, 101, 100, 100]);
+  assert.notEqual(result[0], result[5], "duplicated identities have independent result objects");
+});
+
+test("fatal history errors drain active work and prevent new batches", async () => {
+  const { s } = fixture({ batch_read_limit: 1, primary_batch_limit: 1 });
+  const original = (s as any).read.bind(s);
+  const error = new SoranError("archived", "ARCHIVED");
+  const pending: Array<{ resolve: (value: unknown) => void; reject: (error: unknown) => void }> = [];
+  Object.assign(s, { read: async (id: string, fn: string, args: xdr.ScVal[]) => {
+    if (fn !== "primary_names") return original(id, fn, args);
+    return new Promise((resolve, reject) => pending.push({ resolve, reject }));
+  } });
+  const answer = s.primaryNames([G, M, C, encodeMuxedAddress(G, "0")]);
+  for (let i = 0; i < 30 && pending.length < 2; i++) await new Promise(resolve => setImmediate(resolve));
+  assert.equal(pending.length, 2);
+  pending[0].reject(error);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(pending.length, 2);
+  pending[1].resolve({ ledger: 1, timestamp: 1n, results: [["None"]] });
+  await assert.rejects(answer, value => value === error);
+  assert.equal(pending.length, 2);
+});
+
+test("concurrent budget splitting preserves every full muxed identity exactly once", async () => {
+  const { s } = fixture();
+  const original = (s as any).read.bind(s);
+  let active = 0, peak = 0, ledger = 100;
+  const succeeded: bigint[] = [];
+  Object.assign(s, { read: async (id: string, fn: string, args: xdr.ScVal[]) => {
+    if (fn !== "reverse_names") return original(id, fn, args);
+    const input = scValToNative(args[1]) as Array<[string, { account: string; id: bigint }]>;
+    peak = Math.max(peak, ++active);
+    await new Promise(resolve => setImmediate(resolve));
+    active--;
+    if (input.length > 2) throw new SoranError(`simulate ${fn} on ${id} failed: Error(Budget, ExceededLimit)`, "SIMULATION");
+    const observed = ledger++;
+    succeeded.push(...input.map(([, route]) => route.id));
+    return { ledger: observed, timestamp: BigInt(observed), results: input.map(([, route]) => ["Name", `user${route.id}.nova`]) };
+  } });
+  const input = Array.from({ length: 100 }, (_, i) => encodeMuxedAddress(G, String(i)));
+  const rows = await s.reverseMany("nova", input, { concurrency: 3 });
+  assert.equal(peak, 3);
+  assert.equal(active, 0);
+  assert.equal(succeeded.length, 100);
+  assert.equal(new Set(succeeded).size, 100);
+  assert.deepEqual(rows.map(row => row.address), input);
+  rows.forEach((row, i) => { assert.equal(row.kind, "name"); if (row.kind === "name") assert.equal(row.name, `user${i}.nova`); });
 });
