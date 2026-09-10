@@ -2,3 +2,6 @@ node_modules/
 dist/
 *.log
 .DS_Store
+
+# Include dependency symlinks as well as directories.
+**/node_modules

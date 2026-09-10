@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { Account, Address, Keypair, Networks, Operation, StrKey, TransactionBuilder, hash, nativeToScVal, xdr } from "@stellar/stellar-sdk";
 import { Soran } from "@sorandomains/lookup";
+import { SoranOwner as Owner } from "@sorandomains/owner";
+import { z } from "zod";
+import { normalizeRegistrarPolicy } from "../src/registrar-policy.js";
 import { registerWriteTools } from "../src/tools.js";
 const key = Keypair.random(), wallet = key.publicKey();
 const registry = StrKey.encodeContract(new Uint8Array(32).fill(4)), allocator = StrKey.encodeContract(new Uint8Array(32).fill(5));
@@ -18,6 +21,16 @@ function challenge(sequence = "0", name = "soran.domains auth") {
 }
 async function setup(prep: Record<string, unknown>, ch = challenge(), deploymentVersion: 0 | 1 | null = 0, selectedRegistry = registry) {
   const handlers = new Map<string, (arg: any) => Promise<any>>();
+  const schemas = new Map<string, any>();
+  let requestedPolicy = normalizeRegistrarPolicy("reclaimable");
+  const savedPolicy = Owner.prototype.policy;
+  const savedRegistrar = Owner.prototype.registrarOf;
+  Owner.prototype.registrarOf = async () => String(prep.observedRegistrar ?? prep.predictedId);
+  Owner.prototype.policy = async () => {
+    if (prep.policyReadFailure) throw new Error("read unavailable");
+    const p = normalizeRegistrarPolicy(prep.observedPolicy ?? requestedPolicy);
+    return {defaultTermSecs: BigInt(p.default_term_secs), reclaimable:p.reclaimable, transferable:p.transferable, tradeable:p.tradeable, tradeFeeBps:p.trade_fee_bps};
+  };
   let submissions = 0, challenges = 0;
   const cancellations: Array<{ path: string; body: unknown }> = [];
   const saved = globalThis.fetch;
@@ -26,7 +39,11 @@ async function setup(prep: Record<string, unknown>, ch = challenge(), deployment
     let body: unknown;
     if (path.endsWith("/challenge")) { challenges++; body = { challengeId: "one", xdr: ch, network: Networks.TESTNET }; }
     else if (path.endsWith("/verify")) body = { token: "fake-test-session" };
-    else if (path.endsWith("/prepare")) body = { ...prep, network: Networks.TESTNET };
+    else if (path.endsWith("/prepare")) {
+      const input=JSON.parse(String(opts?.body));
+      if (input.policy) requestedPolicy=normalizeRegistrarPolicy(input.policy);
+      body = { policy:requestedPolicy, ...prep, network: Networks.TESTNET };
+    }
     else if (path.endsWith("/cancel")) { cancellations.push({ path, body: JSON.parse(String(opts?.body)) }); body = { ok: prep.cancelOk ?? true }; }
     else if (path.endsWith("/submit")) {
       submissions++;
@@ -37,8 +54,8 @@ async function setup(prep: Record<string, unknown>, ch = challenge(), deployment
     } else throw new Error(`unexpected fetch ${path}`);
     return new Response(JSON.stringify(body), { status: 200 });
   };
-  await registerWriteTools({ tool(n: string, _d: string, _s: unknown, fn: (arg: any) => Promise<any>) { handlers.set(n, fn); } } as never, { secret: key.secret(), registryId: selectedRegistry, allocatorId: allocator, ...(deploymentVersion === null ? {} : { registryDeploymentSaltVersion: deploymentVersion }) });
-  return { handlers, restore: () => { globalThis.fetch = saved; }, submissions: () => submissions, challenges: () => challenges, cancellations: () => cancellations };
+  await registerWriteTools({ tool(n: string, _d: string, _s: unknown, fn: (arg: any) => Promise<any>) { handlers.set(n, fn); schemas.set(n,_s); } } as never, { secret: key.secret(), registryId: selectedRegistry, allocatorId: allocator, ...(deploymentVersion === null ? {} : { registryDeploymentSaltVersion: deploymentVersion }) });
+  return { handlers, schemas, restore: () => { globalThis.fetch = saved; Owner.prototype.policy = savedPolicy; Owner.prototype.registrarOf = savedRegistrar; }, submissions: () => submissions, challenges: () => challenges, cancellations: () => cancellations };
 }
 test("MCP withdrawal signs only selected Allocator/label and bounded fee", async () => {
   for (const [encoded, succeeds] of [[prepared(allocator, "withdraw", [bytes("acme")]), true], [prepared(registry, "withdraw", [bytes("acme")]), false], [prepared(allocator, "withdraw", [bytes("else")]), false], [prepared(allocator, "withdraw", [bytes("acme")], [], "10001"), false], [prepared(allocator, "withdraw", [bytes("acme")], [inv(registry, "arbitrary", [])]), false]] as const) {
@@ -147,4 +164,31 @@ test("MCP vanity cancellation is namespace/role scoped and never submits a trans
     const result = await state.handlers.get("cancel_namespace_activation")!({ namespace: "acme", role: "registrar" });
     assert.equal(result.isError, true); assert.equal(state.submissions(), 0);
   } finally { state.restore(); }
+});
+
+
+test("MCP explicit activation checks all five requested fields and constructor policy", async () => {
+ const node=await new Soran({registryId:registry}).namehash('acme'); const salt=new Uint8Array(32).fill(1);
+ const preimage=xdr.HashIdPreimage.envelopeTypeContractId(new xdr.HashIdPreimageContractId({networkId:hash(new TextEncoder().encode(Networks.TESTNET)),contractIdPreimage:xdr.ContractIdPreimage.contractIdPreimageFromAddress(new xdr.ContractIdPreimageFromAddress({address:new Address(registry).toScAddress(),salt}))}));
+ const predictedId=StrKey.encodeContract(hash(preimage.toXDR()));
+ const selected=normalizeRegistrarPolicy({default_term_secs:'86400',reclaimable:true,transferable:false,tradeable:true,trade_fee_bps:250});
+ const encode=(value:any)=>{const p=normalizeRegistrarPolicy(value);return xdr.ScVal.scvMap(Object.entries(p).map(([k,v])=>new xdr.ScMapEntry({key:xdr.ScVal.scvSymbol(k),val:k==='default_term_secs'?nativeToScVal(BigInt(v as string),{type:'u64'}):k==='trade_fee_bps'?nativeToScVal(v,{type:'u32'}):xdr.ScVal.scvBool(v as boolean)})));};
+ const encoded=(policy:any,constructorPolicy:any=policy)=>{const p=encode(policy);const args=[xdr.ScVal.scvBytes(node),new Address(wallet).toScVal(),p,xdr.ScVal.scvBytes(salt)];const child=inv(predictedId,'__constructor',[new Address(registry).toScVal(),args[0],new Address(wallet).toScVal(),args[1],encode(constructorPolicy),xdr.ScVal.scvBool(true)]);return prepared(registry,'deploy_registrar',args,[child]);};
+ for(const patch of [null,{transferable:true},{default_term_secs:'0'},{reclaimable:false},{tradeable:false},{trade_fee_bps:251}]) {
+  for(const constructorOnly of patch ? [false,true] : [false]) {
+   const changed={...selected,...patch};
+   const state=await setup({xdr:constructorOnly?encoded(selected,changed):encoded(changed),predictedId});
+   try {
+    const schema=z.object(state.schemas.get('activate_namespace'));assert.equal(schema.safeParse({namespace:'acme',policy:selected,maxNetworkFeeStroops:'10000'}).success,true);
+    assert.equal(schema.safeParse({namespace:'acme',policy:{...selected,unknown:true},maxNetworkFeeStroops:'10000'}).success,false);
+    const result=await state.handlers.get('activate_namespace')!({namespace:'acme',policy:selected,maxNetworkFeeStroops:'10000'});
+    assert.equal(result.isError===true,patch!==null,result.content[0].text);assert.equal(state.submissions(),patch?0:1);
+    if(!patch) {const out=JSON.parse(result.content[0].text);assert.deepEqual(out.policy,selected);assert.equal(out.policyVerified,true);}
+   } finally {state.restore();}
+  }
+ }
+ for(const outcome of [{policyReadFailure:true},{observedPolicy:{...selected,transferable:true}},{observedRegistrar:registry}]) {
+  const state=await setup({xdr:encoded(selected),predictedId,...outcome});
+  try {const result=await state.handlers.get('activate_namespace')!({namespace:'acme',policy:selected,maxNetworkFeeStroops:'10000'});const out=JSON.parse(result.content[0].text);assert.equal(out.activated,null);assert.equal(out.pendingVerification,true);assert.equal(out.policyVerified,false);assert.match(out.nextStep,/Do not activate again/);assert.equal(state.submissions(),1);} finally {state.restore();}
+ }
 });
