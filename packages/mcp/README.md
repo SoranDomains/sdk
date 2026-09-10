@@ -159,7 +159,7 @@ import { registerReadTools, registerWriteTools } from "@sorandomains/mcp";
 Source: <https://github.com/SoranDomains/sdk> · Docs: <https://github.com/SoranDomains/docs> · License: MIT
 
 
-Version 0.9.3 uses Stellar SDK17 and the matching Lookup 0.10.1,
+Version 0.9.3 uses Stellar SDK17 and the matching Lookup 0.10.2,
 Holder 0.7.0 and Owner 0.8.0 packages. Holder receipt recovery requires sufficiently fresh clean Registrar provenance after each receipt read or transaction inclusion. Both transports pass the same universal
 configuration and export the same MCP version. The successor deployment retains Lookup V2; custom Registry or passphrase
 settings require their own Allocator pin and do not inherit testnet fee routing.
