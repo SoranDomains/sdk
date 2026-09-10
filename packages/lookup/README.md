@@ -48,18 +48,21 @@ const scoped = await soran.reverseMany("nova", [walletA, muxedWallet]);
 can be reserved or restricted by policy, and active names can have unavailable
 payment instructions. The status is from the returned ledger and timestamp.
 
-`primaryBatch` and `reverseBatch` each make one contract batch read after checking
-deployment capabilities. The initial limit is **two identities**. The limit is an
-input bound, not a guarantee that every combination of dependency calls fits a
-transaction. Existing contracts can make even two populated rows exceed memory.
+`reverseBatch` accepts up to **16 identities in one namespace**. `primaryBatch`
+accepts up to **8 identities across namespaces**. Each makes one contract batch
+read after checking deployment capabilities. `batchReadLimit()` and
+`primaryBatchReadLimit()` return the deployed bounds. Batch capability 2 uses
+shared namespace verification and grouped reads; complete forward destinations,
+expiry and generations are still checked on chain.
 
 For history screens, `primaryNames` and `reverseMany` accept up to **256 identities**.
-They try bounded batches and switch to individual reads after a leading host
-budget error. The individual reads still use the same on-chain batch methods.
-Each row retains its ledger/timestamp, because separate simulations can observe
-different ledgers. Order and duplicates are preserved. RPC, restoration, ABI and
-other errors reject; they never become `none`. A single read that exceeds budget
-also rejects. These helpers do not enumerate names owned by an address.
+They start at the method's deployed limit. A leading host budget error halves
+that batch until it fits; a one-item failure rejects. Older namespace contracts
+or unusually expensive proofs can require smaller batches. Each row retains its
+ledger/timestamp, because separate simulations can observe different ledgers.
+Order and duplicates are preserved. RPC, restoration, ABI and other errors
+reject; they never become `none`. These helpers do not enumerate names owned by
+an address. The contract bounds apply before deduplication.
 
 G/C and full muxed identities remain distinct. A G address plus transaction memo
 does not identify a separate reverse-election identity. Disabling G/C Primary in
@@ -278,7 +281,7 @@ Read the [native claim APIs, security boundaries and complete signup flow](https
 
 ## Verified testnet deployment
 
-See the [deployment manifest](../../deployments/testnet.json) for confirmed code hashes, transaction receipts and verification scope. Network passphrase: `Test SDF Network ; September 2015`.
+See the [deployment manifest](../../deploy/testnet/deployment.json) for confirmed code hashes, transaction receipts and verification scope. Network passphrase: `Test SDF Network ; September 2015`.
 
 | Contract | Address |
 |---|---|
