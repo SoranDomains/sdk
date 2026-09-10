@@ -1,7 +1,7 @@
 # @sorandomains/mcp
 
 
-> Native claim testnet deployment verified at ledger 4534629 on 6 September 2026 (12:12 UTC). See the
+> Governed testnet migration sealed at ledger 4604192 on 10 September 2026. See the
 > [release status](https://docs.soran.domains/reference/release-status) for package and service availability.
 
 
@@ -82,10 +82,10 @@ https://mcp.soran.domains/mcp
 | `my_wallet` | own address, balance, names, primary |
 | `claim_namespace` | **announce a claim** on a top-level namespace for this wallet (opens the objection window; unopposed claims become eligible for permissionless execution) |
 | `claim_status` · `withdraw_claim` | watch a claim's window · cancel it before it elapses |
-| `activate_namespace` | deploy the Registrar for a claimed namespace; `permanent` selects non-reclaimable zero-term issuance, with final permanence requiring a separate lock |
+| `activate_namespace` | deploy the Registrar for a claimed namespace; `permanent` selects non-reclaimable zero-term issuance, without locking contract upgrades |
 | `cancel_namespace_activation` | clear a namespace/role vanity-generation job without withdrawing a claim or undoing a contract |
 | `issue_name` · `issue_batch` · `reclaim_name` · `renew_name` | issue (single/bulk ≤23), reclaim, and renew names in a namespace this wallet OWNS |
-| `set_treasury` · `set_resolver` · `make_permanent` | route reclaim custody · point at a resolver · **the irreversible one-way door** (guarded) |
+| `set_treasury` · `set_resolver` · `make_permanent` | route reclaim custody · point at a resolver · historical permanence API (unavailable on governed testnet) |
 | `transfer_namespace` · `accept_namespace_transfer` · `cancel_namespace_transfer` · `namespace_status` | hand the whole namespace to another wallet (two-step) · read owner/policy/permanence |
 | `claim_display_name` | make a held name this wallet's verified display name (forward + reverse + primary in one call) |
 | `set_payment` | atomically update address and complete memo instruction; use type `none` to remove a memo |
@@ -102,7 +102,7 @@ memo on a shared exchange account. Old installed clients need an explicit upgrad
 
 ### Complete M display-name tools
 
-MCP 0.8.0 local mode exposes:
+MCP 0.9.0 local mode exposes:
 
 ```text
 set_muxed_display_name({ name, destination: fullM, kind: "reverse" | "primary" })
@@ -159,8 +159,8 @@ import { registerReadTools, registerWriteTools } from "@sorandomains/mcp";
 Source: <https://github.com/SoranDomains/sdk> · Docs: <https://github.com/SoranDomains/docs> · License: MIT
 
 
-Version 0.9.0 uses Stellar SDK17 and the matching lookup 0.8.0,
-holder 0.6.1 and owner 0.7.1 packages. Holder receipt recovery requires sufficiently fresh clean Registrar provenance after each receipt read or transaction inclusion. Both transports pass the same universal
+Version 0.9.0 uses Stellar SDK17 and the matching Lookup 0.10.0,
+Holder 0.7.0 and Owner 0.8.0 packages. Holder receipt recovery requires sufficiently fresh clean Registrar provenance after each receipt read or transaction inclusion. Both transports pass the same universal
 configuration and export the same MCP version. The successor deployment retains Lookup V2; custom Registry or passphrase
 settings require their own Allocator pin and do not inherit testnet fee routing.
 
@@ -226,13 +226,13 @@ Read the [native claim APIs, security boundaries and complete signup flow](https
 
 ## Verified testnet deployment
 
-Verified on 6 September 2026 at ledger **4534629** (12:12 UTC). Network passphrase: `Test SDF Network ; September 2015`.
+See the [deployment manifest](../../deployments/testnet.json) for confirmed code hashes, transaction receipts and verification scope. Network passphrase: `Test SDF Network ; September 2015`.
 
 | Contract | Address |
 |---|---|
-| Registry | `CBSORANPM664QXYMYRZKLQDQE2TXFSK4GBMC6EIRSRTAUZRZCRZRFNMK` |
+| Registry | `CCSORANDPQINYOYB5SVO45WJP2LBBYKC72HHUIRVXB4J6RUZKDAUW7G4` |
 | Lookup | `CDSORANQAJK35UV2HR63CMB6M5NYISHMUBTB6EQY2CZ3Y7HJDIOHRJWA` |
-| Primary | `CASORAN755O3GCQTRAHKDXLLCSDLNKAQWAP6MWABRSFVSHLJOEKAC7AB` |
+| Primary | `CCSORAN7Y7ICQK2MBSVCJT3BUN5EHXKDKSTMGVB6QWSYXWMMLG2WIFJ6` |
 | Allocator | `CCSORANYFHUJUWETEQ7UWIDN4JTPV7NN5G6YUSSBZI57X7EQWVA63VMJ` |
 
 Mainnet has no deployment preset. Custom networks must supply their own verified

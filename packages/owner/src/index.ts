@@ -128,9 +128,9 @@ export const DEPLOYMENTS = {
   testnet: {
     rpcUrl: "https://soroban-testnet.stellar.org",
     passphrase: Networks.TESTNET as string,
-    // The immutable Registry. The Registrar for a namespace is discovered on
+    // The governed Registry. The Registrar for a namespace is discovered on
     // chain via `registrar_of(node)` — never configured by hand.
-    registryId: "CBSORANPM664QXYMYRZKLQDQE2TXFSK4GBMC6EIRSRTAUZRZCRZRFNMK",
+    registryId: "CCSORANDPQINYOYB5SVO45WJP2LBBYKC72HHUIRVXB4J6RUZKDAUW7G4",
   },
 } as const;
 

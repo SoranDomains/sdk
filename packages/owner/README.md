@@ -1,14 +1,14 @@
 # @sorandomains/owner
 
 
-> Native claim testnet deployment verified at ledger 4534629 on 6 September 2026 (12:12 UTC). See the
+> Governed testnet migration sealed at ledger 4604192 on 10 September 2026. See the
 > [release status](https://docs.soran.domains/reference/release-status) for package and service availability.
 
 
 Version 0.8.0 targets Stellar SDK17 (`>=17 <18`). ASCII names
 and labels are validated before lowercase normalization; Unicode lookalikes are
 rejected. Writes continue to target the owning Registry/Registrar/Resolver. Universal
-Lookup is the read entry point in `@sorandomains/lookup` 0.8.0.
+Lookup is the read entry point in `@sorandomains/lookup` 0.10.0.
 
 Ownership, issuer, holder and treasury inputs remain G/C account or contract
 addresses. Muxed M addresses are payment destinations only: issue the name to its
@@ -91,11 +91,11 @@ Read the [native claim APIs, security boundaries and complete signup flow](https
 
 ## Verified testnet deployment
 
-Verified on 6 September 2026 at ledger **4534629** (12:12 UTC). Network passphrase: `Test SDF Network ; September 2015`.
+See the [deployment manifest](../../deployments/testnet.json) for confirmed code hashes, transaction receipts and verification scope. Network passphrase: `Test SDF Network ; September 2015`.
 
 | Contract | Address |
 |---|---|
-| Registry | `CBSORANPM664QXYMYRZKLQDQE2TXFSK4GBMC6EIRSRTAUZRZCRZRFNMK` |
+| Registry | `CCSORANDPQINYOYB5SVO45WJP2LBBYKC72HHUIRVXB4J6RUZKDAUW7G4` |
 
 Mainnet has no deployment preset. Custom networks must supply their own verified
 addresses. Universal Lookup upgrades remain immediately executable; an address

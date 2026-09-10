@@ -1,6 +1,6 @@
 # @sorandomains/lookup
 
-> Native claim testnet deployment verified at ledger 4534629 on 6 September 2026 (12:12 UTC). See the
+> Governed testnet migration sealed at ledger 4604192 on 10 September 2026. See the
 > [release status](https://docs.soran.domains/reference/release-status) for package and service availability.
 
 
@@ -272,19 +272,19 @@ and declares peer `>=17 <18`. It does not claim untested SDK14–16 compatibilit
 
 ## Native username claiming
 
-Version 0.7.0 selects the native-claim successor testnet deployment while retaining the existing Universal Lookup V2 payment API. Ownership, payment routes and account identity remain distinct. A username with the same spelling in another Registry is a separate record.
+Version 0.10.0 selects the governed successor testnet deployment while retaining the existing Universal Lookup V2 payment API. Ownership, payment routes and account identity remain distinct. A username with the same spelling in another Registry is a separate record.
 
 Read the [native claim APIs, security boundaries and complete signup flow](https://github.com/SoranDomains/sdk/blob/main/NATIVE-CLAIMS.md). G/no memo, G with ID/Text/Hash, full M/no separate memo and C/no memo remain supported payment destinations. Current transaction-signing adapters use classic G accounts.
 
 ## Verified testnet deployment
 
-Verified on 6 September 2026 at ledger **4534629** (12:12 UTC). Network passphrase: `Test SDF Network ; September 2015`.
+See the [deployment manifest](../../deployments/testnet.json) for confirmed code hashes, transaction receipts and verification scope. Network passphrase: `Test SDF Network ; September 2015`.
 
 | Contract | Address |
 |---|---|
-| Registry | `CBSORANPM664QXYMYRZKLQDQE2TXFSK4GBMC6EIRSRTAUZRZCRZRFNMK` |
+| Registry | `CCSORANDPQINYOYB5SVO45WJP2LBBYKC72HHUIRVXB4J6RUZKDAUW7G4` |
 | Lookup | `CDSORANQAJK35UV2HR63CMB6M5NYISHMUBTB6EQY2CZ3Y7HJDIOHRJWA` |
-| Primary | `CASORAN755O3GCQTRAHKDXLLCSDLNKAQWAP6MWABRSFVSHLJOEKAC7AB` |
+| Primary | `CCSORAN7Y7ICQK2MBSVCJT3BUN5EHXKDKSTMGVB6QWSYXWMMLG2WIFJ6` |
 | Allocator | `CCSORANYFHUJUWETEQ7UWIDN4JTPV7NN5G6YUSSBZI57X7EQWVA63VMJ` |
 
 Mainnet has no deployment preset. Custom networks must supply their own verified

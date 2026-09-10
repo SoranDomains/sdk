@@ -1,14 +1,14 @@
 # @sorandomains/holder
 
 
-> Native claim testnet deployment verified at ledger 4534629 on 6 September 2026 (12:12 UTC). See the
+> Governed testnet migration sealed at ledger 4604192 on 10 September 2026. See the
 > [release status](https://docs.soran.domains/reference/release-status) for package and service availability.
 
 
 Version 0.7.0 targets Stellar SDK17 (`>=17 <18`). ASCII names
 and labels are validated before lowercase normalization; Unicode lookalikes are
 rejected. Payment and ownership writes target the owning Registry/Registrar/Resolver.
-Complete-M display-name writes target Universal Lookup; Lookup 0.8.0 provides
+Complete-M display-name writes target Universal Lookup; Lookup 0.10.0 provides
 the corresponding read interface. Check the release status before enabling the
 new capability on a deployment.
 
@@ -197,12 +197,12 @@ Read the [native claim APIs, security boundaries and complete signup flow](https
 
 ## Verified testnet deployment
 
-Verified on 6 September 2026 at ledger **4534629** (12:12 UTC). Network passphrase: `Test SDF Network ; September 2015`.
+See the [deployment manifest](../../deployments/testnet.json) for confirmed code hashes, transaction receipts and verification scope. Network passphrase: `Test SDF Network ; September 2015`.
 
 | Contract | Address |
 |---|---|
-| Registry | `CBSORANPM664QXYMYRZKLQDQE2TXFSK4GBMC6EIRSRTAUZRZCRZRFNMK` |
-| Primary (G/C) | `CASORAN755O3GCQTRAHKDXLLCSDLNKAQWAP6MWABRSFVSHLJOEKAC7AB` |
+| Registry | `CCSORANDPQINYOYB5SVO45WJP2LBBYKC72HHUIRVXB4J6RUZKDAUW7G4` |
+| Primary (G/C) | `CCSORAN7Y7ICQK2MBSVCJT3BUN5EHXKDKSTMGVB6QWSYXWMMLG2WIFJ6` |
 | Universal Lookup (M elections) | `CDSORANQAJK35UV2HR63CMB6M5NYISHMUBTB6EQY2CZ3Y7HJDIOHRJWA` |
 
 Mainnet has no deployment preset. Custom networks must supply their own verified
