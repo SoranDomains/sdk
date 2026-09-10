@@ -46,6 +46,7 @@ function fixture(options: Options = {}) {
       return data.value.val.value;
     },
     getLedgerEntries: async (key: xdr.LedgerKey) => {
+      if (key.toXDR('base64') === new Contract(registry).getFootprint().toXDR('base64')) return instanceProof(registry, receiptSeen ? own('receiptLedger', 200) as number : 190);
       calls.push('getLedgerEntries');
       assert(receiptSeen, 'receipt proof must follow the actual simulation');
       assert.equal(key.toXDR('base64'), new Contract(registrar).getFootprint().toXDR('base64'));
@@ -132,8 +133,8 @@ test('transfer receipt must precede its exact proposal expiry', async () => {
   const f = fixture({ method: 'accept_transfer_with_destination', record: receipt('accept_transfer_with_destination', { timestamp: sc.u64(1051n) }) });
   await assert.rejects(f.holder.acceptNameTransferWithDestination(transfer), /proposal window/);
 });
-test('post-receipt executable must match the immutable Registrar template', async () => {
-  const f = fixture({ hashAfter: new Uint8Array(32).fill(7) }); await assert.rejects(f.holder.recoverClaim(claim), /immutable Registry template/);
+test('post-receipt executable must match Registry-approved Registrar code', async () => {
+  const f = fixture({ hashAfter: new Uint8Array(32).fill(7) }); await assert.rejects(f.holder.recoverClaim(claim), /Registry-approved code/);
 });
 for (const kind of ['missing', 'other-key', 'other-contract', 'other-data-key', 'temporary', 'non-wasm'] as const) test(`post-receipt proof rejects ${kind} ledger entry`, async () => {
   const f = fixture({ entryMutation: proof => {

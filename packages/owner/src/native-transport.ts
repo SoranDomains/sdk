@@ -1,3 +1,4 @@
+import { expectedRegistrarCode } from "./native-code-policy.js";
 import { Account, BASE_FEE, Contract, Operation, Transaction, TransactionBuilder, rpc, scValToNative, xdr } from "@stellar/stellar-sdk";
 import { NativeClaimError, address, bytes32, hex, namespaceNode, sc, unhex } from "./native-codec.js";
 import { assertSignedBodyUnchanged, validateEligibilityAuthorization, validateNativeTransaction, type NativeAuthorizationPlan } from "./native-auth.js";
@@ -16,10 +17,10 @@ export async function verifyRegistrarProvenance(context: NativeContext, registra
   const node=sc.bytes(unhex(namespace));
   const [attested,tainted,templates,instance]=await Promise.all([
     context.read(context.registryId,"registrar_of",[node]),context.read(context.registryId,"registrar_tainted",[node]),
-    context.read(context.registryId,"template_hashes",[]),context.server.getContractInstance(registrar),
+    expectedRegistrarCode(context,namespace),context.server.getContractInstance(registrar),
   ]);
-  if(attested!==registrar||tainted!==false||!Array.isArray(templates)||templates.length!==2||instance.executable.type!=="contractExecutableWasm")throw new NativeClaimError("Registrar provenance is unavailable or tainted; refusing authoritative claim/receipt reads","unavailable");
-  if(hex(bytes32(templates[0],"Registry Registrar template"))!==hex(instance.executable.wasmHash.value))throw new NativeClaimError("Registrar executable differs from immutable Registry template","unavailable");
+  if(attested!==registrar||tainted!==false||instance.executable.type!=="contractExecutableWasm")throw new NativeClaimError("Registrar provenance is unavailable or tainted; refusing authoritative claim/receipt reads","unavailable");
+  if(templates!==hex(instance.executable.wasmHash.value))throw new NativeClaimError("Registrar executable differs from Registry-approved code","unavailable");
 }
 export async function nativeCapability(context: NativeContext, namespace: string): Promise<NativeCapability> {
   const node = namespaceNode(namespace), nodeArg = sc.bytes(node);

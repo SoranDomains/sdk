@@ -1,3 +1,5 @@
+import { recoverFrozenClaim, type HistoricalRecoveryOptions } from "./native-history.js";
+export type { HistoricalRecoveryOptions } from "./native-history.js";
 /**
  * @sorandomains/holder — the write-side SDK for people who HOLD a Soran name.
  *
@@ -41,6 +43,7 @@ import {
   Networks,
   Operation,
   StrKey,
+  SorobanDataBuilder,
   TransactionBuilder,
   hash,
   nativeToScVal,
@@ -143,7 +146,37 @@ const REGISTRAR_ERRORS: Record<number, string> = {
   18: "InvalidPolicy",
   19: "ExpiryOverflow",
   20: "InvalidRegistry",
-  21:"InvalidClaimConfig",22:"ClaimsNotConfigured",23:"ClaimsPaused",24:"StaleClaimPolicy",25:"ClaimIntentMismatch",26:"ClaimIntentExpired",27:"ReservedName",28:"NameNotReserved",29:"PublicIssuanceRequired",30:"WalletClaimLimit",31:"InvalidEligibility",32:"ApprovalAllowanceReached",33:"ApprovalRateReached",34:"RequestIdConflict",35:"CounterOverflow",36:"InvalidNativeBinding",37:"UnsupportedClaimant",38:"DuplicateLabel",39:"RenewalTooEarly",40:"RenewalLeaseLimit",41:"DestinationInitializationFailed",42:"FeeSettlementFailed",
+  21: "InvalidClaimConfig",
+  22: "ClaimsNotConfigured",
+  23: "ClaimsPaused",
+  24: "StaleClaimPolicy",
+  25: "ClaimIntentMismatch",
+  26: "ClaimIntentExpired",
+  27: "ReservedName",
+  28: "NameNotReserved",
+  29: "PublicIssuanceRequired",
+  30: "WalletClaimLimit",
+  31: "InvalidEligibility",
+  32: "ApprovalAllowanceReached",
+  33: "ApprovalRateReached",
+  34: "RequestIdConflict",
+  35: "CounterOverflow",
+  36: "InvalidNativeBinding",
+  37: "UnsupportedClaimant",
+  38: "DuplicateLabel",
+  39: "RenewalTooEarly",
+  40: "RenewalLeaseLimit",
+  41: "DestinationInitializationFailed",
+  42: "FeeSettlementFailed",
+  43: "MigrationInProgress",
+  44: "MigrationAlreadyStarted",
+  45: "MigrationNotActive",
+  46: "MigrationMismatch",
+  47: "MigrationDuplicate",
+  48: "MigrationIncomplete",
+  49: "MigrationUnavailable",
+  50: "MigrationUnsupported",
+  51: "PermanentLockDisabled",
 };
 
 const RESOLVER_ERRORS: Record<number, string> = {
@@ -168,6 +201,15 @@ const RESOLVER_ERRORS: Record<number, string> = {
   19: "PaymentContextMismatch",
   20: "PaymentUnavailable",
   21: "MuxedDestination",
+  22: "InitializationContextMismatch",
+  23: "DestinationAlreadyInitialized",
+  24: "GenerationMismatch",
+  25: "MigrationNotActive",
+  26: "MigrationMismatch",
+  27: "MigrationInProgress",
+  28: "MigrationUnavailable",
+  29: "MigrationDuplicate",
+  30: "MigrationIncomplete",
 };
 
 const LOOKUP_IDENTITY_ERRORS: Record<number, string> = {
@@ -183,6 +225,13 @@ const PRIMARY_ERRORS: Record<number, string> = {
   3: "NotDisplayName",
   4: "ResolverUnavailable",
   5: "InvalidRegistry",
+  6: "MigrationInProgress",
+  7: "MigrationAlreadyStarted",
+  8: "MigrationNotActive",
+  9: "MigrationMismatch",
+  10: "MigrationIncomplete",
+  11: "MigrationUnavailable",
+  12: "UpgradeUnavailable",
 };
 
 /**
@@ -320,7 +369,10 @@ export const PROFILE_KEYS = [
 ] as const;
 
 export type HolderOptions = {
-  /** Upper total network fee for successor native operations; default 5 XLM. */
+  /** Maximum total network fee per transaction, including restoration. Default 5 XLM.
+   * If omitted, an explicit maxNativeFeeStroops also supplies this ceiling. */
+  maxNetworkFeeStroops?: bigint;
+  /** Optional additional native-operation ceiling; the lower configured limit wins. */
   maxNativeFeeStroops?: bigint;
   /** Signs every transaction: the name HOLDER's account (or, for
    *  `acceptNameTransfer`, the proposed new holder's). */
@@ -349,6 +401,7 @@ export type HolderOptions = {
 
 export class SoranHolder {
   private maxNativeFeeStroops: bigint;
+  private maxNetworkFeeStroops: bigint;
   private server: rpc.Server;
   private passphrase: string;
   private registryId: string;
@@ -363,8 +416,13 @@ export class SoranHolder {
   private static POINTER_TTL_MS = 30_000;
 
   constructor(opts: HolderOptions) {
-    this.maxNativeFeeStroops = opts?.maxNativeFeeStroops ?? 50_000_000n;
-    if (typeof this.maxNativeFeeStroops !== "bigint" || this.maxNativeFeeStroops <= 0n || this.maxNativeFeeStroops > 4_294_967_295n) throw new NativeClaimError("maximum native network fee must be positive");
+    this.maxNetworkFeeStroops = opts?.maxNetworkFeeStroops ?? opts?.maxNativeFeeStroops ?? 50_000_000n;
+    const nativeLimit = opts?.maxNativeFeeStroops ?? this.maxNetworkFeeStroops;
+    for (const limit of [this.maxNetworkFeeStroops, nativeLimit]) {
+      if (typeof limit !== "bigint" || limit <= 0n || limit > 4_294_967_295n)
+        throw new HolderError("maximum network fee must be a bigint between 1 and 4294967295 stroops");
+    }
+    this.maxNativeFeeStroops = nativeLimit < this.maxNetworkFeeStroops ? nativeLimit : this.maxNetworkFeeStroops;
     if (!opts?.signer) throw new HolderError("HolderOptions.signer is required");
     const d = DEPLOYMENTS[opts.network ?? "testnet"];
     if (!d) throw new HolderError(`unknown network "${opts.network}"`);
@@ -385,6 +443,8 @@ export class SoranHolder {
     }
     this.timeoutSecs = t;
     this.fee = opts.fee ?? BASE_FEE;
+    if (!/^[1-9][0-9]*$/.test(this.fee) || BigInt(this.fee) > 4_294_967_295n)
+      throw new HolderError("base network fee must be canonical decimal stroops between 1 and 4294967295");
   }
 
   private nativeClient(): NativeHolderClient {
@@ -396,6 +456,12 @@ export class SoranHolder {
   claimQuote(name: string, claimant?: string) { return this.nativeClient().claimQuote(name, claimant); }
   claimReceipt(namespace: string, claimant: string, requestId: string) { return this.nativeClient().claimReceipt(namespace, claimant, requestId); }
   recoverClaim(intent: ClaimIntent) { return this.nativeClient().recoverClaim(intent); }
+  /** Read the original frozen-source receipt after a fully sealed migration. Never submits. */
+  recoverHistoricalClaim(intent: ClaimIntent, options: HistoricalRecoveryOptions) {
+    if (this.lookupId && options.lookupId !== this.lookupId) throw new HolderError("historical recovery Lookup differs from the configured trust anchor");
+    return recoverFrozenClaim({ registryId: this.registryId, passphrase: this.passphrase, server: this.server,
+      readWithLedger: (id, method, args) => this.readWithLedger(id, method, args) }, intent, options);
+  }
   buildClaim(intent: ClaimIntent, options: ClaimSubmitOptions = {}) { return this.nativeClient().buildClaim(intent, options); }
   claim(intent: ClaimIntent, options: ClaimSubmitOptions = {}) { return this.nativeClient().claim(intent, options); }
   renewalPreview(name: string) { return this.nativeClient().renewalPreview(name); }
@@ -852,6 +918,11 @@ export class SoranHolder {
     return { value: v === undefined ? null : v, ledger: sim.latestLedger };
   }
 
+  private assertNetworkFee(fee: string, fn: string): void {
+    if (!/^[1-9][0-9]*$/.test(fee) || BigInt(fee) > this.maxNetworkFeeStroops)
+      throw new HolderError(`${fn}: network fee ${fee} stroops exceeds the configured maximum ${this.maxNetworkFeeStroops} stroops`, null, fn);
+  }
+
   private async signEnvelope(xdrBase64: string): Promise<string> {
     const signed = await this.signer.signTransaction(xdrBase64, {
       networkPassphrase: this.passphrase,
@@ -937,7 +1008,7 @@ export class SoranHolder {
       try {
         return await this.attempt(contractId, fn, args, errNames);
       } catch (e) {
-        if (!this.isMuxedIdentityWrite(fn) && /txBadSeq|bad_seq/i.test(String(e))) {
+        if (!this.isMuxedIdentityWrite(fn) && !(e instanceof HolderError && e.txHash) && /txBadSeq|bad_seq/i.test(String(e))) {
           return await this.attempt(contractId, fn, args, errNames);
         }
         throw e;
@@ -985,6 +1056,7 @@ export class SoranHolder {
       throw typedError(contractId, fn, sim.error, errNames);
     }
     const prepared = rpc.assembleTransaction(tx, sim).build();
+    this.assertNetworkFee(prepared.fee, fn);
     this.assertSatisfiableAuth(prepared, pub, contractId, fn);
     this.assertPaymentIntent(prepared, pub, contractId, fn, args);
     if (this.isMuxedIdentityWrite(fn)) {
@@ -996,7 +1068,7 @@ export class SoranHolder {
     const txHash = toHex(prepared.hash()); // (SDK17) hash() is Uint8Array
     const signed = await this.signEnvelope(prepared.toXDR());
     const envelope = this.isMuxedIdentityWrite(fn) ? assertSignedBodyUnchanged(prepared, signed, this.passphrase) : TransactionBuilder.fromXDR(signed, this.passphrase);
-    if ((fn === "set_payment" || fn === "set_muxed") && toHex(envelope.hash()) !== txHash) throw new HolderError("signer changed the reviewed transaction body", contractId, fn);
+    if (toHex(envelope.hash()) !== txHash) throw new HolderError("signer changed the reviewed transaction body", contractId, fn);
     let sent: Awaited<ReturnType<rpc.Server["sendTransaction"]>>;
     try {
       sent = await this.server.sendTransaction(envelope);
@@ -1051,30 +1123,48 @@ export class SoranHolder {
     pub: string,
   ): Promise<void> {
     const pre = sim.restorePreamble;
-    const fee = (Number(this.fee) + Number(pre.minResourceFee)).toString();
+    if (!/^(0|[1-9][0-9]*)$/.test(pre.minResourceFee))
+      throw new HolderError("invalid restoration resource fee", null, "restore_footprint");
+    const quoted = BigInt(pre.minResourceFee);
+    const data = pre.transactionData.build();
+    const encoded = BigInt(data.resourceFee.toString());
+    if (encoded < 0n) throw new HolderError("invalid encoded restoration resource fee", null, "restore_footprint");
+    const resourceFee = quoted > encoded ? quoted : encoded;
+    this.assertNetworkFee((BigInt(this.fee) + resourceFee).toString(), "restore_footprint");
     const tx = new TransactionBuilder(await this.sourceAccount(pub, "restore_footprint"), {
-      fee,
+      // SDK 17 adds Soroban resourceFee itself; supply the base only once.
+      fee: this.fee,
       networkPassphrase: this.passphrase,
     })
-      .setSorobanData(pre.transactionData.build())
+      .setSorobanData(new SorobanDataBuilder(data).setResourceFee(resourceFee.toString()).build())
       .addOperation(Operation.restoreFootprint({}))
       .setTimeout(this.timeoutSecs)
       .build();
+    this.assertNetworkFee(tx.fee, "restore_footprint");
+    const txHash = toHex(tx.hash());
     const signed = await this.signEnvelope(tx.toXDR());
-    const sent = await this.server.sendTransaction(
-      TransactionBuilder.fromXDR(signed, this.passphrase),
-    );
-    if (sent.status === "ERROR") {
+    const envelope = TransactionBuilder.fromXDR(signed, this.passphrase);
+    if (toHex(envelope.hash()) !== txHash) throw new HolderError("signer changed the reviewed restoration body", null, "restore_footprint");
+    let sent: Awaited<ReturnType<rpc.Server["sendTransaction"]>>;
+    try { sent = await this.server.sendTransaction(envelope); }
+    catch (error) {
+      throw new HolderError(`restoration submission is uncertain (${String(error)}); check ${txHash} before retrying`, null, "restore_footprint", null, null, txHash);
+    }
+    if (sent.status === "ERROR" || sent.status === "TRY_AGAIN_LATER") {
       throw new HolderError(
         `restore_footprint: submit rejected: ${JSON.stringify(sent.errorResult ?? sent.status)}`,
         null,
         "restore_footprint",
         null,
         null,
-        sent.hash,
+        txHash,
       );
     }
-    await this.confirm(sent.hash, "", "restore_footprint", {});
+    try { await this.confirm(txHash, "", "restore_footprint", {}); }
+    catch (error) {
+      if (error instanceof HolderError) throw error;
+      throw new HolderError(`restoration confirmation is uncertain (${String(error)}); check ${txHash} before retrying`, null, "restore_footprint", null, null, txHash);
+    }
   }
 
   private async confirm(

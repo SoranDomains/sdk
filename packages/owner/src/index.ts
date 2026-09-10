@@ -1,3 +1,6 @@
+import { recoverFrozenClaim, historicalReadLedger, type HistoricalRead, type HistoricalRecoveryOptions } from "./native-history.js";
+import type { ClaimIntent } from "./native-types.js";
+export type { HistoricalRecoveryOptions } from "./native-history.js";
 /**
  * @sorandomains/owner — the write-side SDK for Soran namespace owners.
  *
@@ -45,6 +48,7 @@ import {
   Networks,
   Operation,
   StrKey,
+  SorobanDataBuilder,
   TransactionBuilder,
   hash,
   nativeToScVal,
@@ -199,7 +203,37 @@ const REGISTRAR_ERRORS: Record<number, string> = {
   18: "InvalidPolicy",
   19: "ExpiryOverflow",
   20: "InvalidRegistry",
-  21:"InvalidClaimConfig",22:"ClaimsNotConfigured",23:"ClaimsPaused",24:"StaleClaimPolicy",25:"ClaimIntentMismatch",26:"ClaimIntentExpired",27:"ReservedName",28:"NameNotReserved",29:"PublicIssuanceRequired",30:"WalletClaimLimit",31:"InvalidEligibility",32:"ApprovalAllowanceReached",33:"ApprovalRateReached",34:"RequestIdConflict",35:"CounterOverflow",36:"InvalidNativeBinding",37:"UnsupportedClaimant",38:"DuplicateLabel",39:"RenewalTooEarly",40:"RenewalLeaseLimit",41:"DestinationInitializationFailed",42:"FeeSettlementFailed",
+  21: "InvalidClaimConfig",
+  22: "ClaimsNotConfigured",
+  23: "ClaimsPaused",
+  24: "StaleClaimPolicy",
+  25: "ClaimIntentMismatch",
+  26: "ClaimIntentExpired",
+  27: "ReservedName",
+  28: "NameNotReserved",
+  29: "PublicIssuanceRequired",
+  30: "WalletClaimLimit",
+  31: "InvalidEligibility",
+  32: "ApprovalAllowanceReached",
+  33: "ApprovalRateReached",
+  34: "RequestIdConflict",
+  35: "CounterOverflow",
+  36: "InvalidNativeBinding",
+  37: "UnsupportedClaimant",
+  38: "DuplicateLabel",
+  39: "RenewalTooEarly",
+  40: "RenewalLeaseLimit",
+  41: "DestinationInitializationFailed",
+  42: "FeeSettlementFailed",
+  43: "MigrationInProgress",
+  44: "MigrationAlreadyStarted",
+  45: "MigrationNotActive",
+  46: "MigrationMismatch",
+  47: "MigrationDuplicate",
+  48: "MigrationIncomplete",
+  49: "MigrationUnavailable",
+  50: "MigrationUnsupported",
+  51: "PermanentLockDisabled",
 };
 
 /** Registry contract error codes, by number. */
@@ -232,6 +266,19 @@ const REGISTRY_ERRORS: Record<number, string> = {
   26: "AnchorMismatch",
   27: "InvalidAllocator",
   28: "StaleEra",
+  29: "OwnershipEpochUnavailable",
+  30: "OwnershipEpochOverflow",
+  31: "MigrationInProgress",
+  32: "MigrationAlreadyStarted",
+  33: "MigrationNotActive",
+  34: "MigrationMismatch",
+  35: "MigrationIncomplete",
+  36: "MigrationDuplicate",
+  37: "MigrationUnsupported",
+  38: "MigrationUnavailable",
+  39: "UpgradePolicyMismatch",
+  40: "UpgradeNotApproved",
+  41: "PermanentLockDisabled",
 };
 
 /**
@@ -405,7 +452,10 @@ export type NameState = {
 };
 
 export type OwnerOptions = {
-  /** Upper total network fee for successor native operations; default 5 XLM. */
+  /** Maximum total network fee per transaction, including restoration. Default 5 XLM.
+   * If omitted, an explicit maxNativeFeeStroops also supplies this ceiling. */
+  maxNetworkFeeStroops?: bigint;
+  /** Optional additional native-operation ceiling; the lower configured limit wins. */
   maxNativeFeeStroops?: bigint;
   /** Signs every transaction. The namespace owner's account — or, for
    *  `acceptNamespaceTransfer`, the proposed new owner's. */
@@ -433,6 +483,7 @@ export type OwnerOptions = {
 
 export class SoranOwner {
   private maxNativeFeeStroops: bigint;
+  private maxNetworkFeeStroops: bigint;
   private server: rpc.Server;
   private passphrase: string;
   private registryId: string;
@@ -449,8 +500,13 @@ export class SoranOwner {
   private static REGISTRAR_TTL_MS = 30_000;
 
   constructor(opts: OwnerOptions) {
-    this.maxNativeFeeStroops = opts?.maxNativeFeeStroops ?? 50_000_000n;
-    if (typeof this.maxNativeFeeStroops !== "bigint" || this.maxNativeFeeStroops <= 0n || this.maxNativeFeeStroops > 4_294_967_295n) throw new NativeClaimError("maximum native network fee must be positive");
+    this.maxNetworkFeeStroops = opts?.maxNetworkFeeStroops ?? opts?.maxNativeFeeStroops ?? 50_000_000n;
+    const nativeLimit = opts?.maxNativeFeeStroops ?? this.maxNetworkFeeStroops;
+    for (const limit of [this.maxNetworkFeeStroops, nativeLimit]) {
+      if (typeof limit !== "bigint" || limit <= 0n || limit > 4_294_967_295n)
+        throw new OwnerError("maximum network fee must be a bigint between 1 and 4294967295 stroops");
+    }
+    this.maxNativeFeeStroops = nativeLimit < this.maxNetworkFeeStroops ? nativeLimit : this.maxNetworkFeeStroops;
     if (!opts?.signer) throw new OwnerError("OwnerOptions.signer is required");
     const d = DEPLOYMENTS[opts.network ?? "testnet"];
     if (!d) throw new OwnerError(`unknown network "${opts.network}"`);
@@ -467,6 +523,8 @@ export class SoranOwner {
     }
     this.timeoutSecs = t;
     this.fee = opts.fee ?? BASE_FEE;
+    if (!/^[1-9][0-9]*$/.test(this.fee) || BigInt(this.fee) > 4_294_967_295n)
+      throw new OwnerError("base network fee must be canonical decimal stroops between 1 and 4294967295");
   }
 
   // ---- discovery -----------------------------------------------------------
@@ -478,6 +536,12 @@ export class SoranOwner {
   private nativeContext(): NativeContext {
     return { registryId: this.registryId, passphrase: this.passphrase, server: this.server, signer: this.signer, fee: this.fee, timeoutSecs: this.timeoutSecs, maxFeeStroops: this.maxNativeFeeStroops,
       read: (id, method, args) => this.read(id, method, args), serialize: work => this.serialize(work) };
+  }
+
+  /** Read the original frozen-source receipt after a fully sealed migration. Never submits. */
+  recoverHistoricalClaim(intent: ClaimIntent, options: HistoricalRecoveryOptions) {
+    return recoverFrozenClaim({ registryId: this.registryId, passphrase: this.passphrase, server: this.server,
+      readWithLedger: (id, method, args) => this.readWithLedger(id, method, args) }, intent, options);
   }
 
   /** Native successor capability. A failed RPC read never means open or legacy. */
@@ -894,6 +958,15 @@ export class SoranOwner {
 
   /** Simulation-only contract read — no signature, no fee, no state change. */
   private async read(contractId: string, fn: string, args: xdr.ScVal[]): Promise<unknown> {
+    return (await this.simulateRead(contractId, fn, args)).value;
+  }
+
+  private async readWithLedger(contractId: string, fn: string, args: xdr.ScVal[]): Promise<HistoricalRead> {
+    const result = await this.simulateRead(contractId, fn, args);
+    return { value: result.value, ledger: historicalReadLedger(result.ledger) };
+  }
+
+  private async simulateRead(contractId: string, fn: string, args: xdr.ScVal[]): Promise<{ value: unknown; ledger: unknown }> {
     const tx = new TransactionBuilder(new Account(SIM_SOURCE, "0"), {
       fee: BASE_FEE,
       networkPassphrase: this.passphrase,
@@ -916,7 +989,12 @@ export class SoranOwner {
     }
     if (!rpc.Api.isSimulationSuccess(sim) || !sim.result?.retval) throw new OwnerError(`${fn}: missing simulation return value`, contractId, fn);
     const v = scValToNative(sim.result.retval);
-    return v === undefined ? null : v;
+    return { value: v === undefined ? null : v, ledger: sim.latestLedger };
+  }
+
+  private assertNetworkFee(fee: string, fn: string): void {
+    if (!/^[1-9][0-9]*$/.test(fee) || BigInt(fee) > this.maxNetworkFeeStroops)
+      throw new OwnerError(`${fn}: network fee ${fee} stroops exceeds the configured maximum ${this.maxNetworkFeeStroops} stroops`, null, fn);
   }
 
   private async signEnvelope(xdrBase64: string): Promise<string> {
@@ -961,7 +1039,7 @@ export class SoranOwner {
       } catch (e) {
         // A stale sequence (another process moved the account) is safe to
         // retry once with a fresh sequence — nothing was included.
-        if (/txBadSeq|bad_seq/i.test(String(e))) {
+        if (!(e instanceof OwnerError && e.txHash) && /txBadSeq|bad_seq/i.test(String(e))) {
           return await this.attempt(contractId, fn, args, errNames);
         }
         throw e;
@@ -1040,12 +1118,14 @@ export class SoranOwner {
       throw typedError(contractId, fn, sim.error, errNames);
     }
     const prepared = rpc.assembleTransaction(tx, sim).build();
+    this.assertNetworkFee(prepared.fee, fn);
     this.assertSatisfiableAuth(prepared, pub, contractId, fn);
     // The hash is fixed before signatures — compute it now so every failure
     // past this point can carry it (the "re-check before retrying" contract).
     const txHash = toHex(prepared.hash()); // (SDK17) hash() is Uint8Array
     const signed = await this.signEnvelope(prepared.toXDR());
     const envelope = TransactionBuilder.fromXDR(signed, this.passphrase);
+    if (toHex(envelope.hash()) !== txHash) throw new OwnerError("signer changed the reviewed transaction body", contractId, fn);
     let sent: Awaited<ReturnType<rpc.Server["sendTransaction"]>>;
     try {
       sent = await this.server.sendTransaction(envelope);
@@ -1102,30 +1182,48 @@ export class SoranOwner {
     pub: string,
   ): Promise<void> {
     const pre = sim.restorePreamble;
-    const fee = (Number(this.fee) + Number(pre.minResourceFee)).toString();
+    if (!/^(0|[1-9][0-9]*)$/.test(pre.minResourceFee))
+      throw new OwnerError("invalid restoration resource fee", null, "restore_footprint");
+    const quoted = BigInt(pre.minResourceFee);
+    const data = pre.transactionData.build();
+    const encoded = BigInt(data.resourceFee.toString());
+    if (encoded < 0n) throw new OwnerError("invalid encoded restoration resource fee", null, "restore_footprint");
+    const resourceFee = quoted > encoded ? quoted : encoded;
+    this.assertNetworkFee((BigInt(this.fee) + resourceFee).toString(), "restore_footprint");
     const tx = new TransactionBuilder(await this.sourceAccount(pub, "restore_footprint"), {
-      fee,
+      // SDK 17 adds Soroban resourceFee itself; supply the base only once.
+      fee: this.fee,
       networkPassphrase: this.passphrase,
     })
-      .setSorobanData(pre.transactionData.build())
+      .setSorobanData(new SorobanDataBuilder(data).setResourceFee(resourceFee.toString()).build())
       .addOperation(Operation.restoreFootprint({}))
       .setTimeout(this.timeoutSecs)
       .build();
+    this.assertNetworkFee(tx.fee, "restore_footprint");
+    const txHash = toHex(tx.hash());
     const signed = await this.signEnvelope(tx.toXDR());
-    const sent = await this.server.sendTransaction(
-      TransactionBuilder.fromXDR(signed, this.passphrase),
-    );
-    if (sent.status === "ERROR") {
+    const envelope = TransactionBuilder.fromXDR(signed, this.passphrase);
+    if (toHex(envelope.hash()) !== txHash) throw new OwnerError("signer changed the reviewed restoration body", null, "restore_footprint");
+    let sent: Awaited<ReturnType<rpc.Server["sendTransaction"]>>;
+    try { sent = await this.server.sendTransaction(envelope); }
+    catch (error) {
+      throw new OwnerError(`restoration submission is uncertain (${String(error)}); check ${txHash} before retrying`, null, "restore_footprint", null, null, txHash);
+    }
+    if (sent.status === "ERROR" || sent.status === "TRY_AGAIN_LATER") {
       throw new OwnerError(
         `restore_footprint: submit rejected: ${JSON.stringify(sent.errorResult ?? sent.status)}`,
         null,
         "restore_footprint",
         null,
         null,
-        sent.hash,
+        txHash,
       );
     }
-    await this.confirm(sent.hash, "", "restore_footprint", {});
+    try { await this.confirm(txHash, "", "restore_footprint", {}); }
+    catch (error) {
+      if (error instanceof OwnerError) throw error;
+      throw new OwnerError(`restoration confirmation is uncertain (${String(error)}); check ${txHash} before retrying`, null, "restore_footprint", null, null, txHash);
+    }
   }
 
   // Poll past the tx time bound (timeoutSecs) so we never declare failure

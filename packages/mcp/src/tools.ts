@@ -27,7 +27,9 @@ import { z } from "zod";
 import { Soran, SoranError, DEPLOYMENTS, normalizeLabel, parseName, validatePaymentDestination, decodeMuxedAddress } from "@sorandomains/lookup";
 import { validateClaimFee, validateClaimTransaction, sameFee } from "./prepared.js";
 import { predictRegistrar } from "./deployment.js";
-export const MCP_VERSION = "0.8.0";
+import { networkFeeLimit, assertFeeLimit, feeBoundSigner } from "./fee-policy.js";
+import { recoverHistoricalSavedClaim } from "./historical.js";
+export const MCP_VERSION = "0.9.0";
 
 /** The only server capability used by this package. Keep the callback limited
  * to parsed arguments: importing MCP's full callback type also imports its
@@ -148,6 +150,23 @@ export function registerReadTools(server: ToolRegistrar, opts: ReadToolOptions =
   const allocatorId = configuredAllocator(opts);
   const hintUrl = opts.hintUrl ?? DEFAULT_HINT;
   const soran = new Soran({ ...opts, hintUrl });
+  const historicalOptions = Object.freeze({ rpcUrl: opts.rpcUrl, passphrase: opts.passphrase, registryId: opts.registryId, lookupId: opts.lookupId });
+
+  server.tool("recover_historical_claim", "Read-only recovery of an exact saved public username claim after a verified, fully sealed contract migration. Uses the operator's trusted Lookup and RPC. Never signs, retries or changes the original intent. A receipt proves the original operation, not current ownership. Missing history does not prove transaction failure; retain the original reference and hash.", {
+    intentJson: z.string().min(2).max(16384).describe("The complete original serialized ClaimIntent, unchanged from its saved recovery reference"),
+    originalTransactionHash: z.string().regex(/^[0-9a-f]{64}$/).optional().describe("Optional original hash to retain; this read does not independently verify its transaction outcome"),
+  }, async ({ intentJson, originalTransactionHash }) => {
+    const reference = { originalIntentJson: intentJson, ...(originalTransactionHash ? { originalTransactionHash } : {}), retryAllowed: false, submitted: false, _note: UNTRUSTED_NOTE };
+    try {
+      const receipt = await recoverHistoricalSavedClaim(intentJson, historicalOptions);
+      return text({ ...reference, status: receipt ? "confirmed" : "not_found", receipt,
+        message: receipt ? "Original claim confirmed. Check current name state separately and reconcile any pending transaction hash before another request."
+          : "No receipt found in verified frozen history. Keep the original reference and transaction hash. This does not authorize a retry.",
+        _note: UNTRUSTED_NOTE });
+    } catch {
+      return { ...text({ ...reference, status: "unavailable", message: "Original claim history could not be verified against the configured sealed migration. Keep the saved reference and transaction hash; nothing was retried." }), isError: true };
+    }
+  });
 
   server.tool("claim_fee_quote", "Read the current on-chain fee quote through the API for the namespace claim fee in XLM. Review amount, recipient, network and refund terms before passing expectedFee to claim_namespace. Claim signing rechecks the policy on chain.", {}, async () => {
     try {
@@ -325,7 +344,9 @@ export function registerReadTools(server: ToolRegistrar, opts: ReadToolOptions =
 }
 
 export type WriteToolOptions = ReadToolOptions & {
-  /** Operator-selected total network fee ceiling for native username methods only; default 5 XLM. */
+  /** Operator-selected total fee ceiling for every write/restoration; default 5 XLM. */
+  maxNetworkFeeStroops?: bigint;
+  /** Additional native-operation ceiling; supplies the total cap when the new option is absent. */
   maxNativeFeeStroops?: bigint;
   /** Trusted local Registry deployment scheme: 0 legacy raw salt, 1 namespace-bound.
    * New testnet defaults to 1; activation on a custom Registry requires this option. */
@@ -391,9 +412,11 @@ export async function registerWriteTools(server: ToolRegistrar, opts: WriteToolO
     );
   }
   const me = kp.publicKey();
-  const rpc = { rpcUrl: opts.rpcUrl, passphrase: opts.passphrase, registryId: opts.registryId, maxNativeFeeStroops: opts.maxNativeFeeStroops };
-  const holder = new SoranHolder({ signer: keypairSigner(secret), ...rpc, primaryId: opts.primaryId, lookupId: opts.lookupId });
-  const owner = new SoranOwner({ signer: ownerSigner(secret), ...rpc });
+  const maximumFee = networkFeeLimit(opts);
+  const nativeLimit = opts.maxNativeFeeStroops ?? maximumFee;
+  const rpc = { rpcUrl: opts.rpcUrl, passphrase: opts.passphrase, registryId: opts.registryId, maxNetworkFeeStroops: maximumFee, maxNativeFeeStroops: nativeLimit < maximumFee ? nativeLimit : maximumFee };
+  const holder = new SoranHolder({ signer: feeBoundSigner(keypairSigner(secret), maximumFee), ...rpc, primaryId: opts.primaryId, lookupId: opts.lookupId });
+  const owner = new SoranOwner({ signer: feeBoundSigner(ownerSigner(secret), maximumFee), ...rpc });
   // Local successor methods are capability-gated; deployed legacy presets remain unchanged.
   const nativeHolder = await import("@sorandomains/holder");
   const nativeInteger = z.string().regex(/^(0|[1-9][0-9]*)$/).max(39);
@@ -405,7 +428,7 @@ export async function registerWriteTools(server: ToolRegistrar, opts: WriteToolO
   }).strict();
   server.tool("native_claim_quote","Read native username claim terms on chain. Availability is not a reservation. This is separate from the 5000 XLM namespace application fee.",{name:nameSchema},async({name})=>{try{return text(await holder.claimQuote(name));}catch(e){return errText(e);}});
   server.tool("native_claim_policy","Read native claim policy and capability; errors never mean open admission.",{namespace:labelSchema},async({namespace})=>{try{return text({capability:await owner.nativeClaimCapability(namespace),config:await owner.claimPolicy(namespace)});}catch(e){return errText(e);}});
-  server.tool("native_claim_receipt","Recover historical username claim result; does not prove current ownership or create a new claim.",{namespace:labelSchema,claimant:z.string(),requestId:z.string().regex(/^[0-9a-f]{64}$/)},async({namespace,claimant,requestId})=>{try{return text(await holder.claimReceipt(namespace,claimant,requestId));}catch(e){return errText(e);}});
+  server.tool("native_claim_receipt","Read a receipt from the current clean namespace Registrar. For a saved claim from a migrated source, use recover_historical_claim with its complete original intent. Does not prove current ownership or create a claim.",{namespace:labelSchema,claimant:z.string(),requestId:z.string().regex(/^[0-9a-f]{64}$/)},async({namespace,claimant,requestId})=>{try{return text(await holder.claimReceipt(namespace,claimant,requestId));}catch(e){return errText(e);}});
   const nativeIntentSchema=z.string().max(16384).describe("Exact lossless SDK stringifyNativeIntent JSON; bigint values use {$u64:decimal}. Reuse the original request ID for recovery.");
   server.tool("prepare_native_claim","Build and inspect the exact user claim without signing or broadcasting. Returns a scoped eligibility entry only when configured. Persist the immutable intent before requesting approval.",{intentJson:nativeIntentSchema,proof:z.array(z.string().regex(/^[0-9a-f]{64}$/)).max(32).optional()},async({intentJson,proof})=>{try{const intent=nativeHolder.parseNativeClaimIntent(intentJson);const built=await holder.buildClaim(intent,{proof});return text({intentJson:nativeHolder.stringifyNativeIntent(intent),transactionXdr:built.transactionXdr,hash:built.hash,feeStroops:built.feeStroops,eligibilityEntryXdr:built.eligibilityEntryXdr,networkPassphrase:built.networkPassphrase,submitted:false});}catch(e){return errText(e);}});
   server.tool("claim_username","Sign one exact native username claim with the local claimant wallet. Checks fees, full G/M/C destination, current rules and any separate scoped app approval. Unknown results retain a hash; recover original request before replacement.",{intentJson:nativeIntentSchema,proof:z.array(z.string().regex(/^[0-9a-f]{64}$/)).max(32).optional(),eligibilityAuthorization:z.string().max(32768).optional()},async({intentJson,proof,eligibilityAuthorization})=>{try{return text(await holder.claim(nativeHolder.parseNativeClaimIntent(intentJson),{proof,eligibilityAuthorization}));}catch(e){return errText(e);}});
@@ -458,6 +481,7 @@ export async function registerWriteTools(server: ToolRegistrar, opts: WriteToolO
       if (Address.fromScAddress(call.contractAddress).toString() !== expected.id || call.functionName.toString() !== "__constructor") throw new Error("activation authorizes a different constructor");
       equalArgs(call.args, expected.args);
     } else if (auth.subInvocations.length) throw new Error("unexpected nested prepared authorization");
+    assertFeeLimit(tx, maximumFee);
     tx.sign(kp);
     return tx.toXDR();
   }
@@ -569,6 +593,7 @@ export async function registerWriteTools(server: ToolRegistrar, opts: WriteToolO
         const returnedFee = validateClaimFee(prep.fee, allocatorId, PASSPHRASE);
         if (!sameFee(selected, returnedFee)) throw new Error("prepare returned a different claim fee");
         const checked = validateClaimTransaction(prep.xdr, me, label, basis ?? [], selected, maxNetworkFeeStroops);
+        assertFeeLimit(checked, maximumFee);
         checked.sign(kp);
         const signed = checked.toXDR();
         const sub = (await authPost("/console/tx/submit", { xdr: signed })) as {
