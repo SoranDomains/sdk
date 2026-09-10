@@ -1,3 +1,4 @@
+import { expectedRegistrarCode } from "./native-code-policy.js";
 import { Account, BASE_FEE, Contract, Operation, Transaction, TransactionBuilder, rpc, scValToNative, xdr } from "@stellar/stellar-sdk";
 import { NativeClaimError, address, bytes32, hex, namespaceNode, sc, unhex } from "./native-codec.js";
 import { assertSignedBodyUnchanged, validateEligibilityAuthorization, validateNativeTransaction, type NativeAuthorizationPlan } from "./native-auth.js";
@@ -21,8 +22,8 @@ export function requireReadLedger(value: unknown, minimum = 1): number {
 }
 
 /** Every post-receipt observation must be at least as new as that simulation.
- * Registry taint is irreversible: clean at/after the receipt rules out an
- * upgrade before it, even when these truthful RPC snapshots differ in ledger.
+ * Unreviewed Registry taint is irreversible. Governed deployments also prove
+ * the current reviewed namespace code; approval of that code is a trust boundary.
  * The RPC remains trusted to report its ledger and returned state honestly.
  */
 async function verifyProvenanceAfter(context: NativeContext, registrar: string, namespace: string, minimumLedger: number): Promise<void> {
@@ -32,12 +33,12 @@ async function verifyProvenanceAfter(context: NativeContext, registrar: string, 
   const [attestation, taint, templates, executable] = await Promise.all([
     context.readWithLedger(context.registryId, "registrar_of", [node]),
     context.readWithLedger(context.registryId, "registrar_tainted", [node]),
-    context.readWithLedger(context.registryId, "template_hashes", []),
+    expectedRegistrarCode(context, namespace, minimumLedger),
     context.server.getLedgerEntries(key),
   ]);
-  for (const observation of [attestation, taint, templates]) requireReadLedger(observation?.ledger, minimumLedger);
+  for (const observation of [attestation, taint]) requireReadLedger(observation?.ledger, minimumLedger);
   requireReadLedger(executable?.latestLedger, minimumLedger);
-  if (attestation.value !== registrar || taint.value !== false || !Array.isArray(templates.value) || templates.value.length !== 2)
+  if (attestation.value !== registrar || taint.value !== false)
     throw new NativeClaimError("Registrar provenance changed or is unavailable after receipt read", "unavailable");
   // getContractInstance discards latestLedger; read and bind the exact entry.
   const entry = executable.entries?.[0];
@@ -46,8 +47,8 @@ async function verifyProvenanceAfter(context: NativeContext, registrar: string, 
   const data = entry.val.value;
   if (data.contract.toXDR("base64") !== new Contract(registrar).address().toScAddress().toXDR("base64") || data.key.type !== "scvLedgerKeyContractInstance" || data.durability !== xdr.ContractDataDurability.persistent || data.val.type !== "scvContractInstance" || data.val.value.executable.type !== "contractExecutableWasm")
     throw new NativeClaimError("Registrar executable proof is not the requested Wasm instance", "unavailable");
-  if (hex(bytes32(templates.value[0], "Registry Registrar template")) !== hex(data.val.value.executable.wasmHash.value))
-    throw new NativeClaimError("Registrar executable differs from immutable Registry template after receipt read", "unavailable");
+  if (templates !== hex(data.val.value.executable.wasmHash.value))
+    throw new NativeClaimError("Registrar executable differs from Registry-approved code after receipt read", "unavailable");
 }
 /** Historical reads must not trust an upgraded Registrar that can fabricate receipts. Resolver changes do not block this Registrar-only check. */
 export async function verifyRegistrarProvenance(context: NativeContext, registrar: string, namespace: string, minimumLedger?: number): Promise<void> {
@@ -55,10 +56,10 @@ export async function verifyRegistrarProvenance(context: NativeContext, registra
   const node=sc.bytes(unhex(namespace));
   const [attested,tainted,templates,instance]=await Promise.all([
     context.read(context.registryId,"registrar_of",[node]),context.read(context.registryId,"registrar_tainted",[node]),
-    context.read(context.registryId,"template_hashes",[]),context.server.getContractInstance(registrar),
+    expectedRegistrarCode(context,namespace),context.server.getContractInstance(registrar),
   ]);
-  if(attested!==registrar||tainted!==false||!Array.isArray(templates)||templates.length!==2||instance.executable.type!=="contractExecutableWasm")throw new NativeClaimError("Registrar provenance is unavailable or tainted; refusing authoritative claim/receipt reads","unavailable");
-  if(hex(bytes32(templates[0],"Registry Registrar template"))!==hex(instance.executable.wasmHash.value))throw new NativeClaimError("Registrar executable differs from immutable Registry template","unavailable");
+  if(attested!==registrar||tainted!==false||instance.executable.type!=="contractExecutableWasm")throw new NativeClaimError("Registrar provenance is unavailable or tainted; refusing authoritative claim/receipt reads","unavailable");
+  if(templates!==hex(instance.executable.wasmHash.value))throw new NativeClaimError("Registrar executable differs from Registry-approved code","unavailable");
 }
 export async function nativeCapability(context: NativeContext, namespace: string): Promise<NativeCapability> {
   const node = namespaceNode(namespace), nodeArg = sc.bytes(node);

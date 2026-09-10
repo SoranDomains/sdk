@@ -1,14 +1,22 @@
 {
   "network": "testnet",
   "rpcUrl": "https://soroban-testnet.stellar.org",
-  "verifiedAt": "2026-09-08T12:08:16.854Z",
-  "verifiedLedger": 4569136,
+  "verifiedAt": "2026-09-10T12:50:16.139Z",
+  "verifiedLedger": 4604205,
   "governance": "GAJCWWNMBKCSTQQISDFTHFTCEOGXYA37YTP3U3ZW7Q5CYQPHSW6TB4QX",
   "namespaceDeploymentSaltVersion": 1,
   "lookupVersion": 2,
   "destinationVersion": 2,
   "nativeClaimVersion": 1,
   "resolverInitializationVersion": 1,
+  "lookupMuxedIdentityVersion": 1,
+  "lookupNameStatusVersion": 1,
+  "lookupBatchReadVersion": 1,
+  "lookupBatchReadLimit": 2,
+  "allocatorRulingVersion": 1,
+  "allocatorReopenVersion": 1,
+  "allocatorUpgradeDelaySeconds": 0,
+  "allocatorSchemaVersion": 4,
   "claimFee": {
     "token": "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
     "amount": "50000000000",
@@ -27,125 +35,195 @@
   },
   "contracts": {
     "registry": {
-      "id": "CBSORANPM664QXYMYRZKLQDQE2TXFSK4GBMC6EIRSRTAUZRZCRZRFNMK",
-      "wasmHash": "160824a32377fb33b3981e957c34f0b6f4c0a0d17c2f056b05f48509813f62bb",
-      "deploymentTransaction": "e43902f2a31babfd87bc6fcbeaf20868b9f61515cb7588baf843b6864143797f",
-      "deploymentLedger": 4534621
+      "id": "CCSORANDPQINYOYB5SVO45WJP2LBBYKC72HHUIRVXB4J6RUZKDAUW7G4",
+      "wasmHash": "5c38509d69fac48c68b1972049dabcd9ef9661e3b284c358775bdd71821c7270",
+      "deploymentTransaction": "747b859a98b8ef8ba811cce8475b4cf45e74c104ce97cc4ec852cb3f453b76c1",
+      "deploymentLedger": 4602289,
+      "codeVerifiedAt": "2026-09-10T12:49:28.456Z"
     },
     "allocator": {
       "id": "CCSORANYFHUJUWETEQ7UWIDN4JTPV7NN5G6YUSSBZI57X7EQWVA63VMJ",
-      "wasmHash": "df086b031a94b6d59b8251079c051d1499fc609bd6f19a2ac06138bb509fa197",
+      "wasmHash": "5998c24ec34154f9cf72db104384b225ea9ae05c0c7410d37c54dcf917c4b631",
       "deploymentTransaction": "6588ca3a8d09458e6aadeaf0173927dc10865b68c8531632d4368c109b85d46e",
       "deploymentLedger": 4534622,
       "deploymentWasmHash": "584d5dc1d82e34655d4130f4f0e93ae7b5cd75d6465484efb51b8525f13c3db0",
-      "upgradeTransaction": "bcfdd52a7e10330f437f133abb0dcbf712c9912dad225c40bd73fbe8d55faae9",
-      "upgradeLedger": 4569136,
-      "codeVerifiedAt": "2026-09-08T12:08:16.854Z",
+      "upgradeTransaction": "41c9ffe731b32d87c614e7d24539558568a6af5062e0d6451651b8e8951339b8",
+      "upgradeLedger": 4602368,
+      "codeVerifiedAt": "2026-09-10T12:49:29.244Z",
       "upgradeHistory": [
         {
           "wasmHash": "9480a4f980de9df0a31652b0b64c54d5c5e1979745cc8c4fc486624b9c177e40",
           "transaction": "8a25369b3a11676ea602a93f3830b0c22df47033726ab433367355072d2f0631",
           "ledger": 4564382,
           "codeVerifiedAt": "2026-09-08T05:31:39.329Z"
+        },
+        {
+          "wasmHash": "df086b031a94b6d59b8251079c051d1499fc609bd6f19a2ac06138bb509fa197",
+          "transaction": "bcfdd52a7e10330f437f133abb0dcbf712c9912dad225c40bd73fbe8d55faae9",
+          "ledger": 4569136,
+          "codeVerifiedAt": "2026-09-08T12:08:16.854Z"
+        },
+        {
+          "wasmHash": "609a736865dc7d4dbbaf29ac0a60ff876141809c5a0d5da9fe747b12f040a618",
+          "transaction": "a9c77709a1a4e51fa4a5ca74647e332302f629ef53578bb3bc912fd7e29ca9c3",
+          "ledger": 4575408,
+          "codeVerifiedAt": "2026-09-08T20:54:03.390Z"
         }
       ]
     },
     "registrar": {
-      "id": "CBSORANHQRVZ7PEZ7VVFEQ7GQJ3M4RLBY2DNQ44MIVLU5C4J2DJ3DH3N",
-      "wasmHash": "be772a3c71c50a507d990e7fdbe48fa79fcf1c60a50c871a988ffa67ee99403c",
-      "deploymentTransaction": "784de3dd3e6ac845f88aa919b19359fbc49449799cbf4dc1be911561cb44aa6a",
-      "deploymentLedger": 4534625
+      "id": "CDSORANBRJUG4LLF2D26JZIKRGLKHVWHPEGRR4ZJKKLBSREEADD4MDC2",
+      "wasmHash": "26e03cd1d7fbfa46fe442406fb1b88022ec8cd8bd9123bed570f971fce596a14",
+      "deploymentTransaction": "ea6708f83344ded18025b121527ad6e7abb002dbed252dd36c1d3e2c20546c12",
+      "deploymentLedger": 4603489,
+      "codeVerifiedAt": "2026-09-10T12:49:30.204Z"
     },
     "resolver": {
-      "id": "CDSORANQGIHRR7ZLQTARI6UJUA6TPVFUYO4BXKFJQPUXUVWLCJPGWA5H",
-      "wasmHash": "d44387e7f162e19e95d5e29db9ab4b9a4a4571f8d28046d17b337d0a19af3c64",
-      "deploymentTransaction": "92415ecf83b92cecdf47061d83a983eb7d8b2635a4e3a6d6e07c40db02eeb853",
-      "deploymentLedger": 4534626
+      "id": "CDSORANVZ5JS2VSVQ6VBYGE6A26NC736SL66HW7LZ7O4EE7BSMMDWFAX",
+      "wasmHash": "5e7b4fb8d310d67ed6966a155e748d60be771422b3e8c34bbc14485f98525574",
+      "deploymentTransaction": "a1ab05725745dfd4f2827129b25599dc9bc73995bc52c29268848f6c95575f7d",
+      "deploymentLedger": 4603491,
+      "codeVerifiedAt": "2026-09-10T12:49:31.005Z"
     },
     "primary": {
-      "id": "CASORAN755O3GCQTRAHKDXLLCSDLNKAQWAP6MWABRSFVSHLJOEKAC7AB",
-      "wasmHash": "bd17f0cf0b5066a925941afe11766a3fb933faf55564462844c36f749ec79b7d",
-      "deploymentTransaction": "cbc0af7ab24b7eca1ca6a8dd692d1dadd6692eaa6fab958af3d6f88fe44be25c",
-      "deploymentLedger": 4534627
+      "id": "CCSORAN7Y7ICQK2MBSVCJT3BUN5EHXKDKSTMGVB6QWSYXWMMLG2WIFJ6",
+      "wasmHash": "aa59205bff574e27469559cfcf39f1028eabc975c8f37591ea2f373682d918ee",
+      "deploymentTransaction": "def1397f65056a767a15c1d090f879e9e806536ab8411cae1ff3984fee8f1be0",
+      "deploymentLedger": 4602308,
+      "codeVerifiedAt": "2026-09-10T12:49:31.766Z"
     },
     "lookup": {
       "id": "CDSORANQAJK35UV2HR63CMB6M5NYISHMUBTB6EQY2CZ3Y7HJDIOHRJWA",
-      "wasmHash": "0d8ed0c9dd5f7ea4e8783ecb505f3da37ba643c632d85a52b3d9976fd11cea10",
+      "wasmHash": "7a9560e0451164cce018163d017581d879b4632540d1e0edd3d6c8615808c56c",
       "deploymentTransaction": "d480c19edd9d101357432142a14e0d0e3e6b2c7706b01de8393cb94d6d6a63fc",
       "deploymentLedger": 4534628,
       "deploymentWasmHash": "67c2d2c7f9b80b2901426a31d4a85cf1cf56c4f70afd69d229dfe4b67db78041",
-      "upgradeTransaction": "0ad8700aee3c142330e6c02d7c8d3139663001bccc50ed2f3a40c1571e403f8a",
-      "upgradeLedger": 4549326,
-      "codeVerifiedAt": "2026-09-07T08:37:00.175Z"
+      "upgradeTransaction": "0af7e7f66edf3f6840e6e8563c7842e8245f057b3b81d28e8aabdd14c8594d2b",
+      "upgradeLedger": 4602396,
+      "codeVerifiedAt": "2026-09-10T12:49:32.650Z",
+      "upgradeHistory": [
+        {
+          "wasmHash": "0d8ed0c9dd5f7ea4e8783ecb505f3da37ba643c632d85a52b3d9976fd11cea10",
+          "transaction": "0ad8700aee3c142330e6c02d7c8d3139663001bccc50ed2f3a40c1571e403f8a",
+          "ledger": 4549326,
+          "codeVerifiedAt": "2026-09-07T08:37:00.175Z"
+        },
+        {
+          "wasmHash": "ff3fcd22c400bb855644407588de35295ccf957d11bb6aae6570a769a4018cb8",
+          "transaction": "34ac6a1189a83f6ea33692b4a9dca65324e147653b9ef8d74800c6eedc7ff907",
+          "ledger": 4591279,
+          "codeVerifiedAt": "2026-09-09T18:53:05.250Z"
+        }
+      ]
     }
   },
+  "upgradePolicy": {
+    "version": 1,
+    "network": "testnet",
+    "permanentCodeLocks": false,
+    "registryAndPrimary": "governance with exact current and replacement code hashes",
+    "namespaceChildren": "current namespace owner plus role-specific Registry implementation approval"
+  },
+  "migration": {
+    "transaction": "f4f35e55036761151ffd0e9a0faf533d421802f6619a1b94c15b0fa5ff33b3f7",
+    "ledger": 4604192,
+    "source": {
+      "registry": "CBSORANPM664QXYMYRZKLQDQE2TXFSK4GBMC6EIRSRTAUZRZCRZRFNMK",
+      "primary": "CASORAN755O3GCQTRAHKDXLLCSDLNKAQWAP6MWABRSFVSHLJOEKAC7AB",
+      "registrar": "CBSORANHQRVZ7PEZ7VVFEQ7GQJ3M4RLBY2DNQ44MIVLU5C4J2DJ3DH3N",
+      "resolver": "CDSORANQGIHRR7ZLQTARI6UJUA6TPVFUYO4BXKFJQPUXUVWLCJPGWA5H"
+    },
+    "namesPreserved": 37,
+    "originalClaimReceiptsRetained": 34,
+    "namespaceClaimWindowsPreserved": true
+  },
+  "verificationScope": "Sealed on-chain migration, exact imported persistent records, original receipt lineage and preserved namespace claim escrow. Hosted-service activation is verified separately.",
   "status": "deployed",
   "networkPassphrase": "Test SDF Network ; September 2015",
   "lookupUpgradeDelaySeconds": 0,
   "lookupDestinationVersion": 2,
   "resolverPaymentVersion": 2,
   "resolverDestinationVersion": 2,
-  "lookup": {
-    "version": 2,
-    "destinationVersion": 2,
-    "upgradeDelaySeconds": 0,
-    "governance": "GAJCWWNMBKCSTQQISDFTHFTCEOGXYA37YTP3U3ZW7Q5CYQPHSW6TB4QX",
-    "muxedIdentityVersion": 1
-  },
   "namespace": {
     "label": "nova",
     "node": "857f994cc3975eda4e373f51c9f5b0f7940451a5eb3ff225edc5cd468228b430",
     "owner": "GAAHFS7CISNAJOQK5VS447NS6ZFPRLLQQP6IM2EA4W7XZWGJNMXZ4VLK",
-    "ownerEpoch": "1",
     "permanent": false,
-    "reclaimable": true
+    "reclaimable": true,
+    "ownerEpoch": "1"
   },
-  "verificationScope": "Original deployment receipts and configuration were verified on 6 September at deploymentVerifiedLedger. The in-place Lookup upgrade and muxed identity ABI 1 were verified on 7 September at contracts.lookup.upgradeLedger. The earlier 8 September Allocator payout/zero-delay upgrade remains recorded in contracts.allocator.upgradeHistory. At verifiedLedger the subsequent same-address Allocator upgrade added case-bound rulings, on-chain decision records and ruling API version 1 while retaining schema 4, all existing instance storage, fee policy, liabilities and Registry authority. All six current Wasm hashes were rechecked at the per-contract ledgers in independentCodeVerification. The indexed allocation queue was empty, so no persistent claims were sampled; this verification does not enumerate historical claim storage. Historical observations retain their original dated scope.",
-  "deploymentVerifiedAt": "2026-09-06T12:12:11.925Z",
-  "deploymentVerifiedLedger": 4534629,
-  "lookupMuxedIdentityVersion": 1,
-  "lookupUpkeep": {
-    "transaction": "50c1c2506d3c0a123a5126f984dff66352bc58606428f68c8bec4acbd423ab82",
-    "ledger": 4549418,
-    "feeStroops": "1337205130",
-    "paidBy": "platform deployment account",
-    "instanceLiveUntilLedger": 7534628,
-    "codeLiveUntilLedger": 7549418,
-    "consumerFeeCapsChanged": false
-  },
-  "allocatorUpgradeDelaySeconds": 0,
-  "allocatorSchemaVersion": 4,
-  "allocatorUpkeep": {
-    "transaction": "17534552b0df1903ba0782880fe681e3e8b16712710a43e8ee139132176d3675",
-    "ledger": 4569139,
-    "feeStroops": "1709664771",
-    "paidBy": "platform deployment account",
-    "instanceLiveUntilLedger": 7534623,
-    "codeLiveUntilLedger": 7569139,
-    "consumerFeeCapsChanged": false
-  },
-  "independentCodeVerification": {
-    "verifiedAt": "2026-09-08T12:08:16.854Z",
-    "contractLedgers": {
-      "registry": 4569139,
-      "allocator": 4569139,
-      "registrar": 4569140,
-      "resolver": 4569140,
-      "primary": 4569140,
-      "lookup": 4569140
-    },
-    "scope": "Downloaded and verified all six deployed Wasm hashes after the case-bound Allocator ruling upgrade. Every retained Allocator instance entry matched the pre-upgrade snapshot. Schema 4, fee policy, liabilities and Registry Allocator anchor were unchanged. Ruling API version 1 and its added read methods were verified directly on chain. The indexed allocation queue was empty; no persistent claims were sampled."
-  },
-  "allocatorRulingVersion": 1,
-  "allocatorUpkeepHistory": [
+  "publishedPackages": [
     {
-      "transaction": "9980133f17fa679f6f941069a2b735bf1de02ae7c7020922cf5573944e8b0436",
-      "ledger": 4564393,
-      "feeStroops": "1504970268",
-      "paidBy": "platform deployment account",
-      "instanceLiveUntilLedger": 7534623,
-      "codeLiveUntilLedger": 7564393,
-      "consumerFeeCapsChanged": false
+      "name": "owner",
+      "version": "0.8.0",
+      "shasum": "7c5b10aedd88f7a23d661005d77f857b42da04e8",
+      "integrity": "sha512-bapSfgBtZhdsRIee09o1wdKQa7CANvfjwDLwjJtrObziHK0IV2JyU/hMHJkQHlDo1WK2MjALvKZ/iA4UqpCiMQ==",
+      "package": "@sorandomains/owner"
+    },
+    {
+      "name": "holder",
+      "version": "0.7.0",
+      "shasum": "db2d3eb692abcbc0e2e51f199ea9349ebbcbf14a",
+      "integrity": "sha512-P0dtc7zrmfxb9l4fjtq2RD7ovzLatjILya5gXiar3d5EwJq1luRvkL6JWWkyyKZ2W2ZBw318iM5G0Bz8b1CiBw==",
+      "package": "@sorandomains/holder"
+    },
+    {
+      "name": "lookup",
+      "version": "0.10.0",
+      "shasum": "63cd13890a425b14e95db59bac633fe741693837",
+      "integrity": "sha512-8hZ5v2Zd9AFi/KQrCX4Qpt5UHpsEoh6M3jc2uT7/4n1oOFdvVOGm6YXS8YN9zWJmr4ju43M90aCIhP+iqDlK2g==",
+      "package": "@sorandomains/lookup"
+    },
+    {
+      "name": "mcp",
+      "version": "0.9.0",
+      "shasum": "11956e547263e1ca039246f17ae553cafa2e3689",
+      "integrity": "sha512-9l6nujM3pANN9BypjWGp3fFnxGdmAtgCR7n0oMQCcWghTNMXTds4xclOUQKNpDsVj3+AB7XgrzPRcf50IQT6sw==",
+      "package": "@sorandomains/mcp"
     }
-  ]
+  ],
+  "clientVerification": {
+    "paymentTypes": [
+      "G",
+      "G with memo",
+      "M with routing ID",
+      "C"
+    ],
+    "primaryIdentities": 9,
+    "muxedIdentities": 8,
+    "historicalClaimRecovery": true,
+    "freshClaim": {
+      "name": "migration-check-0910.nova",
+      "transaction": "9836dd03b7cce4c097086aa9b92f37c973eb4035690e499919fac1ec9666d597",
+      "ledger": 4604333
+    }
+  },
+  "hostedServices": {
+    "checkedAt": "2026-09-10T13:05:08.955Z",
+    "services": {
+      "api": {
+        "url": "https://api.soran.domains",
+        "deploymentVersion": "bcda5086-714b-498b-8e1d-8c301e1cd8fa"
+      },
+      "nova": {
+        "url": "https://nova-claim-app.throbbing-cloud-0f8e.workers.dev",
+        "deploymentVersion": "5ec1dffb-e116-48a1-9e33-1545c37ea7f0"
+      },
+      "studio": {
+        "url": "https://soran-studio.throbbing-cloud-0f8e.workers.dev",
+        "deploymentVersion": "0d759f38-fbf1-49b4-9c3e-5ad1e7889fcb"
+      },
+      "console": {
+        "url": "https://soran.domains",
+        "deploymentVersion": "c9cdd082-9237-444c-a55d-df46461b61dd"
+      },
+      "mcp": {
+        "url": "https://mcp.soran.domains/mcp",
+        "deploymentVersion": "8ffb9c7f-d77a-4bdc-873c-017565c9f24f"
+      }
+    },
+    "mcpVersion": "0.9.0",
+    "hostedWrites": false,
+    "paymentChecks": 15
+  }
 }

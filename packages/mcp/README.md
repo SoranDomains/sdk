@@ -1,7 +1,7 @@
 # @sorandomains/mcp
 
 
-> Native claim testnet deployment verified at ledger 4534629 on 6 September 2026 (12:12 UTC). See the
+> Governed testnet migration sealed at ledger 4604192 on 10 September 2026. See the
 > [release status](https://docs.soran.domains/reference/release-status) for package and service availability.
 
 
@@ -20,7 +20,7 @@ Two transports, one tool set:
   read tools — what hosted agents (claude.ai connectors and friends) reach
   with no install.
 
-Version 0.8.0 targets the native-claim **Stellar testnet** successor deployment.
+Version 0.9.0 targets the native-claim **Stellar testnet** successor deployment.
 The default Registry, Lookup, Primary and Allocator pins belong to that deployment.
 
 ## Install
@@ -82,10 +82,10 @@ https://mcp.soran.domains/mcp
 | `my_wallet` | own address, balance, names, primary |
 | `claim_namespace` | **announce a claim** on a top-level namespace for this wallet (opens the objection window; unopposed claims become eligible for permissionless execution) |
 | `claim_status` · `withdraw_claim` | watch a claim's window · cancel it before it elapses |
-| `activate_namespace` | deploy the Registrar for a claimed namespace; `permanent` selects non-reclaimable zero-term issuance, with final permanence requiring a separate lock |
+| `activate_namespace` | deploy the Registrar for a claimed namespace; `permanent` selects non-reclaimable zero-term issuance, without locking contract upgrades |
 | `cancel_namespace_activation` | clear a namespace/role vanity-generation job without withdrawing a claim or undoing a contract |
 | `issue_name` · `issue_batch` · `reclaim_name` · `renew_name` | issue (single/bulk ≤23), reclaim, and renew names in a namespace this wallet OWNS |
-| `set_treasury` · `set_resolver` · `make_permanent` | route reclaim custody · point at a resolver · **the irreversible one-way door** (guarded) |
+| `set_treasury` · `set_resolver` · `make_permanent` | route reclaim custody · point at a resolver · historical permanence API (unavailable on governed testnet) |
 | `transfer_namespace` · `accept_namespace_transfer` · `cancel_namespace_transfer` · `namespace_status` | hand the whole namespace to another wallet (two-step) · read owner/policy/permanence |
 | `claim_display_name` | make a held name this wallet's verified display name (forward + reverse + primary in one call) |
 | `set_payment` | atomically update address and complete memo instruction; use type `none` to remove a memo |
@@ -102,7 +102,7 @@ memo on a shared exchange account. Old installed clients need an explicit upgrad
 
 ### Complete M display-name tools
 
-MCP 0.8.0 local mode exposes:
+MCP 0.9.0 local mode exposes:
 
 ```text
 set_muxed_display_name({ name, destination: fullM, kind: "reverse" | "primary" })
@@ -159,8 +159,8 @@ import { registerReadTools, registerWriteTools } from "@sorandomains/mcp";
 Source: <https://github.com/SoranDomains/sdk> · Docs: <https://github.com/SoranDomains/docs> · License: MIT
 
 
-Version 0.8.0 uses Stellar SDK17 and the matching lookup 0.8.0,
-holder 0.6.0 and owner 0.7.0 packages. Holder receipt recovery requires sufficiently fresh clean Registrar provenance after each receipt read or transaction inclusion. Both transports pass the same universal
+Version 0.9.0 uses Stellar SDK17 and the matching Lookup 0.10.0,
+Holder 0.7.0 and Owner 0.8.0 packages. Holder receipt recovery requires sufficiently fresh clean Registrar provenance after each receipt read or transaction inclusion. Both transports pass the same universal
 configuration and export the same MCP version. The successor deployment retains Lookup V2; custom Registry or passphrase
 settings require their own Allocator pin and do not inherit testnet fee routing.
 
@@ -226,13 +226,13 @@ Read the [native claim APIs, security boundaries and complete signup flow](https
 
 ## Verified testnet deployment
 
-Verified on 6 September 2026 at ledger **4534629** (12:12 UTC). Network passphrase: `Test SDF Network ; September 2015`.
+See the [deployment manifest](../../deployments/testnet.json) for confirmed code hashes, transaction receipts and verification scope. Network passphrase: `Test SDF Network ; September 2015`.
 
 | Contract | Address |
 |---|---|
-| Registry | `CBSORANPM664QXYMYRZKLQDQE2TXFSK4GBMC6EIRSRTAUZRZCRZRFNMK` |
+| Registry | `CCSORANDPQINYOYB5SVO45WJP2LBBYKC72HHUIRVXB4J6RUZKDAUW7G4` |
 | Lookup | `CDSORANQAJK35UV2HR63CMB6M5NYISHMUBTB6EQY2CZ3Y7HJDIOHRJWA` |
-| Primary | `CASORAN755O3GCQTRAHKDXLLCSDLNKAQWAP6MWABRSFVSHLJOEKAC7AB` |
+| Primary | `CCSORAN7Y7ICQK2MBSVCJT3BUN5EHXKDKSTMGVB6QWSYXWMMLG2WIFJ6` |
 | Allocator | `CCSORANYFHUJUWETEQ7UWIDN4JTPV7NN5G6YUSSBZI57X7EQWVA63VMJ` |
 
 Mainnet has no deployment preset. Custom networks must supply their own verified
@@ -265,6 +265,17 @@ search, call `cancel_namespace_activation` with the exact `namespace` and
 `role: "registrar"` or `"resolver"`. Cancellation only clears the service's
 address-generation job; it does not withdraw a claim or undo a contract.
 
-### Local native claim network fee cap
+### Local transaction signing limits
 
-Native username methods retain the 5 XLM total network fee cap. The local operator may configure `SORAN_MAX_NATIVE_FEE_STROOPS` (canonical integer 1–4294967295), or `WriteToolOptions.maxNativeFeeStroops`, after reviewing deployment/storage estimates. Agent tool arguments cannot increase that setting. This is separate from the namespace owner's username treasury price and does not change older methods' existing fee guards. Initial storage rent may exceed the default, in which case signing stops. See [native claim behavior and limitations](https://github.com/SoranDomains/sdk/blob/main/NATIVE-CLAIMS.md).
+Available in 0.9.0.
+
+Every write, including older SDK operations and storage restoration, has a default 5 XLM total network-fee ceiling. The local operator may configure `SORAN_MAX_NETWORK_FEE_STROOPS` (canonical integer 1–4294967295), or `WriteToolOptions.maxNetworkFeeStroops`, after reviewing deployment/storage estimates. Agent tool arguments cannot increase that ceiling. The older `SORAN_MAX_NATIVE_FEE_STROOPS` setting remains supported: it also supplies the overall ceiling when the new setting is absent; if both are set, native methods use the lower value. This is a per-transaction limit, separate from username/namespace prices and any batch spending budget. Initial storage rent may exceed the default, in which case signing stops. See [native claim behavior and limitations](https://github.com/SoranDomains/sdk/blob/main/NATIVE-CLAIMS.md).
+
+Write envelopes must be valid now and expire within five minutes. Unbounded,
+expired or later-expiring requests stop before the local key signs them.
+
+## Governed testnet code and migration recovery
+
+On a governed Registry, native verification reads the exact per-namespace Registrar code pin and its upgrade history. Approved upgrades do not have to match the current factory default. Missing or malformed provenance still prevents signing and receipt confirmation; RPC failure never downgrades verification to a legacy rule.
+
+Historical claim recovery is read-only and binds the original intent to the frozen source Registrar and sealed migration commitments. It never rewrites the intent to a successor Registry or treats an unavailable receipt as permission to submit again. Deployment migration and package publication are separate; check the release status for the active addresses.

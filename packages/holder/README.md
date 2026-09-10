@@ -1,14 +1,14 @@
 # @sorandomains/holder
 
 
-> Native claim testnet deployment verified at ledger 4534629 on 6 September 2026 (12:12 UTC). See the
+> Governed testnet migration sealed at ledger 4604192 on 10 September 2026. See the
 > [release status](https://docs.soran.domains/reference/release-status) for package and service availability.
 
 
-Version 0.6.0 targets Stellar SDK17 (`>=17 <18`). ASCII names
+Version 0.7.0 targets Stellar SDK17 (`>=17 <18`). ASCII names
 and labels are validated before lowercase normalization; Unicode lookalikes are
 rejected. Payment and ownership writes target the owning Registry/Registrar/Resolver.
-Complete-M display-name writes target Universal Lookup; Lookup 0.8.0 provides
+Complete-M display-name writes target Universal Lookup; Lookup 0.10.0 provides
 the corresponding read interface. Check the release status before enabling the
 new capability on a deployment.
 
@@ -191,20 +191,41 @@ supply the matching `primaryId` explicitly.
 
 ## Native username claiming
 
-Native username claiming uses `claimQuote`, `createClaimIntent`, `buildClaim` and `claim`. The current namespace owner must first enable the public policy. The claimant's G wallet authorizes the exact username, complete receiving destination, owner price, policy version and deadline. `recoverClaim` reads the original immutable receipt; it never silently retries an uncertain transaction. Receipt reads, receipt absence and confirmed transaction results are accepted only after a clean Registrar attestation and executable check with RPC ledger context at least as recent as the receipt read or transaction inclusion. Missing or older context stops recovery; retain the original request and transaction hash. This check trusts the configured RPC to report its state and ledger honestly. Later namespace-owner, claim-policy or Resolver changes alone do not invalidate a historical receipt, while a tainted or upgraded Registrar cannot supply authoritative history. `acceptNameTransferWithDestination` and `renewName` cover separately authorized holder lifecycle actions.
+Native username claiming uses `claimQuote`, `createClaimIntent`, `buildClaim` and `claim`. The current namespace owner must first enable the public policy. The claimant's G wallet authorizes the exact username, complete receiving destination, owner price, policy version and deadline. `recoverClaim` reads the original immutable receipt; it never silently retries an uncertain transaction. Receipt reads, receipt absence and confirmed transaction results are accepted only after a clean Registrar attestation and executable check with RPC ledger context at least as recent as the receipt read or transaction inclusion. Missing or older context stops recovery; retain the original request and transaction hash. This check trusts the configured RPC to report its state and ledger honestly. Later namespace-owner, claim-policy or Resolver changes alone do not invalidate a historical receipt, while tainted or unapproved Registrar code cannot supply authoritative history. On governed deployments, approved code is verified against the namespace-specific Registry pin. `acceptNameTransferWithDestination` and `renewName` cover separately authorized holder lifecycle actions.
 
 Read the [native claim APIs, security boundaries and complete signup flow](https://github.com/SoranDomains/sdk/blob/main/NATIVE-CLAIMS.md). G/no memo, G with ID/Text/Hash, full M/no separate memo and C/no memo remain supported payment destinations. Current transaction-signing adapters use classic G accounts.
 
 ## Verified testnet deployment
 
-Verified on 6 September 2026 at ledger **4534629** (12:12 UTC). Network passphrase: `Test SDF Network ; September 2015`.
+See the [deployment manifest](../../deployments/testnet.json) for confirmed code hashes, transaction receipts and verification scope. Network passphrase: `Test SDF Network ; September 2015`.
 
 | Contract | Address |
 |---|---|
-| Registry | `CBSORANPM664QXYMYRZKLQDQE2TXFSK4GBMC6EIRSRTAUZRZCRZRFNMK` |
-| Primary (G/C) | `CASORAN755O3GCQTRAHKDXLLCSDLNKAQWAP6MWABRSFVSHLJOEKAC7AB` |
+| Registry | `CCSORANDPQINYOYB5SVO45WJP2LBBYKC72HHUIRVXB4J6RUZKDAUW7G4` |
+| Primary (G/C) | `CCSORAN7Y7ICQK2MBSVCJT3BUN5EHXKDKSTMGVB6QWSYXWMMLG2WIFJ6` |
 | Universal Lookup (M elections) | `CDSORANQAJK35UV2HR63CMB6M5NYISHMUBTB6EQY2CZ3Y7HJDIOHRJWA` |
 
 Mainnet has no deployment preset. Custom networks must supply their own verified
 addresses. Universal Lookup upgrades remain immediately executable; an address
 and ABI version do not pin the code that will execute after a governance upgrade.
+
+## Network fee limits
+
+Available in 0.7.0.
+
+Every write and automatic restoration has a total network-fee limit, including the base and resource fees. The default is **5 XLM** (`50_000_000n` stroops). Set `maxNetworkFeeStroops` on the client only after reviewing a higher storage/rent estimate. This limits each transaction separately; it is not a daily or batch spending budget, and namespace/username prices are separate.
+
+```ts
+const client = new SoranHolder({
+  signer,
+  maxNetworkFeeStroops: 50_000_000n,
+});
+```
+
+The older `maxNativeFeeStroops` option remains supported: when the new option is omitted, it also supplies the total ceiling. If both are set, native operations use the lower value and other writes use `maxNetworkFeeStroops`. An excessive estimate is rejected before wallet approval. After a possible submission, errors retain the original transaction hash; reconcile it before creating a replacement transaction.
+
+## Governed testnet code and migration recovery
+
+On a governed Registry, native verification reads the exact per-namespace Registrar code pin and its upgrade history. Approved upgrades do not have to match the current factory default. Missing or malformed provenance still prevents signing and receipt confirmation; RPC failure never downgrades verification to a legacy rule.
+
+Historical claim recovery is read-only and binds the original intent to the frozen source Registrar and sealed migration commitments. It never rewrites the intent to a successor Registry or treats an unavailable receipt as permission to submit again. Deployment migration and package publication are separate; check the release status for the active addresses.
