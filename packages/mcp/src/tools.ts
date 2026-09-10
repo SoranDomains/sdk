@@ -29,7 +29,7 @@ import { validateClaimFee, validateClaimTransaction, sameFee } from "./prepared.
 import { predictRegistrar } from "./deployment.js";
 import { networkFeeLimit, assertFeeLimit, feeBoundSigner } from "./fee-policy.js";
 import { recoverHistoricalSavedClaim } from "./historical.js";
-export const MCP_VERSION = "0.9.0";
+export const MCP_VERSION = "0.9.2";
 
 /** The only server capability used by this package. Keep the callback limited
  * to parsed arguments: importing MCP's full callback type also imports its

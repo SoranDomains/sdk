@@ -20,7 +20,7 @@ Two transports, one tool set:
   read tools — what hosted agents (claude.ai connectors and friends) reach
   with no install.
 
-Version 0.9.0 targets the native-claim **Stellar testnet** successor deployment.
+Version 0.9.2 targets the native-claim **Stellar testnet** successor deployment.
 The default Registry, Lookup, Primary and Allocator pins belong to that deployment.
 
 ## Install
@@ -102,7 +102,7 @@ memo on a shared exchange account. Old installed clients need an explicit upgrad
 
 ### Complete M display-name tools
 
-MCP 0.9.0 local mode exposes:
+MCP 0.9.2 local mode exposes:
 
 ```text
 set_muxed_display_name({ name, destination: fullM, kind: "reverse" | "primary" })
@@ -159,7 +159,7 @@ import { registerReadTools, registerWriteTools } from "@sorandomains/mcp";
 Source: <https://github.com/SoranDomains/sdk> · Docs: <https://github.com/SoranDomains/docs> · License: MIT
 
 
-Version 0.9.0 uses Stellar SDK17 and the matching Lookup 0.10.0,
+Version 0.9.2 uses Stellar SDK17 and the matching Lookup 0.10.1,
 Holder 0.7.0 and Owner 0.8.0 packages. Holder receipt recovery requires sufficiently fresh clean Registrar provenance after each receipt read or transaction inclusion. Both transports pass the same universal
 configuration and export the same MCP version. The successor deployment retains Lookup V2; custom Registry or passphrase
 settings require their own Allocator pin and do not inherit testnet fee routing.
@@ -226,7 +226,7 @@ Read the [native claim APIs, security boundaries and complete signup flow](https
 
 ## Verified testnet deployment
 
-See the [deployment manifest](../../deployments/testnet.json) for confirmed code hashes, transaction receipts and verification scope. Network passphrase: `Test SDF Network ; September 2015`.
+See the [deployment manifest](../../deploy/testnet/deployment.json) for confirmed code hashes, transaction receipts and verification scope. Network passphrase: `Test SDF Network ; September 2015`.
 
 | Contract | Address |
 |---|---|
@@ -267,7 +267,7 @@ address-generation job; it does not withdraw a claim or undo a contract.
 
 ### Local transaction signing limits
 
-Available in 0.9.0.
+Available in 0.9.2.
 
 Every write, including older SDK operations and storage restoration, has a default 5 XLM total network-fee ceiling. The local operator may configure `SORAN_MAX_NETWORK_FEE_STROOPS` (canonical integer 1–4294967295), or `WriteToolOptions.maxNetworkFeeStroops`, after reviewing deployment/storage estimates. Agent tool arguments cannot increase that ceiling. The older `SORAN_MAX_NATIVE_FEE_STROOPS` setting remains supported: it also supplies the overall ceiling when the new setting is absent; if both are set, native methods use the lower value. This is a per-transaction limit, separate from username/namespace prices and any batch spending budget. Initial storage rent may exceed the default, in which case signing stops. See [native claim behavior and limitations](https://github.com/SoranDomains/sdk/blob/main/NATIVE-CLAIMS.md).
 
