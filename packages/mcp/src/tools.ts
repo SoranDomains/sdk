@@ -27,9 +27,10 @@ import { z } from "zod";
 import { Soran, SoranError, DEPLOYMENTS, normalizeLabel, parseName, validatePaymentDestination, decodeMuxedAddress } from "@sorandomains/lookup";
 import { validateClaimFee, validateClaimTransaction, sameFee } from "./prepared.js";
 import { predictRegistrar } from "./deployment.js";
+import { normalizeRegistrarPolicy, sameRegistrarPolicy, registrarPolicyFromNative } from "./registrar-policy.js";
 import { networkFeeLimit, assertFeeLimit, feeBoundSigner } from "./fee-policy.js";
 import { recoverHistoricalSavedClaim } from "./historical.js";
-export const MCP_VERSION = "0.9.2";
+export const MCP_VERSION = "0.9.3";
 
 /** The only server capability used by this package. Keep the callback limited
  * to parsed arguments: importing MCP's full callback type also imports its
@@ -720,17 +721,21 @@ export async function registerWriteTools(server: ToolRegistrar, opts: WriteToolO
 
   server.tool(
     "activate_namespace",
-    "OWNER power: ACTIVATE this wallet's namespace by deploying its Registrar — the one-time step required before you can issue names. Names the exact namespace this wallet intends to activate; the API session must select that same namespace. Choose 'reclaimable' issuance or 'permanent' for a non-reclaimable, zero-term policy. Policy has no ordinary setter, but an eligible upgrade can change behavior while the namespace is unlocked. Final permanence requires the separate irreversible make_permanent step. Do this once after claim_namespace executes.",
+    "OWNER power: activate this wallet's awarded namespace by deploying its Registrar. Choose an explicit five-field policy or a preset. Both presets enable transfers and no expiry, disable trading and set trade fee to zero; permanent additionally disables owner reclaim. Construction policy has no ordinary setter. Governed testnet contracts stay upgradeable and reject permanent code locks. Review all fields before signing. Registration fees are configured separately with configure_native_claims.",
     {
       namespace: labelSchema.describe("Exact namespace to activate; must match the API session namespace"),
       maxNetworkFeeStroops: z.string().regex(/^[1-9][0-9]*$/),
-      policy: z
-        .enum(["reclaimable", "permanent"])
-        .default("reclaimable")
-        .describe("Initial issuance policy; permanent selects non-reclaimable zero-term issuance, while final permanence requires make_permanent"),
+      policy: z.union([z.enum(["reclaimable", "permanent"]), z.object({
+        default_term_secs: z.union([z.string().regex(/^(0|[1-9][0-9]{0,9})$/), z.number().int().min(0).max(3153600000)]).describe("0 for no expiry, or 86400 through 3153600000 seconds"),
+        reclaimable: z.boolean().describe("Whether the owner can reclaim usernames"),
+        trade_fee_bps: z.number().int().min(0).max(10000).describe("Stored trade-policy field, not the username claim fee"),
+        tradeable: z.boolean().describe("Stored policy field; does not enable an on-chain username marketplace"),
+        transferable: z.boolean().describe("Whether holders can transfer usernames"),
+      }).strict()]).default("reclaimable").describe("Explicit complete construction policy, or a shorthand preset. No ordinary setter after activation."),
     },
     async ({ namespace, policy, maxNetworkFeeStroops }) => {
       try {
+        const requestedPolicy = normalizeRegistrarPolicy(policy);
         const registry = opts.registryId ?? DEPLOYMENTS.testnet.registryId;
         if (opts.passphrase && opts.passphrase !== DEPLOYMENTS.testnet.passphrase && !opts.registryId) throw new Error("custom signing network requires an explicit Registry");
         const saltVersion = opts.registryDeploymentSaltVersion ?? (
@@ -738,7 +743,8 @@ export async function registerWriteTools(server: ToolRegistrar, opts: WriteToolO
         );
         if (saltVersion !== 0 && saltVersion !== 1) throw new Error("custom Registry activation requires a locally pinned registryDeploymentSaltVersion (0 legacy or 1 namespace-bound)");
         refreshSession(); // reflect ownership as of now, not server start
-        const prep = (await authPost("/console/registrar/deploy/prepare", { namespace, policy })) as {
+        const prep = (await authPost("/console/registrar/deploy/prepare", { namespace, policy: requestedPolicy })) as {
+          policy?: unknown;
           xdr?: string;
           predictedId?: string;
           namespace?: string;
@@ -762,6 +768,7 @@ export async function registerWriteTools(server: ToolRegistrar, opts: WriteToolO
         if (prep.network && prep.network !== PASSPHRASE)
           return errText(new Error(`network mismatch: server prepared for ${prep.network}, pinned to ${PASSPHRASE}`));
         if (prep.namespace !== undefined && prep.namespace !== namespace) throw new Error("prepared namespace differs from selected namespace");
+        if (!sameRegistrarPolicy(prep.policy, requestedPolicy)) throw new Error("prepared policy differs from the requested Registrar policy");
         const namespaceNode = await soran.namehash(namespace);
         let constructorIntent: { id: string; args: import("@stellar/stellar-sdk").xdr.ScVal[] };
         const signed = checkedSign(prep.xdr, { fn: "deploy_registrar", contractId: registry, maxFee: maxNetworkFeeStroops, deploymentAuthorization: () => constructorIntent, args: (args) => {
@@ -771,9 +778,9 @@ export async function registerWriteTools(server: ToolRegistrar, opts: WriteToolO
           const sx = stellar.xdr;
           const field = (key: string, val: import("@stellar/stellar-sdk").xdr.ScVal) => new sx.ScMapEntry({ key: sx.ScVal.scvSymbol(key), val });
           const selectedPolicy = sx.ScVal.scvMap([
-            field("default_term_secs", stellar.nativeToScVal(0n, { type: "u64" })),
-            field("reclaimable", sx.ScVal.scvBool(policy === "reclaimable")),
-            field("trade_fee_bps", sx.ScVal.scvU32(0)), field("tradeable", sx.ScVal.scvBool(false)), field("transferable", sx.ScVal.scvBool(true)),
+            field("default_term_secs", stellar.nativeToScVal(BigInt(requestedPolicy.default_term_secs), { type: "u64" })),
+            field("reclaimable", sx.ScVal.scvBool(requestedPolicy.reclaimable)),
+            field("trade_fee_bps", sx.ScVal.scvU32(requestedPolicy.trade_fee_bps)), field("tradeable", sx.ScVal.scvBool(requestedPolicy.tradeable)), field("transferable", sx.ScVal.scvBool(requestedPolicy.transferable)),
           ]);
           equalArgs(args, [sx.ScVal.scvBytes(namespaceNode), new Address(me).toScVal(), selectedPolicy, sx.ScVal.scvBytes(salt)]);
           const predicted = predictRegistrar(registry, namespaceNode, salt, PASSPHRASE, saltVersion);
@@ -796,12 +803,26 @@ export async function registerWriteTools(server: ToolRegistrar, opts: WriteToolO
             ),
           );
         }
+        if (sub.registrarId !== prep.predictedId) throw new Error("activation returned a different Registrar; verify namespace_status before retrying");
+        let policyVerification: { policyVerified: boolean; policyVerificationError?: string };
+        try {
+          if (await owner.registrarOf(namespace) !== prep.predictedId) throw new Error("The on-chain Registrar differs from the prepared deployment.");
+          const actual = await owner.policy(namespace);
+          const observed = registrarPolicyFromNative({ default_term_secs: actual.defaultTermSecs, reclaimable: actual.reclaimable,
+            trade_fee_bps: actual.tradeFeeBps, tradeable: actual.tradeable, transferable: actual.transferable });
+          if (!sameRegistrarPolicy(observed, requestedPolicy)) throw new Error("The on-chain policy differs from the requested policy.");
+          policyVerification = { policyVerified: true };
+        } catch (error) {
+          policyVerification = { policyVerified: false, policyVerificationError: String(error) };
+        }
         return text({
-          activated: true,
+          activated: policyVerification.policyVerified ? true : null,
+          pendingVerification: !policyVerification.policyVerified,
           registrar: sub.registrarId,
-          policy,
+          policy: requestedPolicy,
+          ...policyVerification,
           txHash: sub.txHash,
-          nextStep: "You can now issue_name / issue_batch in this namespace.",
+          nextStep: policyVerification.policyVerified ? "You can now configure username claiming or issue names in this namespace." : "The API reported activation, but on-chain verification did not complete. Check namespace_status before issuing names. Do not activate again.",
         });
       } catch (e) {
         return errText(e);

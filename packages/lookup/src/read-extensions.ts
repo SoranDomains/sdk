@@ -2,8 +2,8 @@ import { nativeToScVal, StrKey, xdr } from "@stellar/stellar-sdk";
 import { decodeMuxedAddress } from "./payment.js";
 import { address, u64 } from "./views.js";
 
-export const MAX_BATCH_READS = 16;
-export const MAX_PRIMARY_BATCH_READS = 8;
+export const MAX_BATCH_READS = 32;
+export const MAX_PRIMARY_BATCH_READS = 16;
 export type RegisteredName = { registrar: string; node: string; holder: string; generation: bigint; expiresAt: bigint };
 export type NameState =
   | { kind: "namespaceMissing" | "registrarMissing" | "unregistered" }
@@ -16,6 +16,8 @@ export type IdentityName =
 export type BatchNames = { ledger: number; timestamp: bigint; results: IdentityName[] };
 export type ObservedIdentityName = IdentityName & { ledger: number; timestamp: bigint };
 export const MAX_HISTORY_IDENTITIES = 256;
+/** Independent RPC calls may observe different ledgers. Defaults to two workers. */
+export type IdentityHistoryOptions = { concurrency?: 1 | 2 | 3 | 4 };
 
 function object(raw: unknown, fields: string[]): Record<string, unknown> {
   if (!raw || typeof raw !== "object" || Array.isArray(raw) || Object.keys(raw).sort().join() !== [...fields].sort().join()) throw new Error("unexpected result fields");

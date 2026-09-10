@@ -48,21 +48,26 @@ const scoped = await soran.reverseMany("nova", [walletA, muxedWallet]);
 can be reserved or restricted by policy, and active names can have unavailable
 payment instructions. The status is from the returned ledger and timestamp.
 
-`reverseBatch` accepts up to **16 identities in one namespace**. `primaryBatch`
-accepts up to **8 identities across namespaces**. Each makes one contract batch
-read after checking deployment capabilities. `batchReadLimit()` and
-`primaryBatchReadLimit()` return the deployed bounds. Batch capability 2 uses
-shared namespace verification and grouped reads; complete forward destinations,
-expiry and generations are still checked on chain.
+The **unreleased 0.10.2 audit candidate** supports up to **32 identities in one
+namespace** with `reverseBatch`, and **16 across namespaces** with `primaryBatch`.
+The deployed capability 2 remains **16/8** until the candidate is audited and
+upgraded. Each method checks the actual deployed capability and limit; getters
+`batchReadLimit()` and `primaryBatchReadLimit()` return those limits. Candidate
+capability 3 bundles anchors and record data, retaining current routing,
+independent Registrar generations/expiry and exact forward verification on chain.
 
-For history screens, `primaryNames` and `reverseMany` accept up to **256 identities**.
-They start at the method's deployed limit. A leading host budget error halves
-that batch until it fits; a one-item failure rejects. Older namespace contracts
-or unusually expensive proofs can require smaller batches. Each row retains its
-ledger/timestamp, because separate simulations can observe different ledgers.
-Order and duplicates are preserved. RPC, restoration, ABI and other errors
-reject; they never become `none`. These helpers do not enumerate names owned by
-an address. The contract bounds apply before deduplication.
+For history screens, `primaryNames` and `reverseMany` accept up to **256 inputs**.
+They deduplicate complete identities within the request and use two concurrent
+calls by default. Pass `{ concurrency: 1 }` for sequential reads or a value up to
+4 for bounded concurrency. A leading host budget error shrinks a batch until it
+fits; a single-item failure rejects. Other RPC, restoration and ABI failures
+stop scheduling new work, drain in-flight reads and reject the whole helper.
+
+Order and duplicates are restored in the results. Duplicate identities share the
+same observation ledger/time; independent calls may observe different ledgers.
+There is no persistent cache. Older/custom namespace contracts may need smaller
+batches. These methods return elected display names, not an inventory of names
+owned by an address. Contract input bounds apply before on-chain deduplication.
 
 G/C and full muxed identities remain distinct. A G address plus transaction memo
 does not identify a separate reverse-election identity. Disabling G/C Primary in

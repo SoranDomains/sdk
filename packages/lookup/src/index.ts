@@ -19,8 +19,8 @@ import {
 import { decodeMuxedAddress, destinationFromNative, paymentFromNative, validatePaymentDestination, type PaymentDestination } from "./payment.js";
 import { lookupFromNative, type LookupResult } from "./lookup.js";
 import { nameFromNative, namespaceFromNative, type NameMetadata, type NamespaceMetadata } from "./views.js";
-import { batchNamesFromNative, identitiesToScVal, MAX_BATCH_READS, MAX_PRIMARY_BATCH_READS, MAX_HISTORY_IDENTITIES, nameStatusFromNative, type BatchNames, type NameStatus, type ObservedIdentityName } from "./read-extensions.js";
-export { MAX_BATCH_READS, MAX_PRIMARY_BATCH_READS, MAX_HISTORY_IDENTITIES, type BatchNames, type IdentityName, type NameState, type NameStatus, type RegisteredName, type ObservedIdentityName } from "./read-extensions.js";
+import { batchNamesFromNative, identitiesToScVal, MAX_BATCH_READS, MAX_PRIMARY_BATCH_READS, MAX_HISTORY_IDENTITIES, nameStatusFromNative, type BatchNames, type NameStatus, type ObservedIdentityName, type IdentityHistoryOptions } from "./read-extensions.js";
+export { MAX_BATCH_READS, MAX_PRIMARY_BATCH_READS, MAX_HISTORY_IDENTITIES, type BatchNames, type IdentityName, type NameState, type NameStatus, type RegisteredName, type ObservedIdentityName, type IdentityHistoryOptions } from "./read-extensions.js";
 export type { NameMetadata, NamespaceMetadata, NamespacePolicy } from "./views.js";
 export { encodeMuxedAddress, decodeMuxedAddress, PAYMENT_RECORD_KEY, encodePaymentRecord, parsePaymentRecord, validatePaymentDestination, type PaymentMemo, type PaymentDestination } from "./payment.js";
 export type { LookupResult, NativePaymentResolution, LegacyAddressResolution } from "./lookup.js";
@@ -484,16 +484,17 @@ export class Soran {
   }
 
   /** History helper for up to 256 G/C/M identities. Uses bounded contract
-   * batches; after a simulation budget failure, halves the batch size until
+   * batches with request-local identity deduplication and bounded concurrency;
+   * after a simulation budget failure, halves the batch size until
    * it fits or one identity still fails. Each row retains its own observation.
    * Restoration, transport and other failures reject instead of becoming None. */
-  async primaryNames(addresses: readonly string[]): Promise<ObservedIdentityName[]> {
-    return this.identityHistory("primary_names", addresses);
+  async primaryNames(addresses: readonly string[], options: IdentityHistoryOptions = {}): Promise<ObservedIdentityName[]> {
+    return this.identityHistory("primary_names", addresses, undefined, options);
   }
 
   /** Bounded history helper for elected names in one namespace. See primaryNames. */
-  async reverseMany(namespace: string, addresses: readonly string[]): Promise<ObservedIdentityName[]> {
-    return this.identityHistory("reverse_names", addresses, normalizeLabel(namespace));
+  async reverseMany(namespace: string, addresses: readonly string[], options: IdentityHistoryOptions = {}): Promise<ObservedIdentityName[]> {
+    return this.identityHistory("reverse_names", addresses, normalizeLabel(namespace), options);
   }
 
   private async batchContext(): Promise<{ id: string; reverseLimit: number; primaryLimit: number }> {
@@ -503,9 +504,11 @@ export class Soran {
     const reverseLimit = await this.read(id, "batch_read_limit", []);
     // Supports the current deployment during a coordinated code rollout.
     if (capability === 1 && reverseLimit === 2) return { id, reverseLimit: 2, primaryLimit: 2 };
-    if (capability !== 2 || typeof reverseLimit !== "number" || !Number.isInteger(reverseLimit) || reverseLimit < 1 || reverseLimit > MAX_BATCH_READS)
+    if ((capability !== 2 && capability !== 3) || typeof reverseLimit !== "number" || !Number.isInteger(reverseLimit) || reverseLimit < 1 || reverseLimit > MAX_BATCH_READS)
       throw new SoranError("Lookup has an unsupported batch capability or limit", "ABI");
     const primaryLimit = await this.read(id, "primary_batch_limit", []);
+    if (capability === 2 && (reverseLimit > 16 || (typeof primaryLimit === "number" && primaryLimit > 8)))
+      throw new SoranError("Lookup version 2 advertises unsupported limits", "ABI");
     if (typeof primaryLimit !== "number" || !Number.isInteger(primaryLimit) || primaryLimit < 1 || primaryLimit > MAX_PRIMARY_BATCH_READS || primaryLimit > reverseLimit)
       throw new SoranError("Lookup has an unsupported Primary batch limit", "ABI");
     return { id, reverseLimit, primaryLimit };
@@ -533,7 +536,9 @@ export class Soran {
     catch (e) { throw new SoranError(`invalid identity batch: ${String(e)}`, "ABI"); }
   }
 
-  private async identityHistory(method: "primary_names" | "reverse_names", addresses: readonly string[], namespace?: string): Promise<ObservedIdentityName[]> {
+  private async identityHistory(method: "primary_names" | "reverse_names", addresses: readonly string[], namespace: string | undefined, options: IdentityHistoryOptions): Promise<ObservedIdentityName[]> {
+    const concurrency = options?.concurrency ?? 2;
+    if (!options || typeof options !== "object" || Array.isArray(options) || !Number.isInteger(concurrency) || concurrency < 1 || concurrency > 4) throw new SoranError("concurrency must be an integer from 1 to 4", "INVALID_INPUT");
     if (!Array.isArray(addresses) || addresses.length > MAX_HISTORY_IDENTITIES) throw new SoranError(`provide at most ${MAX_HISTORY_IDENTITIES} identities`, "INVALID_INPUT");
     const requested = [...addresses];
     try { for (let i = 0; i < requested.length; i += MAX_BATCH_READS) identitiesToScVal(requested.slice(i, i + MAX_BATCH_READS)); }
@@ -544,27 +549,45 @@ export class Soran {
     const { id, reverseLimit, primaryLimit } = await this.batchContext();
     if (method === "primary_names" && hasDirect && this.explicitPrimaryId && await this.read(id, "primary", []) !== this.explicitPrimaryId)
       throw new SoranError("Lookup Primary does not match configured primaryId", "CONFIG");
-    const results: ObservedIdentityName[] = [];
+    // Deduplicate complete identities only within this request. No durable cache:
+    // G, M(id=0), M(id=1), and C always remain different identities.
+    const unique = [...new Set(requested)];
+    const results = new Map<string, ObservedIdentityName>();
     let size = method === "primary_names" ? primaryLimit : reverseLimit;
-    for (let offset = 0; offset < requested.length;) {
-      const part = requested.slice(offset, offset + size);
-      try {
-        const batch = await this.readIdentityBatch(id, method, part, identitiesToScVal(part), namespace);
-        results.push(...batch.results.map(row => ({ ...row, ledger: batch.ledger, timestamp: batch.timestamp })));
-        offset += part.length;
-      } catch (error) {
-        // Match the leading host error, never text embedded in dependency logs.
-        // This changes request size only; it preserves the exact contract path.
-        const prefix = `simulate ${method} on ${id} failed: `;
-        if (part.length > 1 && error instanceof SoranError && error.code === "SIMULATION" && error.message.startsWith(prefix)
-          && /^(?:HostError: )?Error\(Budget, ExceededLimit\)(?:\s|$)/.test(error.message.slice(prefix.length))) {
-          size = Math.max(1, Math.floor(part.length / 2));
-          continue;
+    let cursor = 0;
+    let failure: { error: unknown } | undefined;
+    const worker = async () => {
+      while (!failure && cursor < unique.length) {
+        const start = cursor;
+        const end = Math.min(unique.length, start + size);
+        cursor = end;
+        for (let offset = start; !failure && offset < end;) {
+          const part = unique.slice(offset, Math.min(end, offset + size));
+          try {
+            const batch = await this.readIdentityBatch(id, method, part, identitiesToScVal(part), namespace);
+            batch.results.forEach(row => results.set(row.address, { ...row, ledger: batch.ledger, timestamp: batch.timestamp }));
+            offset += part.length;
+          } catch (error) {
+            const prefix = `simulate ${method} on ${id} failed: `;
+            if (part.length > 1 && error instanceof SoranError && error.code === "SIMULATION" && error.message.startsWith(prefix)
+              && /^(?:HostError: )?Error\(Budget, ExceededLimit\)(?:\s|$)/.test(error.message.slice(prefix.length))) {
+              size = Math.min(size, Math.max(1, Math.floor(part.length / 2)));
+              continue;
+            }
+            failure ??= { error };
+          }
         }
-        throw error;
       }
-    }
-    return results;
+    };
+    // Drain in-flight reads after a failure; do not schedule more or return a
+    // partial result that could disguise an RPC/restore/ABI failure as absence.
+    await Promise.all(Array.from({ length: Math.min(concurrency, Math.ceil(unique.length / size)) }, () => worker()));
+    if (failure) throw failure.error;
+    return requested.map(address => {
+      const row = results.get(address);
+      if (!row) throw new SoranError("incomplete history result", "ABI");
+      return { ...row };
+    });
   }
 
   /** M identities live in Universal Lookup and never fall back to their base G account. */

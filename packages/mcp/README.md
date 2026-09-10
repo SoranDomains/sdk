@@ -20,7 +20,7 @@ Two transports, one tool set:
   read tools — what hosted agents (claude.ai connectors and friends) reach
   with no install.
 
-Version 0.9.2 targets the native-claim **Stellar testnet** successor deployment.
+Version 0.9.3 targets the native-claim **Stellar testnet** successor deployment.
 The default Registry, Lookup, Primary and Allocator pins belong to that deployment.
 
 ## Install
@@ -102,7 +102,7 @@ memo on a shared exchange account. Old installed clients need an explicit upgrad
 
 ### Complete M display-name tools
 
-MCP 0.9.2 local mode exposes:
+MCP 0.9.3 local mode exposes:
 
 ```text
 set_muxed_display_name({ name, destination: fullM, kind: "reverse" | "primary" })
@@ -159,7 +159,7 @@ import { registerReadTools, registerWriteTools } from "@sorandomains/mcp";
 Source: <https://github.com/SoranDomains/sdk> · Docs: <https://github.com/SoranDomains/docs> · License: MIT
 
 
-Version 0.9.2 uses Stellar SDK17 and the matching Lookup 0.10.1,
+Version 0.9.3 uses Stellar SDK17 and the matching Lookup 0.10.2,
 Holder 0.7.0 and Owner 0.8.0 packages. Holder receipt recovery requires sufficiently fresh clean Registrar provenance after each receipt read or transaction inclusion. Both transports pass the same universal
 configuration and export the same MCP version. The successor deployment retains Lookup V2; custom Registry or passphrase
 settings require their own Allocator pin and do not inherit testnet fee routing.
@@ -267,7 +267,7 @@ address-generation job; it does not withdraw a claim or undo a contract.
 
 ### Local transaction signing limits
 
-Available in 0.9.2.
+Available in 0.9.3.
 
 Every write, including older SDK operations and storage restoration, has a default 5 XLM total network-fee ceiling. The local operator may configure `SORAN_MAX_NETWORK_FEE_STROOPS` (canonical integer 1–4294967295), or `WriteToolOptions.maxNetworkFeeStroops`, after reviewing deployment/storage estimates. Agent tool arguments cannot increase that ceiling. The older `SORAN_MAX_NATIVE_FEE_STROOPS` setting remains supported: it also supplies the overall ceiling when the new setting is absent; if both are set, native methods use the lower value. This is a per-transaction limit, separate from username/namespace prices and any batch spending budget. Initial storage rent may exceed the default, in which case signing stops. See [native claim behavior and limitations](https://github.com/SoranDomains/sdk/blob/main/NATIVE-CLAIMS.md).
 
@@ -279,3 +279,23 @@ expired or later-expiring requests stop before the local key signs them.
 On a governed Registry, native verification reads the exact per-namespace Registrar code pin and its upgrade history. Approved upgrades do not have to match the current factory default. Missing or malformed provenance still prevents signing and receipt confirmation; RPC failure never downgrades verification to a legacy rule.
 
 Historical claim recovery is read-only and binds the original intent to the frozen source Registrar and sealed migration commitments. It never rewrites the intent to a successor Registry or treats an unavailable receipt as permission to submit again. Deployment migration and package publication are separate; check the release status for the active addresses.
+
+## Namespace activation rules
+
+`activate_namespace` accepts `policy: "reclaimable"`, `policy: "permanent"`, or an explicit object with all five fields:
+
+```json
+{
+  "default_term_secs": "0",
+  "reclaimable": true,
+  "trade_fee_bps": 0,
+  "tradeable": false,
+  "transferable": false
+}
+```
+
+Both presets use no expiry, allow transfers and disable trading with a zero trade fee. The explicit object lets an owner disable holder transfers or set a default term. Terms must be zero or 86,400–3,153,600,000 seconds. Trade fees must be whole basis points from 0 to 10,000. Unknown and incomplete policy fields are rejected. These stored trading preferences do not enable a marketplace. Username claim prices are configured separately through `configure_native_claims`.
+
+The tool checks every policy field in the unsigned invocation and constructor authorization, then verifies the deployed policy on chain. If confirmation succeeds but verification is unavailable, the response reports `activated: null` and `pendingVerification: true`; check `namespace_status` before taking further action. Do not activate again.
+
+There is no ordinary setter for these five rules after activation. See the [activation guide](https://docs.soran.domains/owner/activating-a-namespace) for API requests, exact limits and direct contract calls.
