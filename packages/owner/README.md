@@ -121,3 +121,22 @@ The older `maxNativeFeeStroops` option remains supported: when the new option is
 On a governed Registry, native verification reads the exact per-namespace Registrar code pin and its upgrade history. Approved upgrades do not have to match the current factory default. Missing or malformed provenance still prevents signing and receipt confirmation; RPC failure never downgrades verification to a legacy rule.
 
 Historical claim recovery is read-only and binds the original intent to the frozen source Registrar and sealed migration commitments. It never rewrites the intent to a successor Registry or treats an unavailable receipt as permission to submit again. Deployment migration and package publication are separate; check the release status for the active addresses.
+
+
+## Namespace sponsorship
+
+The next release adds on-chain funding and sponsored actions on Stellar testnet.
+`SoranFunding` manages an owner's deposit, spending limits, pause controls and withdrawals.
+`SoranSponsorship` builds and checks an exact sponsored action, while `FundingServiceClient`
+requests quotes and recovers transaction outcomes from a compatible service.
+
+The Soran service uses fixed quotes based on live Stellar fee estimates. A successful action
+charges the agreed amount; Soran retains any difference from the actual network fee.
+There is no separate refund transaction or later debit. Failed actions do not debit the
+namespace's funding position. A separate username price remains payable by the claimant.
+
+User authorization remains required. A wallet must support Soroban authorization-entry
+signing; a transaction-only wallet cannot silently switch to a user-paid transaction.
+Always preserve the canonical quote before submission and recover its status after a timeout.
+Funding balances and permissions are verified on chain, and terminal outcomes are checked
+against trusted Stellar RPC/history providers.
