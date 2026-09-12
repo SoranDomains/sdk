@@ -1320,3 +1320,11 @@ export class SoranOwner {
     return new OwnerError(`${fn} failed at inclusion (${resultCode})`, contractId, fn, null, null, hash);
   }
 }
+
+export * from "./funding-types.js";
+export { FundingReader, type FundingOptions } from "./funding-reader.js";
+export { SoranFunding } from "./funding-owner.js";
+export { SoranSponsorship, sponsorPlan, validateSponsorTransaction, type SponsorRequest, type SponsorPlan } from "./funding-user.js";
+export { FundingServiceClient } from "./funding-service.js";
+
+export { TestnetSponsorHistory, type SponsorHistory, type FundingReceipt } from "./funding-history.js";
