@@ -125,7 +125,7 @@ Historical claim recovery is read-only and binds the original intent to the froz
 
 ## Namespace sponsorship
 
-The next release adds on-chain funding and sponsored actions on Stellar testnet.
+This package supports on-chain funding and sponsored actions on Stellar testnet.
 `SoranFunding` manages an owner's deposit, spending limits, pause controls and withdrawals.
 `SoranSponsorship` builds and checks an exact sponsored action, while `FundingServiceClient`
 requests quotes and recovers transaction outcomes from a compatible service.
