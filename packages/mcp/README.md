@@ -20,7 +20,7 @@ Two transports, one tool set:
   read tools — what hosted agents (claude.ai connectors and friends) reach
   with no install.
 
-Version 0.9.4 targets the native-claim **Stellar testnet** successor deployment.
+Version 0.9.5 targets the native-claim **Stellar testnet** successor deployment.
 The default Registry, Lookup, Primary and Allocator pins belong to that deployment.
 
 ## Install
@@ -28,10 +28,10 @@ The default Registry, Lookup, Primary and Allocator pins belong to that deployme
 ### Claude Code / any shell agent (full surface)
 
 ```bash
-claude mcp add soran -- npx -y @sorandomains/mcp@0.9.4
+claude mcp add soran -- npx -y @sorandomains/mcp@0.9.5
 ```
 
-Any MCP client: command `npx`, args `["-y", "@sorandomains/mcp@0.9.4"]`. Set env
+Any MCP client: command `npx`, args `["-y", "@sorandomains/mcp@0.9.5"]`. Set env
 `SORAN_SECRET` (the agent's Stellar secret, `S…`) to unlock the write tools.
 
 Restart the MCP process after updating its configured version. If an older client
@@ -88,6 +88,8 @@ https://mcp.soran.domains/mcp
 | `claim_namespace` | **announce a claim** on a top-level namespace for this wallet (opens the objection window; unopposed claims become eligible for permissionless execution) |
 | `claim_status` · `withdraw_claim` | watch a claim's window · cancel it before it elapses |
 | `activate_namespace` | deploy the Registrar for a claimed namespace; `permanent` selects non-reclaimable zero-term issuance, without locking contract upgrades |
+| `deploy_namespace_resolver` | deploy, attest and select the native Resolver; accept an existing attested Resolver regardless of its cosmetic prefix |
+| `confirm_namespace_resolver` | verify a prior Resolver deployment without signing or resubmitting |
 | `confirm_namespace_activation` | verify an existing deployment and its original reviewed policy without signing or submitting another transaction |
 | `cancel_namespace_activation` | clear a namespace/role vanity-generation job without withdrawing a claim or undoing a contract |
 | `issue_name` · `issue_batch` · `reclaim_name` · `renew_name` | issue (single/bulk ≤23), reclaim, and renew names in a namespace this wallet OWNS |
@@ -108,7 +110,7 @@ memo on a shared exchange account. Old installed clients need an explicit upgrad
 
 ### Complete M display-name tools
 
-MCP 0.9.4 local mode exposes:
+MCP 0.9.5 local mode exposes:
 
 ```text
 set_muxed_display_name({ name, destination: fullM, kind: "reverse" | "primary" })
@@ -131,7 +133,8 @@ create_wallet            → store the secret, restart with SORAN_SECRET set
 claim_fee_quote          → review XLM fee/recipient/network and refund terms
 claim_namespace          → pass label, expectedFee and maxNetworkFeeStroops; wait out the window (1 day on testnet);
 claim_status             → confirm execution awarded the namespace
-activate_namespace       → deploy its Registrar before issuing names
+activate_namespace       → deploy its Registrar with the reviewed policy
+deploy_namespace_resolver → deploy/verify its native Resolver before issuing names
 issue_name / claim_display_name  → mint and claim a verified name
 set_profile              → publish who the agent is
 ```
@@ -165,7 +168,7 @@ import { registerReadTools, registerWriteTools } from "@sorandomains/mcp";
 Source: <https://github.com/SoranDomains/sdk> · Docs: <https://github.com/SoranDomains/docs> · License: MIT
 
 
-Version 0.9.4 uses Stellar SDK17 and the matching Lookup 0.10.2,
+Version 0.9.5 uses Stellar SDK17 and the matching Lookup 0.10.2,
 Holder 0.7.0 and Owner 0.8.0 packages. Holder receipt recovery requires sufficiently fresh clean Registrar provenance after each receipt read or transaction inclusion. Both transports pass the same universal
 configuration and export the same MCP version. The successor deployment retains Lookup V2; custom Registry or passphrase
 settings require their own Allocator pin and do not inherit testnet fee routing.
@@ -260,7 +263,7 @@ and ABI version do not pin the code that will execute after a governance upgrade
 
 The new testnet Registry derives Registrar and Resolver addresses from the
 namespace, contract role and caller nonce on chain. MCP validates the predicted
-Registrar independently before signing; an API-supplied version or address is
+Registrar and Resolver independently before signing; an API-supplied version or address is
 never sufficient authorization.
 
 When `activate_namespace` returns `status: "queued"` or `"mining"` with
@@ -297,9 +300,45 @@ search, call `cancel_namespace_activation` with the exact `namespace` and
 `role: "registrar"` or `"resolver"`. Cancellation only clears the service's
 address-generation job; it does not withdraw a claim or undo a contract.
 
+### Complete Resolver setup
+
+After `activate_namespace` verifies the Registrar, call:
+
+```text
+deploy_namespace_resolver({ namespace: "yourbrand", maxNetworkFeeStroops: "50000000" })
+```
+
+This is a separate owner-signed transaction. It uses the official API's Resolver
+vanity search and the Registry factory to deploy, attest and select the Resolver.
+The signer checks the exact namespace, Resolver role, nonce, predicted address,
+network, authorization and fee ceilings before signing. The service's address
+prediction is independently recomputed locally.
+
+A `queued` or `mining` result has no deployment transaction: retry the same tool
+after `retryAfterMs`. A submission with an uncertain outcome instead retains
+`predictedId` and the exact signed `txHash`. Recover it with:
+
+```text
+confirm_namespace_resolver({ namespace: "yourbrand", predictedId, txHash })
+```
+
+Confirmation reads the Registry directly and does not sign or submit. It verifies
+ownership, the selected/attested Resolver and the Registry's native contract check
+before returning `resolverReady: true`. Keep the identifiers while verification
+is pending. If the original response was lost, both identifiers are optional;
+the Registry can discover its existing Resolver. `txHash` is retained for recovery,
+not independently checked as a transaction receipt by this confirmation tool.
+
+An existing clean, attested native Resolver without `C?SORAN` is valid: the prefix
+is cosmetic. Setup returns `alreadyConfigured: true` without preparing or submitting
+anything. A cleared or mismatched pointer stops setup and identifies the attested
+Resolver to review and restore with `set_resolver`; it never deploys a replacement.
+Once resolution is ready, configure public claims with `configure_native_claims` or
+issue names as the owner. Hosted MCP remains read-only.
+
 ### Local transaction signing limits
 
-Available in 0.9.4.
+Available in 0.9.5.
 
 Every write, including older SDK operations and storage restoration, has a default 5 XLM total network-fee ceiling. The local operator may configure `SORAN_MAX_NETWORK_FEE_STROOPS` (canonical integer 1–4294967295), or `WriteToolOptions.maxNetworkFeeStroops`, after reviewing deployment/storage estimates. Agent tool arguments cannot increase that ceiling. The older `SORAN_MAX_NATIVE_FEE_STROOPS` setting remains supported: it also supplies the overall ceiling when the new setting is absent; if both are set, native methods use the lower value. This is a per-transaction limit, separate from username/namespace prices and any batch spending budget. Initial storage rent may exceed the default, in which case signing stops. See [native claim behavior and limitations](https://github.com/SoranDomains/sdk/blob/main/NATIVE-CLAIMS.md).
 

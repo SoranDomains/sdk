@@ -26,13 +26,14 @@
 import { z } from "zod";
 import { Soran, SoranError, DEPLOYMENTS, normalizeLabel, parseName, validatePaymentDestination, decodeMuxedAddress } from "@sorandomains/lookup";
 import { validateClaimFee, validateClaimTransaction, sameFee } from "./prepared.js";
-import { predictRegistrar } from "./deployment.js";
+import { predictRegistrar, predictResolver } from "./deployment.js";
+import { namespaceResolverState, ResolverReadUnavailable } from "./resolver.js";
 import { normalizeRegistrarPolicy, sameRegistrarPolicy, registrarPolicyFromNative } from "./registrar-policy.js";
 import { networkFeeLimit, assertFeeLimit, feeBoundSigner } from "./fee-policy.js";
 import { recoverHistoricalSavedClaim } from "./historical.js";
 import { ApiHttpError, boundedJson } from "./http.js";
 import { submitWithRecovery } from "./submission.js";
-export const MCP_VERSION = "0.9.4";
+export const MCP_VERSION = "0.9.5";
 
 /** The only server capability used by this package. Keep the callback limited
  * to parsed arguments: importing MCP's full callback type also imports its
@@ -719,7 +720,7 @@ export async function registerWriteTools(server: ToolRegistrar, opts: WriteToolO
 
   server.tool(
     "activate_namespace",
-    "OWNER power: activate this wallet's awarded namespace by deploying its Registrar. Choose an explicit five-field policy or a preset. Both presets enable transfers and no expiry, disable trading and set trade fee to zero; permanent additionally disables owner reclaim. Construction policy has no ordinary setter. Governed testnet contracts stay upgradeable and reject permanent code locks. Review all fields before signing. Registration fees are configured separately with configure_native_claims.",
+    "OWNER power: activate this wallet's awarded namespace by deploying its Registrar. Choose an explicit five-field policy or a preset. Both presets enable transfers and no expiry, disable trading and set trade fee to zero; permanent additionally disables owner reclaim. Construction policy has no ordinary setter. Governed testnet contracts stay upgradeable and reject permanent code locks. Review all fields before signing. After activation, call deploy_namespace_resolver to complete resolution setup. Registration fees are configured separately with configure_native_claims.",
     {
       namespace: labelSchema.describe("Exact namespace to activate; must be owned by this wallet"),
       maxNetworkFeeStroops: z.string().regex(/^[1-9][0-9]*$/),
@@ -816,7 +817,7 @@ export async function registerWriteTools(server: ToolRegistrar, opts: WriteToolO
       policy: requestedPolicy,
       ...policyVerification,
       txHash,
-      nextStep: policyVerification.policyVerified ? "You can now configure username claiming or issue names in this namespace." : "The API reported activation, but on-chain verification did not complete. Check namespace_status before issuing names. Do not activate again.",
+      nextStep: policyVerification.policyVerified ? "Call deploy_namespace_resolver with this namespace and a reviewed maxNetworkFeeStroops to set up resolution. Then configure username claiming or issue names." : "The API reported activation, but on-chain verification did not complete. Check namespace_status before issuing names. Do not activate again.",
     };
   }
 
@@ -844,6 +845,85 @@ export async function registerWriteTools(server: ToolRegistrar, opts: WriteToolO
         return errText(Object.assign(error, { ...(txHash ? { txHash } : {}), ...(predictedId ? { predictedId } : {}) }));
       }
     },
+  );
+
+  function resolverRegistry() {
+    if (PASSPHRASE !== DEPLOYMENTS.testnet.passphrase && !opts.registryId)
+      throw new Error("custom signing network requires an explicit Registry");
+    return opts.registryId ?? DEPLOYMENTS.testnet.registryId;
+  }
+  async function resolverState(namespace: string, expectedResolver?: string) {
+    return namespaceResolverState({ registry: resolverRegistry(), node: await soran.namehash(namespace),
+      wallet: me, passphrase: PASSPHRASE, rpcUrl: opts.rpcUrl ?? "https://soroban-testnet.stellar.org", expectedResolver });
+  }
+  function resolverReady(namespace: string, state: { registrar: string; resolver: string | null }) {
+    return { namespace, resolverReady: true, registrar: state.registrar, resolver: state.resolver,
+      nextStep: "Resolution is configured. Use configure_native_claims to review and enable public username claiming, or issue names as the owner." };
+  }
+  function resolverPending(namespace: string, predictedId?: string, txHash?: string, detail?: string) {
+    return { namespace, resolverReady: false, pending: true, predictedId, txHash, detail,
+      nextStep: "Call confirm_namespace_resolver with this namespace, predictedId and txHash to verify the existing deployment without submitting another transaction." };
+  }
+  async function confirmResolver(namespace: string, predictedId?: string, txHash?: string, submitted = false) {
+    try {
+      const state = await resolverState(namespace, predictedId);
+      if (!state.resolver) return text(resolverPending(namespace, predictedId, txHash, "The Registry does not yet show a deployed Resolver."));
+      return text({ ...resolverReady(namespace, state), predictedId, txHash, onchainTransactionSubmitted: submitted });
+    } catch (error) {
+      if (error instanceof ResolverReadUnavailable) return text(resolverPending(namespace, predictedId, txHash, error.message));
+      return errText(Object.assign(error instanceof Error ? error : new Error(String(error)), { predictedId, txHash }));
+    }
+  }
+
+  server.tool(
+    "deploy_namespace_resolver",
+    "OWNER power: complete namespace setup after activate_namespace by deploying, attesting and selecting its native Resolver through the Registry factory. Uses the official vanity-address preparation flow and a reviewed maximum network fee. Independently checks Registry ownership and native binding. An already selected, attested native Resolver is accepted regardless of its cosmetic address prefix; never replaces it. After an uncertain submission use confirm_namespace_resolver, not another deployment.",
+    { namespace: labelSchema, maxNetworkFeeStroops: z.string().regex(/^[1-9][0-9]*$/) },
+    async ({ namespace, maxNetworkFeeStroops }) => {
+      try {
+        const registry = resolverRegistry();
+        const state = await resolverState(namespace);
+        if (state.resolver) return text({ ...resolverReady(namespace, state), alreadyConfigured: true, onchainTransactionSubmitted: false });
+        const saltVersion = opts.registryDeploymentSaltVersion ?? (
+          registry === DEPLOYMENTS.testnet.registryId && PASSPHRASE === DEPLOYMENTS.testnet.passphrase ? 1 : undefined
+        );
+        if (saltVersion !== 0 && saltVersion !== 1) throw new Error("custom Registry deployment requires a locally pinned registryDeploymentSaltVersion (0 legacy or 1 namespace-bound)");
+        const prep = await authPost("/console/resolver/deploy/prepare", { namespace }) as {
+          namespace?: string; network?: string; xdr?: string; predictedId?: string;
+          pending?: boolean; retryAfterMs?: number; vanity?: { status?: string };
+        };
+        if (prep.pending === true) {
+          if (prep.namespace !== namespace || prep.xdr || prep.predictedId || !["queued", "mining"].includes(prep.vanity?.status ?? ""))
+            throw new Error("invalid namespace address-generation response");
+          return text({ namespace, resolverReady: false, pending: true, status: prep.vanity!.status, onchainTransactionSubmitted: false,
+            retryAfterMs: typeof prep.retryAfterMs === "number" && Number.isFinite(prep.retryAfterMs) ? Math.max(1000, Math.min(10000, prep.retryAfterMs)) : 2000,
+            nextStep: "The Resolver vanity address is being generated. Call deploy_namespace_resolver again with the same namespace and fee limit after the retry interval. No deployment transaction has been signed or submitted." });
+        }
+        if (!prep.xdr || !prep.predictedId || prep.namespace !== namespace || prep.network !== PASSPHRASE)
+          throw new Error("Resolver preparation must match the selected namespace and pinned network");
+        const node = await soran.namehash(namespace);
+        const signed = checkedSign(prep.xdr, { fn: "deploy_resolver", contractId: registry, maxFee: maxNetworkFeeStroops, args: args => {
+          if (args.length !== 2) throw new Error("invalid Resolver deployment arguments");
+          const nonce: unknown = scValToNative(args[1]);
+          if (!(nonce instanceof Uint8Array) || nonce.length !== 32) throw new Error("invalid Resolver deployment salt");
+          equalArgs(args, [stellar.xdr.ScVal.scvBytes(node), stellar.xdr.ScVal.scvBytes(nonce)]);
+          const predicted = predictResolver(registry, node, nonce, PASSPHRASE, saltVersion);
+          if (predicted !== prep.predictedId) throw new Error("Resolver predicted ID differs from selected deployment");
+          if (saltVersion === 1 && !/^C[A-D]SORAN[A-Z2-7]{49}$/.test(predicted))
+            throw new Error("Resolver deployment does not have the required Soran vanity prefix");
+        } });
+        const sub = await submitSigned("/console/resolver/deploy/submit", { namespace, signedXdr: signed, predictedId: prep.predictedId }, signed);
+        if (sub.ok !== true) return text(resolverPending(namespace, prep.predictedId, sub.txHash, sub.detail));
+        // A relay acknowledgement alone does not prove native resolution.
+        return await confirmResolver(namespace, prep.predictedId, sub.txHash, true);
+      } catch (error) { return errText(error); }
+    },
+  );
+  server.tool(
+    "confirm_namespace_resolver",
+    "Read-only recovery for a prior Resolver deployment. Checks this wallet's ownership, the selected/attested Resolver and the Registry's native contract verification. No signing or resubmission. Preserve predictedId and txHash from deploy_namespace_resolver when available; the Registry can recover an existing Resolver if the response was lost. A vanity prefix is not required for an existing attested Resolver.",
+    { namespace: labelSchema, predictedId: z.string().refine(value => stellar.StrKey.isValidContract(value), "Expected Resolver contract ID").optional(), txHash: z.string().regex(/^[a-f0-9]{64}$/).optional() },
+    async ({ namespace, predictedId, txHash }) => confirmResolver(namespace, predictedId, txHash),
   );
 
   server.tool(
