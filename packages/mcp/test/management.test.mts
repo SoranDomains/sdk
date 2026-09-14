@@ -33,29 +33,40 @@ async function setup(prep: Record<string, unknown>, ch = challenge(), deployment
   };
   let submissions = 0, challenges = 0;
   const cancellations: Array<{ path: string; body: unknown }> = [];
+  const scopedRequests: Array<{ path: string; namespace: string }> = [];
   const saved = globalThis.fetch;
   globalThis.fetch = async (url, opts) => {
     const path = new URL(String(url)).pathname;
+    if (path.startsWith("/console/registrar/") || path.startsWith("/console/deployment/")) {
+      const namespace = JSON.parse(String(opts?.body)).namespace;
+      assert.equal(typeof namespace, "string", "scoped tool requests retain their explicit namespace");
+      assert.equal(new Headers(opts?.headers).get("X-Soran-Namespace"), namespace);
+      scopedRequests.push({ path, namespace });
+      if (prep.expireFirstScopedRequest && scopedRequests.length === 1)
+        return new Response('{"error":"invalid_or_expired_session"}', { status: 401 });
+    }
     let body: unknown;
     if (path.endsWith("/challenge")) { challenges++; body = { challengeId: "one", xdr: ch, network: Networks.TESTNET }; }
     else if (path.endsWith("/verify")) body = { token: "fake-test-session" };
+    else if (path.endsWith("/session/namespace")) body = { ok: true, namespace: JSON.parse(String(opts?.body)).namespace };
     else if (path.endsWith("/prepare")) {
       const input=JSON.parse(String(opts?.body));
       if (input.policy) requestedPolicy=normalizeRegistrarPolicy(input.policy);
       body = { policy:requestedPolicy, ...prep, network: Networks.TESTNET };
     }
+    else if (path.endsWith("/confirm")) body = { ok: true, registrarId: prep.predictedId };
     else if (path.endsWith("/cancel")) { cancellations.push({ path, body: JSON.parse(String(opts?.body)) }); body = { ok: prep.cancelOk ?? true }; }
     else if (path.endsWith("/submit")) {
       submissions++;
       const submitted = JSON.parse(String(opts?.body));
       const tx = TransactionBuilder.fromXDR(submitted.xdr ?? submitted.signedXdr, Networks.TESTNET);
       assert.equal(tx.signatures.length, 1);
-      body = { ok: true, txHash: "accepted", registrarId: prep.predictedId };
+      body = { ok: true, txHash: Buffer.from(tx.hash()).toString("hex"), registrarId: prep.predictedId };
     } else throw new Error(`unexpected fetch ${path}`);
     return new Response(JSON.stringify(body), { status: 200 });
   };
   await registerWriteTools({ tool(n: string, _d: string, _s: unknown, fn: (arg: any) => Promise<any>) { handlers.set(n, fn); schemas.set(n,_s); } } as never, { secret: key.secret(), registryId: selectedRegistry, allocatorId: allocator, ...(deploymentVersion === null ? {} : { registryDeploymentSaltVersion: deploymentVersion }) });
-  return { handlers, schemas, restore: () => { globalThis.fetch = saved; Owner.prototype.policy = savedPolicy; Owner.prototype.registrarOf = savedRegistrar; }, submissions: () => submissions, challenges: () => challenges, cancellations: () => cancellations };
+  return { handlers, schemas, restore: () => { globalThis.fetch = saved; Owner.prototype.policy = savedPolicy; Owner.prototype.registrarOf = savedRegistrar; }, submissions: () => submissions, challenges: () => challenges, cancellations: () => cancellations, scopedRequests: () => scopedRequests };
 }
 test("MCP withdrawal signs only selected Allocator/label and bounded fee", async () => {
   for (const [encoded, succeeds] of [[prepared(allocator, "withdraw", [bytes("acme")]), true], [prepared(registry, "withdraw", [bytes("acme")]), false], [prepared(allocator, "withdraw", [bytes("else")]), false], [prepared(allocator, "withdraw", [bytes("acme")], [], "10001"), false], [prepared(allocator, "withdraw", [bytes("acme")], [inv(registry, "arbitrary", [])]), false]] as const) {
@@ -191,4 +202,38 @@ test("MCP explicit activation checks all five requested fields and constructor p
   const state=await setup({xdr:encoded(selected),predictedId,...outcome});
   try {const result=await state.handlers.get('activate_namespace')!({namespace:'acme',policy:selected,maxNetworkFeeStroops:'10000'});const out=JSON.parse(result.content[0].text);assert.equal(out.activated,null);assert.equal(out.pendingVerification,true);assert.equal(out.policyVerified,false);assert.match(out.nextStep,/Do not activate again/);assert.equal(state.submissions(),1);} finally {state.restore();}
  }
+});
+
+test("MCP scoped request preserves the selected namespace when authentication is renewed", async () => {
+  const state = await setup({ expireFirstScopedRequest: true });
+  try {
+    const result = await state.handlers.get("cancel_namespace_activation")!({ namespace: "acme", role: "registrar" });
+    assert.notEqual(result.isError, true);
+    assert.equal(state.challenges(), 2);
+    assert.deepEqual(state.scopedRequests(), [
+      { path: "/console/deployment/vanity/registrar/cancel", namespace: "acme" },
+      { path: "/console/deployment/vanity/registrar/cancel", namespace: "acme" },
+    ]);
+    assert.equal(state.submissions(), 0);
+  } finally { state.restore(); }
+});
+
+
+test("MCP activation recovery verifies the original full policy without sending another transaction", async () => {
+  const predictedId = StrKey.encodeContract(new Uint8Array(32).fill(9));
+  const selected = normalizeRegistrarPolicy({ default_term_secs: "86400", reclaimable: true, transferable: false, tradeable: true, trade_fee_bps: 250 });
+  for (const outcome of [{}, { policyReadFailure: true }, { observedPolicy: { ...selected, transferable: true } }, { observedRegistrar: registry }]) {
+    const state = await setup({ predictedId, observedPolicy: selected, ...outcome });
+    try {
+      const schema = z.object(state.schemas.get("confirm_namespace_activation"));
+      assert.equal(schema.safeParse({ namespace: "acme", predictedId }).success, false, "recovery requires the originally reviewed policy");
+      const result = await state.handlers.get("confirm_namespace_activation")!({ namespace: "acme", predictedId, expectedPolicy: selected });
+      const body = JSON.parse(result.content[0].text);
+      assert.equal(body.activated, Object.keys(outcome).length ? null : true);
+      assert.equal(body.policyVerified, Object.keys(outcome).length === 0);
+      assert.deepEqual(body.policy, selected);
+      assert.equal(body.onchainTransactionSubmitted, false);
+      assert.equal(state.submissions(), 0);
+    } finally { state.restore(); }
+  }
 });

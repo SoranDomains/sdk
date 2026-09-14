@@ -20,7 +20,7 @@ Two transports, one tool set:
   read tools — what hosted agents (claude.ai connectors and friends) reach
   with no install.
 
-Version 0.9.3 targets the native-claim **Stellar testnet** successor deployment.
+Version 0.9.4 targets the native-claim **Stellar testnet** successor deployment.
 The default Registry, Lookup, Primary and Allocator pins belong to that deployment.
 
 ## Install
@@ -28,11 +28,16 @@ The default Registry, Lookup, Primary and Allocator pins belong to that deployme
 ### Claude Code / any shell agent (full surface)
 
 ```bash
-claude mcp add soran -- npx -y @sorandomains/mcp
+claude mcp add soran -- npx -y @sorandomains/mcp@0.9.4
 ```
 
-Any MCP client: command `npx`, args `["-y", "@sorandomains/mcp"]`. Set env
+Any MCP client: command `npx`, args `["-y", "@sorandomains/mcp@0.9.4"]`. Set env
 `SORAN_SECRET` (the agent's Stellar secret, `S…`) to unlock the write tools.
+
+Restart the MCP process after updating its configured version. If an older client
+returns `namespace_required` during activation, retry the same namespace, explicit
+policy and fee ceiling with this release. It selects the namespace and supplies
+the required `X-Soran-Namespace` header; no browser tab is needed.
 Other env: `SORAN_HINT_URL` (API base, default `https://api.soran.domains`),
 `SORAN_RPC_URL` (Soroban RPC override), `SORAN_PASSPHRASE`,
 `SORAN_REGISTRY_ID`, `SORAN_LOOKUP_ID`, `SORAN_PRIMARY_ID` (`none` disables),
@@ -83,6 +88,7 @@ https://mcp.soran.domains/mcp
 | `claim_namespace` | **announce a claim** on a top-level namespace for this wallet (opens the objection window; unopposed claims become eligible for permissionless execution) |
 | `claim_status` · `withdraw_claim` | watch a claim's window · cancel it before it elapses |
 | `activate_namespace` | deploy the Registrar for a claimed namespace; `permanent` selects non-reclaimable zero-term issuance, without locking contract upgrades |
+| `confirm_namespace_activation` | verify an existing deployment and its original reviewed policy without signing or submitting another transaction |
 | `cancel_namespace_activation` | clear a namespace/role vanity-generation job without withdrawing a claim or undoing a contract |
 | `issue_name` · `issue_batch` · `reclaim_name` · `renew_name` | issue (single/bulk ≤23), reclaim, and renew names in a namespace this wallet OWNS |
 | `set_treasury` · `set_resolver` · `make_permanent` | route reclaim custody · point at a resolver · historical permanence API (unavailable on governed testnet) |
@@ -102,7 +108,7 @@ memo on a shared exchange account. Old installed clients need an explicit upgrad
 
 ### Complete M display-name tools
 
-MCP 0.9.3 local mode exposes:
+MCP 0.9.4 local mode exposes:
 
 ```text
 set_muxed_display_name({ name, destination: fullM, kind: "reverse" | "primary" })
@@ -159,7 +165,7 @@ import { registerReadTools, registerWriteTools } from "@sorandomains/mcp";
 Source: <https://github.com/SoranDomains/sdk> · Docs: <https://github.com/SoranDomains/docs> · License: MIT
 
 
-Version 0.9.3 uses Stellar SDK17 and the matching Lookup 0.10.2,
+Version 0.9.4 uses Stellar SDK17 and the matching Lookup 0.10.2,
 Holder 0.7.0 and Owner 0.8.0 packages. Holder receipt recovery requires sufficiently fresh clean Registrar provenance after each receipt read or transaction inclusion. Both transports pass the same universal
 configuration and export the same MCP version. The successor deployment retains Lookup V2; custom Registry or passphrase
 settings require their own Allocator pin and do not inherit testnet fee routing.
@@ -212,6 +218,16 @@ not executable-code pins. Namespace assurance does not cover that governance.
 `withdraw_claim` requires a network-fee ceiling. `activate_namespace` requires the
 exact namespace and network-fee ceiling; selected policy, treasury, Registry and
 predicted Registrar address are checked before signing.
+Namespace-scoped tools select the requested namespace in their private API
+session for each request, including after authentication renews. Concurrent
+tools serialize selection with the associated request.
+
+Claims, withdrawals and activation compute the exact signed transaction hash
+locally before submission. If the API response is interrupted or cannot confirm
+that transaction, the result retains `txHash` and reports `pending: true` with
+`announced`, `withdrawn` or `activated` set to `false`. Check that transaction
+before creating a replacement. Explicit API refusals remain errors; a failure
+before signing or dispatch does not claim a pending submission.
 
 The current testnet public-window claim fee is **5,000 XLM** (50,000,000,000 stroops),
 separate from network fees and objection bonds. Always fetch and review the live
@@ -226,7 +242,7 @@ Read the [native claim APIs, security boundaries and complete signup flow](https
 
 ## Verified testnet deployment
 
-See the [deployment manifest](../../deploy/testnet/deployment.json) for confirmed code hashes, transaction receipts and verification scope. Network passphrase: `Test SDF Network ; September 2015`.
+See the [public deployment manifest](https://raw.githubusercontent.com/SoranDomains/docs/main/reference/deployments/testnet.json) for confirmed code hashes, transaction receipts and verification scope. Network passphrase: `Test SDF Network ; September 2015`.
 
 | Contract | Address |
 |---|---|
@@ -247,9 +263,25 @@ namespace, contract role and caller nonce on chain. MCP validates the predicted
 Registrar independently before signing; an API-supplied version or address is
 never sufficient authorization.
 
-`activate_namespace` can return `{ pending: true, activated: false }` while the
-service generates a branded address. Retry the same namespace, policy and fee
-limit after `retryAfterMs`. A pending response signs and submits no deployment.
+When `activate_namespace` returns `status: "queued"` or `"mining"` with
+`retryAfterMs`, the service is generating a branded address. Retry the same
+namespace, policy and fee limit after that interval. This stage signs and
+submits no deployment.
+
+After signing, an unresolved activation instead returns `pending: true`,
+`activated: false`, `txHash` and `predictedId`. Call
+`confirm_namespace_activation({ namespace, predictedId, txHash, expectedPolicy })`
+with the original reviewed policy to check that deployment without redeploying.
+Keep the identifiers when confirmation remains pending. If the original response
+was lost, `predictedId` and `txHash` are optional: the API can discover the Registrar
+from the Registry. The namespace and original `expectedPolicy` remain required.
+Confirmation checks the namespace, wallet, Registrar and policy; it does not sign
+or submit a transaction.
+
+Custom API clients must select their namespace using
+`POST /console/session/namespace { namespace }`, then send the same session token
+and `X-Soran-Namespace` on namespace-scoped prepare, submit and confirm requests.
+See the [complete API flow](https://docs.soran.domains/owner/activating-a-namespace#prepare-through-the-api).
 
 The packaged testnet deployment defaults to salt version `1`. For a custom
 Registry, locally configure `registryDeploymentSaltVersion: 1` (namespace-bound)
@@ -267,7 +299,7 @@ address-generation job; it does not withdraw a claim or undo a contract.
 
 ### Local transaction signing limits
 
-Available in 0.9.3.
+Available in 0.9.4.
 
 Every write, including older SDK operations and storage restoration, has a default 5 XLM total network-fee ceiling. The local operator may configure `SORAN_MAX_NETWORK_FEE_STROOPS` (canonical integer 1–4294967295), or `WriteToolOptions.maxNetworkFeeStroops`, after reviewing deployment/storage estimates. Agent tool arguments cannot increase that ceiling. The older `SORAN_MAX_NATIVE_FEE_STROOPS` setting remains supported: it also supplies the overall ceiling when the new setting is absent; if both are set, native methods use the lower value. This is a per-transaction limit, separate from username/namespace prices and any batch spending budget. Initial storage rent may exceed the default, in which case signing stops. See [native claim behavior and limitations](https://github.com/SoranDomains/sdk/blob/main/NATIVE-CLAIMS.md).
 
@@ -296,6 +328,6 @@ Historical claim recovery is read-only and binds the original intent to the froz
 
 Both presets use no expiry, allow transfers and disable trading with a zero trade fee. The explicit object lets an owner disable holder transfers or set a default term. Terms must be zero or 86,400–3,153,600,000 seconds. Trade fees must be whole basis points from 0 to 10,000. Unknown and incomplete policy fields are rejected. These stored trading preferences do not enable a marketplace. Username claim prices are configured separately through `configure_native_claims`.
 
-The tool checks every policy field in the unsigned invocation and constructor authorization, then verifies the deployed policy on chain. If confirmation succeeds but verification is unavailable, the response reports `activated: null` and `pendingVerification: true`; check `namespace_status` before taking further action. Do not activate again.
+The tool checks every policy field in the unsigned invocation and constructor authorization, then verifies the deployed policy on chain. If confirmation succeeds but verification is unavailable, the response reports `activated: null` and `pendingVerification: true`; use `confirm_namespace_activation` with the original `expectedPolicy` before taking further action. Do not activate again.
 
 There is no ordinary setter for these five rules after activation. See the [activation guide](https://docs.soran.domains/owner/activating-a-namespace) for API requests, exact limits and direct contract calls.
