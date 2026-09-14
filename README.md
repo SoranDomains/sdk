@@ -12,9 +12,9 @@ can call Universal Lookup directly for their own on-chain reads.
 | [`@sorandomains/lookup`](packages/lookup/) | 0.10.2 | Wallets and apps: Universal Lookup, complete payment instructions, identity metadata and verified holdings pages |
 | [`@sorandomains/owner`](packages/owner/) | 0.8.0 | Namespace operators: issuance, lifecycle, policy and owner-authorized operations |
 | [`@sorandomains/holder`](packages/holder/) | 0.7.0 | Name holders: records, payment memos, reverse/Primary and transfers |
-| [`@sorandomains/mcp`](packages/mcp/) | 0.9.4 | AI agents: hosted read tools and locally signed management tools |
+| [`@sorandomains/mcp`](packages/mcp/) | 0.9.5 | AI agents: hosted read tools and locally signed management tools |
 
-MCP 0.9.4 selects the requested namespace before scoped API operations and preserves the signed transaction hash after an uncertain submission. Upgrade and restart older local MCP clients that return `namespace_required` during activation. See [activation and recovery](packages/mcp/README.md#namespace-activation-and-vanity-addresses).
+MCP 0.9.5 adds `deploy_namespace_resolver` and `confirm_namespace_resolver` to complete namespace setup through the official flow. It accepts existing attested Resolvers regardless of their cosmetic address prefix. Scoped operations select the requested namespace and preserve the signed transaction hash after an uncertain submission. Upgrade and restart older local MCP clients that return `namespace_required` during activation. See [activation and recovery](packages/mcp/README.md#namespace-activation-and-vanity-addresses).
 
 All four packages target `@stellar/stellar-sdk >=17 <18`, tested with 17.0.1.
 The governed testnet migration was sealed at ledger **4604192** on **10 September 2026**. Universal Lookup and Allocator retain their addresses; Registry, Primary and Nova's Registrar/Resolver use the successor addresses in the [current deployment manifest](deployments/testnet.json). All six active contracts support authorized code upgrades. The migration preserved 37 existing names, 34 original claim receipts and the original namespace claim windows and escrow. The [release status](https://docs.soran.domains/reference/release-status) records matching packages and hosted services. Mainnet has no preset.
