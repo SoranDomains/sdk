@@ -12,20 +12,22 @@ const settings:ClaimSettings={mode:'public',enabled:true,admission:{type:'open'}
 function quote(overrides:Partial<ClaimQuote>={}):ClaimQuote{return{network:hex(hash(new TextEncoder().encode(Networks.TESTNET))),registry,registrar,namespace:node,resolver,label:'alice',node:nameNode,claimant:G,config:{settings,ownerEpoch:1n,policyVersion:2n,grantEpoch:3n},ownerEpoch:1n,policyVersion:2n,available:true,reserved:false,generation:null,expiresAt:null,termSecs:0n,now:1000n,usage:{publicClaims:0n,reservedIssues:0n},approvalUsage:{total:0n,windowUsed:0n,windowEnds:0n},...overrides};}
 const bytes=(s:string)=>Uint8Array.from(s.match(/../g)!,v=>parseInt(v,16));
 function quoteWire(q:ClaimQuote):unknown{return{network:bytes(q.network),registry:q.registry,registrar:q.registrar,namespace:bytes(q.namespace),resolver:q.resolver,label:new TextEncoder().encode(q.label),node:bytes(q.node),claimant:q.claimant,config:q.config?['Configured',{settings:scValToNative(claimSettingsToScVal(q.config.settings)),owner_epoch:q.config.ownerEpoch,policy_version:q.config.policyVersion,grant_epoch:q.config.grantEpoch}]:['Unconfigured'],owner_epoch:q.ownerEpoch,policy_version:q.policyVersion,available:q.available,reserved:q.reserved,generation:q.generation,expires_at:q.expiresAt,term_secs:q.termSecs,now:q.now,usage:{public_claims:q.usage.publicClaims,reserved_issues:q.usage.reservedIssues},approval_usage:{total:q.approvalUsage.total,window_used:q.approvalUsage.windowUsed,window_ends:q.approvalUsage.windowEnds}};}
-function resultWire(intent:ClaimIntent,status='Fresh',ledger=100){return xdr.ScVal.scvVec([sc.symbol(status),struct({operation:xdr.ScVal.scvVec([sc.symbol('Claim')]),intent_hash:sc.bytes(bytes(nativeIntentHash('claim',claimIntentToScVal(intent)))),node:sc.bytes(bytes(nameNode)),holder:sc.address(G),generation:sc.u64(intent.expectedGeneration===null?0n:intent.expectedGeneration+1n),expires_at:sc.u64(intent.termSecs===0n?0n:1000n+intent.termSecs),fee_amount:sc.i128(intent.feeAmount),fee_token:sc.address(token),fee_recipient:intent.feeAmount>0n?sc.address(treasury):xdr.ScVal.scvVoid(),ledger:sc.u32(ledger),timestamp:sc.u64(1000n)})]);}
+function resultWire(intent:ClaimIntent,status='Fresh',ledger=100){return xdr.ScVal.scvVec([sc.symbol(status),struct({operation:xdr.ScVal.scvVec([sc.symbol('Claim')]),intent_hash:sc.bytes(bytes(nativeIntentHash('claim',claimIntentToScVal(intent)))),node:sc.bytes(bytes(nameNode)),holder:sc.address(intent.claimant),generation:sc.u64(intent.expectedGeneration===null?0n:intent.expectedGeneration+1n),expires_at:sc.u64(intent.termSecs===0n?0n:1000n+intent.termSecs),fee_amount:sc.i128(intent.feeAmount),fee_token:sc.address(token),fee_recipient:intent.feeAmount>0n?sc.address(treasury):xdr.ScVal.scvVoid(),ledger:sc.u32(ledger),timestamp:sc.u64(1000n)})]);}
 const destination={address:G,memo:{type:'id',value:'420'}} as const;
 const makeIntent=(q=quote(),payment:any=destination)=>createClaimIntent(q,payment,{requestId:'ab'.repeat(32),deadline:1100n});
-function fixture(q=quote(),opts:{authMutation?:(auth:xdr.SorobanAuthorizationEntry[])=>void;signerMutation?:boolean;submitError?:boolean;malformedSuccess?:boolean;receiptStatus?:string;receiptLedger?:number;payment?:any}={}){
- let signatures=0,sends=0,record:unknown=null,sentTx:any;const expected=makeIntent(q,opts.payment);
- const holder=new SoranHolder({registryId:registry,passphrase:Networks.TESTNET,signer:{publicKey:()=>G,signTransaction:async(encoded,{networkPassphrase})=>{signatures++;const tx=TransactionBuilder.fromXDR(encoded,networkPassphrase);if(opts.signerMutation){const changed=TransactionBuilder.cloneFrom(tx as any,{networkPassphrase,fee:'999'}).build();changed.sign(kp);return changed.toXDR();}tx.sign(kp);return tx.toXDR();}}});
- const read=async(_id:string,fn:string)=>{if(fn==='registrar_tainted')return false;if(fn==='template_hashes')return[new Uint8Array(32),new Uint8Array(32)];if(fn==='registrar_of')return registrar;if(fn==='native_contracts')return[registrar,resolver];if(fn==='owner_of')return owner;if(fn==='owner_epoch')return 1n;if(fn==='claim_version'||fn==='initialization_version')return 1;if(fn==='anchors')return[registry,bytes(node)];if(fn==='claim_quote')return quoteWire(q);if(fn==='claim_receipt')return record;if(fn==='native_fee_token')return token;throw new Error('unexpected read '+fn);};
- const server={getAccount:async()=>new Account(G,'0'),getLatestLedger:async()=>({sequence:90}),getLedgerEntries:async(key:xdr.LedgerKey)=>instanceProof(Address.fromScAddress(key.value.contract).toString()),getContractInstance:async()=>({executable:{type:'contractExecutableWasm',wasmHash:{value:new Uint8Array(32)}}}),simulateTransaction:async(tx:any)=>{
-  const call=tx.operations[0].func.invokeContract,intent=call.args[0],raw=scValToNative(intent);const children:NativeInvocation[]=[];if(raw.fee_amount>0n)children.push({contract:token,method:'transfer',args:[sc.address(G),sc.address(treasury),sc.i128(raw.fee_amount)]});children.push({contract:resolver,method:'initialize_destination',args:[sc.bytes(raw.label),sc.address(G),sc.u64(expected.expectedGeneration===null?0n:expected.expectedGeneration+1n),paymentDestinationToScVal(expected.destination)]});
-  const auth=[new xdr.SorobanAuthorizationEntry({credentials:xdr.SorobanCredentials.sorobanCredentialsSourceAccount(),rootInvocation:authorizedInvocation({contract:registrar,method:'claim',args:[intent],children})})];
+function fixture(q=quote(),opts:{contractWallet?:boolean;enforceFailure?:boolean;enforcedFee?:string;authMutation?:(auth:xdr.SorobanAuthorizationEntry[])=>void;signerMutation?:boolean;submitError?:boolean;malformedSuccess?:boolean;receiptStatus?:string;receiptLedger?:number;payment?:any}={}){
+ let authorizations=0,enforces=0,signatures=0,sends=0,record:unknown=null,sentTx:any;const expected=makeIntent(q,opts.payment);
+ const holder=new SoranHolder({contractWallet:opts.contractWallet?{address:q.claimant,signAuthorization:async request=>{authorizations++;return sc.bytes(kp.sign(request.signaturePayload));}}:undefined,registryId:registry,passphrase:Networks.TESTNET,signer:{publicKey:()=>G,signTransaction:async(encoded,{networkPassphrase})=>{signatures++;const tx=TransactionBuilder.fromXDR(encoded,networkPassphrase);if(opts.signerMutation){const changed=TransactionBuilder.cloneFrom(tx as any,{networkPassphrase,fee:'999'}).build();changed.sign(kp);return changed.toXDR();}tx.sign(kp);return tx.toXDR();}}});
+ const read=async(_id:string,fn:string)=>{if(fn==='registrar_tainted')return false;if(fn==='template_hashes')return[new Uint8Array(32),new Uint8Array(32)];if(fn==='registrar_of')return registrar;if(fn==='native_contracts')return[registrar,resolver];if(fn==='owner_of')return owner;if(fn==='owner_epoch')return 1n;if(fn==='claim_version'||fn==='contract_claim_version'||fn==='initialization_version')return 1;if(fn==='anchors')return[registry,bytes(node)];if(fn==='claim_quote')return quoteWire(q);if(fn==='claim_receipt')return record;if(fn==='native_fee_token')return token;throw new Error('unexpected read '+fn);};
+ const server={getAccount:async()=>new Account(G,'0'),getLatestLedger:async()=>({sequence:90}),getLedgerEntries:async(key:xdr.LedgerKey)=>instanceProof(Address.fromScAddress(key.value.contract).toString()),getContractInstance:async()=>({executable:{type:'contractExecutableWasm',wasmHash:{value:new Uint8Array(32)}}}),simulateTransaction:async(tx:any,_resources:any,mode:any)=>{
+  if(mode==="enforce"){enforces++;if(opts.enforceFailure)return{error:"custom authorization rejected",latestLedger:90};}
+
+  const call=tx.operations[0].func.invokeContract,intent=call.args[0],raw=scValToNative(intent);const children:NativeInvocation[]=[];if(raw.fee_amount>0n)children.push({contract:token,method:'transfer',args:[sc.address(q.claimant),sc.address(treasury),sc.i128(raw.fee_amount)]});children.push({contract:resolver,method:'initialize_destination',args:[sc.bytes(raw.label),sc.address(q.claimant),sc.u64(expected.expectedGeneration===null?0n:expected.expectedGeneration+1n),paymentDestinationToScVal(expected.destination)]});
+  const auth=[new xdr.SorobanAuthorizationEntry({credentials:opts.contractWallet?xdr.SorobanCredentials.sorobanCredentialsAddress(new xdr.SorobanAddressCredentials({address:new Address(q.claimant).toScAddress(),nonce:18n,signatureExpirationLedger:0,signature:xdr.ScVal.scvVoid()})):xdr.SorobanCredentials.sorobanCredentialsSourceAccount(),rootInvocation:authorizedInvocation({contract:registrar,method:'claim',args:[intent],children})})];
   if(q.config?.settings.admission.type==='approval')auth.push(new xdr.SorobanAuthorizationEntry({credentials:xdr.SorobanCredentials.sorobanCredentialsAddress(new xdr.SorobanAddressCredentials({address:new Address(approver.publicKey()).toScAddress(),nonce:5n,signatureExpirationLedger:0,signature:xdr.ScVal.scvVoid()})),rootInvocation:authorizedInvocation({contract:registrar,method:'claim',args:[intent]})}));opts.authMutation?.(auth);
-  return{_parsed:true,transactionData:new SorobanDataBuilder(),minResourceFee:'0',result:{auth,retval:resultWire(expected)},events:[],latestLedger:90};
+  return{_parsed:true,transactionData:new SorobanDataBuilder().setResourceFee(mode==='enforce'?(opts.enforcedFee??'0'):'0'),minResourceFee:mode==='enforce'?(opts.enforcedFee??'0'):'0',result:{auth,retval:resultWire(expected)},events:[],latestLedger:90};
  },sendTransaction:async(tx:any)=>{sentTx=tx;sends++;if(opts.submitError)throw new Error('offline after sending');record=scValToNative(resultWire(expected))[1];return{status:'PENDING',hash:hex(tx.hash())};},getTransaction:async()=>({status:'SUCCESS',txHash:hex(sentTx.hash()),envelopeXdr:sentTx.toEnvelope(),ledger:100,returnValue:opts.malformedSuccess?sc.u64(9n):resultWire(expected,opts.receiptStatus??'Fresh',opts.receiptLedger??100)})};
- Object.assign(holder,{read,server,readWithLedger:async(id:string,fn:string,args:xdr.ScVal[])=>({value:await (holder as any).read(id,fn,args),ledger:100})});return{holder,intent:expected,counts:()=>({signatures,sends}),setRecord:(r:unknown)=>record=r};
+ Object.assign(holder,{read,server,readWithLedger:async(id:string,fn:string,args:xdr.ScVal[])=>({value:await (holder as any).read(id,fn,args),ledger:100})});return{holder,intent:expected,counts:()=>({signatures,sends}),walletCounts:()=>({authorizations,enforces}),setRecord:(r:unknown)=>record=r};
 }
 test('native quote decodes exact config enum and context',async()=>{assert.deepEqual(await fixture().holder.claimQuote('ALICE.NOVA'),quote());});
 test('native claim signs fee and initializer, then recovers without duplicate effect',async()=>{const f=fixture();let saved='';const result=await f.holder.claim(f.intent,{onPrepared:p=>{saved=p.hash;assert.equal(p.feeStroops,100n);}});assert.equal(result.status,'fresh');assert.equal(result.transaction?.hash,saved);assert.equal(result.receipt.intentHash,nativeIntentHash('claim',claimIntentToScVal(f.intent)));const replay=await f.holder.claim(f.intent);assert.equal(replay.status,'replayed');assert.equal(replay.transaction,null);assert.deepEqual(f.counts(),{signatures:1,sends:1});});
@@ -71,4 +73,49 @@ for (const status of ['Fresh','Replayed']) test(`confirmed ${status} with an old
  if(status==='Fresh') await assert.rejects(f.holder.claim(f.intent),(error:any)=>error.kind==='pending'&&error.txHash?.length===64);
  else {const result=await f.holder.claim(f.intent);assert.equal(result.status,'replayed');assert.equal(result.receipt.ledger,99);assert.equal(result.transaction?.ledger,100);}
  assert.deepEqual(f.counts(),{signatures:1,sends:1});
+});
+
+
+test('C wallet claims and recovers with distinct G payer and enforced custom authorization',async()=>{
+ const f=fixture(quote({claimant:C(8)}),{contractWallet:true});
+ assert.equal((await f.holder.claimQuote('alice.nova')).claimant,C(8));
+ const result=await f.holder.claim(f.intent);
+ assert.equal(result.receipt.holder,C(8));
+ assert.deepEqual(f.walletCounts(),{authorizations:1,enforces:1});
+ assert.deepEqual(f.counts(),{signatures:1,sends:1});
+ assert.equal((await f.holder.claim(f.intent)).status,'replayed');
+ assert.deepEqual(f.walletCounts(),{authorizations:1,enforces:1});
+});
+test('C approval remains separate and unsigned build exposes only app approval entry',async()=>{
+ const f=fixture({...approvalQuote(),claimant:C(8)},{contractWallet:true});
+ const built=await f.holder.buildClaim(f.intent);
+ const entry=xdr.SorobanAuthorizationEntry.fromXDR(built.eligibilityEntryXdr!,'base64');
+ assert.equal(entry.credentials.type,'sorobanCredentialsAddress');
+ if(entry.credentials.type==='sorobanCredentialsAddress')assert.equal(Address.fromScAddress(entry.credentials.address.address).toString(),approver.publicKey());
+ assert.deepEqual(f.walletCounts(),{authorizations:0,enforces:0});
+ const q=approvalQuote();
+ const approval=await signClaimEligibility(f.intent,built.eligibilityEntryXdr!,{config:q.config!,owner,ownerEpoch:1n,network:q.network,registry,registrar,namespace:node,resolver,networkPassphrase:Networks.TESTNET,latestLedger:90,maxExpirationLedger:150,expirationLedger:120},approver);
+ assert.equal((await f.holder.claim(f.intent,{eligibilityAuthorization:approval})).receipt.holder,C(8));
+ assert.deepEqual(f.walletCounts(),{authorizations:1,enforces:1});
+});
+for(const failure of ['signature','fee','old-registrar','wrong-tree'] as const)test(`C claim refuses ${failure} before payer signing`,async()=>{
+ const f=fixture(quote({claimant:C(8)}),{contractWallet:true,enforceFailure:failure==='signature',enforcedFee:failure==='fee'?'50000001':undefined,authMutation:auth=>{if(failure==='wrong-tree')auth[0].rootInvocation.subInvocations=[];}});
+ if(failure==='old-registrar'){const read=(f.holder as any).read;(f.holder as any).read=async(id:string,fn:string,args:any)=>fn==='contract_claim_version'?0:read(id,fn,args);}
+ await assert.rejects(f.holder.claim(f.intent));
+ assert.deepEqual(f.counts(),{signatures:0,sends:0});
+});
+test('allowlists bind a C identity separately from its controlling G account',()=>{
+ const context={network:quote().network,registry,namespace:node,registrar};
+ const bundle=buildClaimAllowlist(context,[C(8),G]);
+ for(const entry of bundle.entries)assert(verifyClaimAllowlistProof(context,entry.account,entry.proof,bundle.root));
+ assert.notEqual(claimAllowlistLeaf(context,C(8)),claimAllowlistLeaf(context,G));
+ assert.throws(()=>buildClaimAllowlist(context,[encodeMuxedAddress(G,'1')]),/address|account/);
+});
+
+test('building a C claim never asks either wallet to sign',async()=>{
+ const f=fixture(quote({claimant:C(8)}),{contractWallet:true});
+ const built=await f.holder.buildClaim(f.intent);
+ assert(built.contractEntryXdr);assert.equal(built.eligibilityEntryXdr,null);
+ assert.deepEqual(f.walletCounts(),{authorizations:0,enforces:0});
+ assert.deepEqual(f.counts(),{signatures:0,sends:0});
 });

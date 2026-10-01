@@ -1,10 +1,5 @@
 # Hint server on Cloudflare Workers
 
-This historical example exposes the earlier, unpaginated discovery format. It does
-not implement the cursor and coverage contract required for complete holdings in
-lookup 0.6.0. Use a compatible current indexer for `namesOfPage` and do not treat
-this example's holdings response as a complete inventory.
-
 The [self-hostable hint server](../hint-server/), adapted to Cloudflare — with
 **zero dependencies**: Soroban RPC's `xdrFormat: "json"` mode returns events
 as plain JSON, so no Stellar SDK and no XDR decoding is needed at the edge.
@@ -80,7 +75,10 @@ verification drops anything that no longer holds.
 - **Self-healing poller:** a cursor that falls out of the RPC's event
   retention (after long downtime) re-anchors at the current ledger and
   counts the gap — check `gaps` and `lastError` on `/healthz`, and reseed
-  if the gap matters. `/healthz` reports `ok: false` while polling fails.
+  if the gap matters. Only that retention error re-anchors: any other
+  failure (network blip, HTTP 5xx, rate limit) keeps the cursor and the next
+  cron retries from the same place. `/healthz` reports `ok: false` while
+  polling fails.
 - **Bounded state:** the index refuses growth past 50k names (`full: true`
   on `/healthz`) and clamps every RPC-supplied field, so neither time nor a
   hostile RPC can push the KV value toward its 25 MiB cap.

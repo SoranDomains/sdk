@@ -1,16 +1,29 @@
 import { expectedRegistrarCode } from "./native-code-policy.js";
-import { Account, BASE_FEE, Contract, Operation, Transaction, TransactionBuilder, rpc, scValToNative, xdr } from "@stellar/stellar-sdk";
+import { Account, Address, BASE_FEE, Contract, Operation, Transaction, TransactionBuilder, rpc, scValToNative, xdr } from "@stellar/stellar-sdk";
 import { NativeClaimError, address, bytes32, hex, namespaceNode, sc, unhex } from "./native-codec.js";
 import { assertSignedBodyUnchanged, validateEligibilityAuthorization, validateNativeTransaction, type NativeAuthorizationPlan } from "./native-auth.js";
+import { signContractAuthorization, type ContractWallet } from "./contract-wallet.js";
 
 export type NativeSigner = { publicKey(): string | Promise<string>; signTransaction(encoded: string, opts: { networkPassphrase: string }): Promise<string | { signedTxXdr: string }> };
 export type NativeRead = { value: unknown; ledger: number };
 export type NativeContext = {
   registryId: string; passphrase: string; server: rpc.Server; signer: NativeSigner; fee: string; timeoutSecs: number; maxFeeStroops: bigint;
+  contractWallet?: ContractWallet;
   read(contract: string, method: string, args: xdr.ScVal[]): Promise<unknown>;
   readWithLedger(contract: string, method: string, args: xdr.ScVal[]): Promise<NativeRead>;
   serialize<T>(work: () => Promise<T>): Promise<T>;
 };
+export async function nativeIdentity(context: NativeContext): Promise<string> {
+  return context.contractWallet
+    ? address(context.contractWallet.address, "contract", "contract wallet")
+    : address(await context.signer.publicKey(), "account", "wallet");
+}
+export async function nativeWalletPlan(context: NativeContext): Promise<Pick<NativeAuthorizationPlan, "source" | "actor">> {
+  const source = address(await context.signer.publicKey(), "account", "transaction payer");
+  if (!context.contractWallet) return { source };
+  const latestLedger = requireReadLedger((await context.server.getLatestLedger()).sequence);
+  return { source, actor: { account: await nativeIdentity(context), latestLedger, maxExpirationLedger: Math.min(0xffff_ffff, latestLedger + 60) } };
+}
 export type NativeCapability = { supported: false; registrar: string; reason: "legacy-template" | "unsupported-version" } | { supported: true; version: 1; registrar: string; resolver: string; registry: string; namespace: string; owner: string; ownerEpoch: bigint };
 /** This published legacy code has owner-only issuance. Missing RPC data is never legacy detection. */
 const LEGACY_REGISTRAR_HASH = "ed06b3374ff4342b4a2316fc546505132cd8fd35be6666571cf088710af9bbc6";
@@ -87,7 +100,7 @@ export async function requireNative(context: NativeContext, namespace: string): 
   if (!capability.supported) throw new NativeClaimError(`namespace has no supported native claim interface (${capability.reason})`, "unsupported");
   return capability;
 }
-export type NativePrepared = { transactionXdr: string; hash: string; networkPassphrase: string; feeStroops: bigint; eligibilityEntryXdr: string | null };
+export type NativePrepared = { transactionXdr: string; hash: string; networkPassphrase: string; feeStroops: bigint; eligibilityEntryXdr: string | null; contractEntryXdr?: string | null };
 export type NativeWriteOptions = {
   /** Exact native admission authorization from the app. This is not an owner transaction signature. */
   eligibilityAuthorization?: string;
@@ -95,20 +108,24 @@ export type NativeWriteOptions = {
   onPrepared?: (prepared: NativePrepared) => void | Promise<void>;
 };
 
-export async function prepareNative(context: NativeContext, plan: NativeAuthorizationPlan, options: NativeWriteOptions = {}): Promise<{ transaction: Transaction; prepared: NativePrepared }> {
+export async function prepareNative(context: NativeContext, plan: NativeAuthorizationPlan, options: NativeWriteOptions = {}, authorizeContract = false): Promise<{ transaction: Transaction; prepared: NativePrepared }> {
   const source = address(await context.signer.publicKey(), "account", "transaction signer");
   if (source !== plan.source) throw new NativeClaimError("wallet changed since the intent was reviewed", "authorization");
   const raw = new TransactionBuilder(await context.server.getAccount(source), { fee: context.fee, networkPassphrase: context.passphrase })
     .addOperation(new Contract(plan.contract).call(plan.method, ...plan.args)).setTimeout(context.timeoutSecs).build();
-  const simulate = async (tx: Transaction) => {
-    const result = await context.server.simulateTransaction(tx, undefined, undefined, false);
+  const simulate = async (tx: Transaction, enforce = false) => {
+    const result = await context.server.simulateTransaction(tx, undefined, enforce ? "enforce" : undefined, false);
     if (rpc.Api.isSimulationRestore(result)) throw new NativeClaimError("native operation requires storage restoration; review and restore separately before resuming this intent", "unavailable");
     if (rpc.Api.isSimulationError(result)) throw new NativeClaimError(`${plan.method}: ${result.error}`, "failed");
     if (!rpc.Api.isSimulationSuccess(result) || !result.result) throw new NativeClaimError("native simulation returned no result", "unavailable");
+    if (enforce && plan.actor) {
+      const latestLedger = requireReadLedger(result.latestLedger, plan.actor.latestLedger);
+      validateNativeTransaction(tx, { ...plan, actor: { ...plan.actor, latestLedger } });
+    }
     return result;
   };
   let transaction = rpc.assembleTransaction(raw, await simulate(raw)).build();
-  validateNativeTransaction(transaction, plan, false);
+  validateNativeTransaction(transaction, plan, false, false);
   if (options.eligibilityAuthorization) {
     if (options.eligibilityAuthorization.length > 32768) throw new NativeClaimError("eligibility authorization is too large", "authorization");
     if (!plan.eligibility) throw new NativeClaimError("this native operation does not require an app approver", "authorization");
@@ -116,20 +133,43 @@ export async function prepareNative(context: NativeContext, plan: NativeAuthoriz
     validateEligibilityAuthorization(signed, plan.eligibility);
     const op = transaction.operations[0];
     if (op.type !== "invokeHostFunction") throw new NativeClaimError("unexpected prepared operation");
-    const auth = (op.auth ?? []).map(entry => entry.credentials.type === "sorobanCredentialsSourceAccount" ? entry : signed);
+    const auth = (op.auth ?? []).map(entry => entry.credentials.type === "sorobanCredentialsAddress" &&
+      Address.fromScAddress(entry.credentials.address.address).toString() === plan.eligibility!.account ? signed : entry);
     transaction = TransactionBuilder.cloneFrom(transaction, { networkPassphrase: context.passphrase }).clearOperations().addOperation(Operation.invokeHostFunction({ func: op.func, auth })).build();
-    transaction = rpc.assembleTransaction(transaction, await simulate(transaction)).build();
+  }
+  const complete = !plan.eligibility || !!options.eligibilityAuthorization;
+  if (plan.actor && complete && authorizeContract) {
+    if (!context.contractWallet) throw new NativeClaimError("a contract wallet authorization adapter is required", "authorization");
+    // Refuse an incomplete approval before asking the contract wallet to sign.
+    validateNativeTransaction(transaction, plan, true, false);
+    const op = transaction.operations[0];
+    if (op.type !== "invokeHostFunction") throw new NativeClaimError("unexpected prepared operation");
+    const auth = [...(op.auth ?? [])];
+    const at = auth.findIndex(entry => entry.credentials.type === "sorobanCredentialsAddress" &&
+      Address.fromScAddress(entry.credentials.address.address).toString() === plan.actor!.account);
+    auth[at] = await signContractAuthorization(auth[at], plan.actor, context.contractWallet, context.passphrase);
+    transaction = TransactionBuilder.cloneFrom(transaction, { networkPassphrase: context.passphrase }).clearOperations().addOperation(Operation.invokeHostFunction({ func: op.func, auth })).build();
+  }
+  if (complete && (plan.actor ? authorizeContract : options.eligibilityAuthorization)) {
+    const authorized = transaction.operations[0];
+    if (authorized.type !== "invokeHostFunction") throw new NativeClaimError("unexpected prepared operation");
+    const reviewedAuth = (authorized.auth ?? []).map(entry => entry.toXDR("base64"));
+    transaction = rpc.assembleTransaction(transaction, await simulate(transaction, true)).build();
+    const enforced = transaction.operations[0];
+    if (enforced.type !== "invokeHostFunction" || JSON.stringify((enforced.auth ?? []).map(entry => entry.toXDR("base64"))) !== JSON.stringify(reviewedAuth))
+      throw new NativeClaimError("simulation changed the reviewed authorizations", "authorization");
     validateNativeTransaction(transaction, plan);
   }
   const op = transaction.operations[0];
   if (op.type !== "invokeHostFunction") throw new NativeClaimError("unexpected native operation");
-  const approval = (op.auth ?? []).find(entry => entry.credentials.type !== "sorobanCredentialsSourceAccount");
-  return { transaction, prepared: { transactionXdr: transaction.toXDR(), hash: hex(transaction.hash()), networkPassphrase: context.passphrase, feeStroops: BigInt(transaction.fee), eligibilityEntryXdr: approval?.toXDR("base64") ?? null } };
+  const approval = (op.auth ?? []).find(entry => entry.credentials.type === "sorobanCredentialsAddress" &&
+    Address.fromScAddress(entry.credentials.address.address).toString() === plan.eligibility?.account);
+  return { transaction, prepared: { transactionXdr: transaction.toXDR(), hash: hex(transaction.hash()), networkPassphrase: context.passphrase, feeStroops: BigInt(transaction.fee), eligibilityEntryXdr: approval?.toXDR("base64") ?? null, contractEntryXdr: plan.actor ? (op.auth ?? []).find(entry => entry.credentials.type === "sorobanCredentialsAddress" && Address.fromScAddress(entry.credentials.address.address).toString() === plan.actor!.account)?.toXDR("base64") ?? null : null } };
 }
 
 /** No automatic transaction retry, implicit restoration or hash-losing error path. */
 export async function sendNative(context: NativeContext, plan: NativeAuthorizationPlan, options: NativeWriteOptions = {}): Promise<{ hash: string; ledger: number; value: unknown }> {
-  const { transaction, prepared } = await prepareNative(context, plan, options);
+  const { transaction, prepared } = await prepareNative(context, plan, options, true);
   validateNativeTransaction(transaction, plan);
   await options.onPrepared?.(prepared);
   if (await context.signer.publicKey() !== plan.source) throw new NativeClaimError("wallet changed before signing", "authorization");

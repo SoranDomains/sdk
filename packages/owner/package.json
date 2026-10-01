@@ -1,8 +1,11 @@
 {
   "name": "@sorandomains/owner",
-  "version": "0.9.0",
+  "version": "0.12.0",
   "description": "Run your Soran namespace on Stellar: configure claims, issue names and manage namespace policies.",
   "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
@@ -13,7 +16,8 @@
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "tsc",
     "check:browser": "esbuild dist/index.js --bundle --platform=browser --external:@stellar/stellar-sdk --outfile=browser-check.js --legal-comments=none --log-level=error && node -e \"const fs=require('fs');const s=fs.readFileSync('browser-check.js','utf8');fs.unlinkSync('browser-check.js');if(/\\bBuffer\\b/.test(s)){console.error('FAIL: bare Buffer reference in browser bundle');process.exit(1)}console.log('browser bundle clean')\"",
-    "test": "node --import tsx test/decode-failure.test.mts && node --import tsx --test test/integration.test.mts test/native-*.test.mts && node --import tsx --test test/funding.test.mts test/funding-history.test.mts"
+    "test": "node --import tsx test/decode-failure.test.mts && node --import tsx --test test/integration.test.mts test/hardening.test.mts test/error-codes.test.mts test/native-*.test.mts && node --import tsx --test test/funding.test.mts test/funding-history.test.mts test/funding-bounds.test.mts && node --import tsx --test test/multichain.test.mts && node --import tsx --test test/subnames.test.mts",
+    "test:hardening": "node --import tsx --test test/hardening.test.mts"
   },
   "license": "MIT",
   "repository": {
@@ -48,5 +52,12 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     }
+  },
+  "dependencies": {
+    "@noble/hashes": "2.4.0",
+    "@scure/base": "2.4.0"
+  },
+  "overrides": {
+    "axios": "1.20.0"
   }
 }

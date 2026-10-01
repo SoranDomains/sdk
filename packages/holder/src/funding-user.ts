@@ -10,6 +10,7 @@ import {
   xdr,
 } from "@stellar/stellar-sdk";
 import { FundingReader } from "./funding-reader.js";
+import { signContractAuthorization, type ContractWallet } from "./contract-wallet.js";
 import {
   FundingError,
   sponsorIntentHash,
@@ -314,6 +315,10 @@ export class SoranSponsorship extends FundingReader {
       const i = request.intent as ClaimIntent;
       if (i.context.registry !== this.registryId)
         throw new FundingError("Claim Registry differs from deployment");
+      if (i.claimant.startsWith("C")) {
+        const capability = await this.read(request.quote.registrar, "contract_claim_version", [], request.quote.issuedLedger);
+        if (capability.value !== 1) throw new FundingError("This namespace needs a Registrar upgrade before contract wallets can claim", "unavailable");
+      }
       const r = await this.read(
         request.quote.registrar,
         "claim_quote",
@@ -362,18 +367,22 @@ export class SoranSponsorship extends FundingReader {
     validateSponsorTransaction(transaction, plan, sim.latestLedger);
     return { transaction, plan, ledger: sim.latestLedger };
   }
-  /** Sign only the caller's G authorization. Wallet adapters retain custody of keys. */
+  /** Sign only the caller's authorization. C wallets supply their own signature
+   * format; the service enforces __check_auth before the relayer signs. */
   async authorize(
     request: SponsorRequest,
     encoded: string,
-    signer: Parameters<typeof authorizeEntry>[1],
+    signer: Parameters<typeof authorizeEntry>[1] | ContractWallet,
     maxSponsorCharge: bigint,
     maxNetworkFee: bigint,
     eligibilityXdr?: string,
   ) {
     if (request.quote.charge > maxSponsorCharge)
       throw new FundingError("Sponsor charge exceeds the reviewed amount");
-    address(request.quote.actor, "account", "this adapter's signing wallet");
+    address(request.quote.actor, "identity", "signing wallet");
+    const contractWallet = typeof signer === "object" && "signAuthorization" in signer ? signer : undefined;
+    if (request.quote.actor.startsWith("C") !== !!contractWallet)
+      throw new FundingError("Use the selected wallet's G signer or C authorization adapter", "authorization");
     const plan = await this.plan(request, maxNetworkFee),
       parsed = TransactionBuilder.fromXDR(encoded, this.passphrase);
     if (!(parsed instanceof Transaction))
@@ -382,9 +391,11 @@ export class SoranSponsorship extends FundingReader {
       );
     const latest = await this.server.getLatestLedger();
     const entry = validateSponsorTransaction(parsed, plan, latest.sequence);
-    const signed = await authorizeEntry(
+    const signed = contractWallet ? await signContractAuthorization(entry, {
+      account: request.quote.actor, latestLedger: latest.sequence, maxExpirationLedger: request.quote.expiresLedger,
+    }, contractWallet, this.passphrase) : await authorizeEntry(
       entry,
-      signer,
+      signer as Parameters<typeof authorizeEntry>[1],
       request.quote.expiresLedger,
       this.passphrase,
     );

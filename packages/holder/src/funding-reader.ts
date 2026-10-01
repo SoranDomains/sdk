@@ -86,6 +86,13 @@ export class FundingReader {
       undefined,
       false,
     );
+    // A simulation that needs a restore preamble still reports success, with the
+    // value computed as if the archived entry were live; it is not a live read.
+    if (rpc.Api.isSimulationRestore(result))
+      throw new FundingError(
+        "Cannot verify funding contract state: an archived entry needs restoring",
+        "unavailable",
+      );
     if (
       !rpc.Api.isSimulationSuccess(result) ||
       !result.result ||

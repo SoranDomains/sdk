@@ -7,6 +7,7 @@ import { claimIntentToScVal, type ClaimIntent } from "./native-types.js";
 import {
   FundingError,
   decodeSponsorQuote,
+  readBoundedText,
   sponsoredIdentityToScVal,
   sponsorIntentHash,
   sponsorQuoteToScVal,
@@ -15,6 +16,8 @@ import {
   type SponsoredIdentityIntent,
 } from "./funding-types.js";
 import { SoranSponsorship, type SponsorRequest } from "./funding-user.js";
+/** An offer carries at most a 100000 character transaction plus the quote XDR; nothing legitimate approaches this. */
+const MAX_SERVICE_BODY_BYTES = 262_144;
 /** HTTP transports offers and status. The contract/RPC checks still authorize spending. */
 export class FundingServiceClient {
   private base: string;
@@ -61,7 +64,30 @@ export class FundingServiceClient {
         "unavailable",
       );
     }
-    const value = (await r.json()) as Record<string, unknown>;
+    let value: Record<string, unknown>;
+    let text: string | null;
+    try {
+      text = await readBoundedText(r, MAX_SERVICE_BODY_BYTES);
+    } catch {
+      text = "";
+    }
+    // Too large is handled like an unreadable body: a submit's outcome is unknown.
+    if (text === null)
+      throw new FundingError(
+        "Service response was too large. Keep your quote reference and recover its status before submitting again.",
+        path === "/v1/sponsorship/submit" ? "pending" : "unavailable",
+      );
+    try {
+      value = JSON.parse(text) as Record<string, unknown>;
+    } catch {
+      // A proxy/gateway error page (e.g. a 502 HTML body) is not JSON. A
+      // submit's outcome is then unknown, so it reads as pending; anything
+      // else simply could not be answered.
+      throw new FundingError(
+        "Service response was not valid JSON. Keep your quote reference and recover its status before submitting again.",
+        path === "/v1/sponsorship/submit" ? "pending" : "unavailable",
+      );
+    }
     if (!value || typeof value !== "object" || Array.isArray(value))
       throw new FundingError("Invalid service response", "unavailable");
     if (!r.ok || value.error)
@@ -91,6 +117,18 @@ export class FundingServiceClient {
       intentXdr: encoded.toXDR("base64"),
       proof,
     });
+    return this.reviewOffer(offer, action, intent, maxSponsorCharge, proof);
+  }
+  /** Re-estimate with the previous, valid wallet authorization. This never
+   * submits; review the new charge and call authorize again before submit. */
+  async refreshQuote(request: SponsorRequest, authorizedTransactionXdr: string, maxSponsorCharge: bigint) {
+    this.id(request.quote.quoteId);
+    const offer = await this.call("/v1/sponsorship/requote", {
+      quoteId: request.quote.quoteId, transactionXdr: authorizedTransactionXdr,
+    });
+    return this.reviewOffer(offer, request.quote.action, request.intent, maxSponsorCharge, request.proof ?? []);
+  }
+  private async reviewOffer(offer: any, action: SponsoredAction, intent: ClaimIntent | SponsoredIdentityIntent, maxSponsorCharge: bigint, proof: readonly string[]) {
     const quote = decodeSponsorQuote(offer.quoteXdr);
     if (
       offer.id !== quote.quoteId ||

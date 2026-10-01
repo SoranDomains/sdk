@@ -3,6 +3,16 @@ import { Account, BASE_FEE, Contract, Operation, Transaction, TransactionBuilder
 import { NativeClaimError, address, bytes32, hex, namespaceNode, sc, unhex } from "./native-codec.js";
 import { assertSignedBodyUnchanged, validateEligibilityAuthorization, validateNativeTransaction, type NativeAuthorizationPlan } from "./native-auth.js";
 
+/** RPC clients sometimes reject with a plain `{ code, message }` object, which String() renders as "[object Object]". */
+export function describeRejection(error: unknown): string {
+  if (error instanceof Error || typeof error === "string") return String(error);
+  if (error && typeof error === "object") {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && message) return message;
+    try { const json = JSON.stringify(error); if (json && json !== "{}") return json.length > 300 ? `${json.slice(0, 300)}...` : json; } catch { /* circular or unserialisable */ }
+  }
+  return "unknown error";
+}
 export type NativeSigner = { publicKey(): string | Promise<string>; signTransaction(encoded: string, opts: { networkPassphrase: string }): Promise<string | { signedTxXdr: string }> };
 export type NativeContext = {
   registryId: string; passphrase: string; server: rpc.Server; signer: NativeSigner; fee: string; timeoutSecs: number; maxFeeStroops: bigint;
@@ -113,7 +123,7 @@ export async function sendNative(context: NativeContext, plan: NativeAuthorizati
     throw new NativeClaimError("transaction outcome is unknown; recover the original receipt and hash before replacing the request", "pending", prepared.hash);
   } catch (error) {
     if (error instanceof NativeClaimError && error.txHash) throw error;
-    throw new NativeClaimError(`submission/confirmation interrupted: ${String(error)}; reconcile the original receipt`, "pending", prepared.hash);
+    throw new NativeClaimError(`submission/confirmation interrupted: ${describeRejection(error)}; reconcile the original receipt`, "pending", prepared.hash);
   }
 }
 

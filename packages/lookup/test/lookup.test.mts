@@ -84,7 +84,7 @@ test("lookup normalizes input, validates anchor/version each time, preserves exa
   for (const c of calls.filter(({ fn }) => fn === "resolve")) assert.equal(scValToNative(c.args[0]), "alice.nova");
 });
 test("invalid names stop before any chain reads", async () => {
-  for (const name of ["alice", "a.b.c", "-a.nova", "a-.nova", "a..nova", " alice.nova", "é.nova", "a".repeat(64) + ".nova"]) {
+  for (const name of ["alice", "a.b.c.d", "-a.nova", "a-.nova", "a..nova", " alice.nova", "é.nova", "a".repeat(64) + ".nova"]) {
     const { s, calls } = client();
     await assert.rejects(s.lookup(name), code("INVALID_INPUT"));
     assert.equal(calls.length, 0);

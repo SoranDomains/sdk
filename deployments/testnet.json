@@ -1,8 +1,8 @@
 {
-  "network": "testnet",
+  "network": "Test SDF Network ; September 2015",
   "rpcUrl": "https://soroban-testnet.stellar.org",
-  "verifiedAt": "2026-09-10T12:50:16.139Z",
-  "verifiedLedger": 4604205,
+  "verifiedAt": "2026-09-10T15:17:50.384Z",
+  "verifiedLedger": 4605980,
   "governance": "GAJCWWNMBKCSTQQISDFTHFTCEOGXYA37YTP3U3ZW7Q5CYQPHSW6TB4QX",
   "namespaceDeploymentSaltVersion": 1,
   "lookupVersion": 2,
@@ -11,8 +11,8 @@
   "resolverInitializationVersion": 1,
   "lookupMuxedIdentityVersion": 1,
   "lookupNameStatusVersion": 1,
-  "lookupBatchReadVersion": 1,
-  "lookupBatchReadLimit": 2,
+  "lookupBatchReadVersion": 2,
+  "lookupBatchReadLimit": 16,
   "allocatorRulingVersion": 1,
   "allocatorReopenVersion": 1,
   "allocatorUpgradeDelaySeconds": 0,
@@ -22,34 +22,40 @@
     "amount": "50000000000",
     "recipient": "GAJCWWNMBKCSTQQISDFTHFTCEOGXYA37YTP3U3ZW7Q5CYQPHSW6TB4QX",
     "asset": "XLM",
-    "decimals": 7,
-    "configurationLedger": 4534623,
-    "configurationTransaction": "6bb169c931a2802dd3419729f24e3d11c382b6b2d19fb2e59fd77a8933badc0e",
-    "refundBps": {
-      "Awarded": 0,
-      "Rejected": 10000,
-      "Stuck": 10000,
-      "Withdrawn": 8000,
-      "Expired": 8000
-    }
+    "decimals": 7
   },
   "contracts": {
     "registry": {
       "id": "CCSORANDPQINYOYB5SVO45WJP2LBBYKC72HHUIRVXB4J6RUZKDAUW7G4",
-      "wasmHash": "5c38509d69fac48c68b1972049dabcd9ef9661e3b284c358775bdd71821c7270",
+      "wasmHash": "6e0ba6d9e6bc21fd5d5c392f79b859aa70d92cd1761c2fdb86a4638876364ce8",
       "deploymentTransaction": "747b859a98b8ef8ba811cce8475b4cf45e74c104ce97cc4ec852cb3f453b76c1",
       "deploymentLedger": 4602289,
-      "codeVerifiedAt": "2026-09-10T12:49:28.456Z"
+      "upgradeTransaction": "f45033257114483fc98bda97c617ad942e013256747ba481e184c2abe7d5dbc7",
+      "upgradeLedger": 4936460,
+      "codeVerifiedAt": "2026-09-30T09:29:41.328Z",
+      "upgradeHistory": [
+        {
+          "wasmHash": "5c38509d69fac48c68b1972049dabcd9ef9661e3b284c358775bdd71821c7270",
+          "transaction": "747b859a98b8ef8ba811cce8475b4cf45e74c104ce97cc4ec852cb3f453b76c1",
+          "ledger": 4602289,
+          "codeVerifiedAt": "2026-09-10T15:17:50.384Z"
+        },
+        {
+          "wasmHash": "f8966c6c6fd15e3621497e4144de17bd6e15ecdc8ff600ffe4e962c51d2bdb21",
+          "transaction": "3a986298a63e55fee824303df240379eb56994b50c356b7ade6ea626903b5f5e",
+          "ledger": 4608215
+        }
+      ]
     },
     "allocator": {
       "id": "CCSORANYFHUJUWETEQ7UWIDN4JTPV7NN5G6YUSSBZI57X7EQWVA63VMJ",
-      "wasmHash": "5998c24ec34154f9cf72db104384b225ea9ae05c0c7410d37c54dcf917c4b631",
+      "wasmHash": "2fa6b1b6f3a201585932c7e5cef797cbe08ec84d26418e82613e5ef0b5437a79",
       "deploymentTransaction": "6588ca3a8d09458e6aadeaf0173927dc10865b68c8531632d4368c109b85d46e",
       "deploymentLedger": 4534622,
       "deploymentWasmHash": "584d5dc1d82e34655d4130f4f0e93ae7b5cd75d6465484efb51b8525f13c3db0",
-      "upgradeTransaction": "41c9ffe731b32d87c614e7d24539558568a6af5062e0d6451651b8e8951339b8",
-      "upgradeLedger": 4602368,
-      "codeVerifiedAt": "2026-09-10T12:49:29.244Z",
+      "upgradeTransaction": "9557158c2a351d6ec159a23b62c28d6975389c9c682af8c1014a195b94e173bc",
+      "upgradeLedger": 4936466,
+      "codeVerifiedAt": "2026-09-30T09:29:41.328Z",
       "upgradeHistory": [
         {
           "wasmHash": "9480a4f980de9df0a31652b0b64c54d5c5e1979745cc8c4fc486624b9c177e40",
@@ -68,39 +74,126 @@
           "transaction": "a9c77709a1a4e51fa4a5ca74647e332302f629ef53578bb3bc912fd7e29ca9c3",
           "ledger": 4575408,
           "codeVerifiedAt": "2026-09-08T20:54:03.390Z"
+        },
+        {
+          "wasmHash": "5998c24ec34154f9cf72db104384b225ea9ae05c0c7410d37c54dcf917c4b631",
+          "transaction": "41c9ffe731b32d87c614e7d24539558568a6af5062e0d6451651b8e8951339b8",
+          "ledger": 4602368,
+          "codeVerifiedAt": "2026-09-10T15:17:50.384Z"
+        },
+        {
+          "wasmHash": "89c09347db87fef77832d6a176933b76fd93124dbbc3a05734f2c7bd2a75f2d4",
+          "transaction": "4ad921703d3584bb669ec5d6f40b8bd4f8fdb0db789d5233b88059876f97361f",
+          "ledger": 4608229
         }
       ]
     },
     "registrar": {
       "id": "CDSORANBRJUG4LLF2D26JZIKRGLKHVWHPEGRR4ZJKKLBSREEADD4MDC2",
-      "wasmHash": "26e03cd1d7fbfa46fe442406fb1b88022ec8cd8bd9123bed570f971fce596a14",
+      "wasmHash": "42dc5f8b40932617d3f2667e1d26dad3e5e9a62c63de1fde7c016cb67a86c420",
       "deploymentTransaction": "ea6708f83344ded18025b121527ad6e7abb002dbed252dd36c1d3e2c20546c12",
       "deploymentLedger": 4603489,
-      "codeVerifiedAt": "2026-09-10T12:49:30.204Z"
+      "upgradeTransaction": "fc159ec68dbcf78b6b6c6fc4adcb3e4823dc2321c79ba9769708ca8bad998f27",
+      "upgradeLedger": 4936550,
+      "codeVerifiedAt": "2026-09-30T09:29:41.328Z",
+      "upgradeHistory": [
+        {
+          "wasmHash": "26e03cd1d7fbfa46fe442406fb1b88022ec8cd8bd9123bed570f971fce596a14",
+          "transaction": "ea6708f83344ded18025b121527ad6e7abb002dbed252dd36c1d3e2c20546c12",
+          "ledger": 4603489
+        },
+        {
+          "wasmHash": "3e6d4f2b289111ddad12428f5d63603e76fa8da91fb9d7e33c73e97835d8781f",
+          "transaction": "97c3ef2515941d7bb8334c654d909d015480bdca2f3de05cd2fcd5c7473d4c61",
+          "ledger": 4605855,
+          "codeVerifiedAt": "2026-09-10T15:17:50.384Z"
+        },
+        {
+          "wasmHash": "5c8ae72ea7370ccf19af52b9bbc0007362be94464651ccdf68a2bb1f478b6f2c",
+          "transaction": "a45fb5a4fd9c9ee70cf6c43c863f11bf32394c01172aa9e090e917b78456200e",
+          "ledger": 4608221
+        },
+        {
+          "wasmHash": "61ded153e6311075c1087c5639a5410222e23f7cade239ed2c946150af94b1c5",
+          "transaction": "bef0d52ae8bccaac5d833718be6dee07f3346ac58e1ac3e6f7a572f38d49f5a5",
+          "ledger": 4680994
+        }
+      ]
     },
     "resolver": {
       "id": "CDSORANVZ5JS2VSVQ6VBYGE6A26NC736SL66HW7LZ7O4EE7BSMMDWFAX",
-      "wasmHash": "5e7b4fb8d310d67ed6966a155e748d60be771422b3e8c34bbc14485f98525574",
+      "wasmHash": "351bf4e056b179b578fe2a4ea46f937bfafccc6538c7357ea70021b7038d91ea",
       "deploymentTransaction": "a1ab05725745dfd4f2827129b25599dc9bc73995bc52c29268848f6c95575f7d",
       "deploymentLedger": 4603491,
-      "codeVerifiedAt": "2026-09-10T12:49:31.005Z"
+      "upgradeTransaction": "2407dfa6d647f2ba49f46737881dff0a0f5a4bd19b70e9c32d007c151fa18a69",
+      "upgradeLedger": 4936553,
+      "codeVerifiedAt": "2026-09-30T09:29:41.328Z",
+      "upgradeHistory": [
+        {
+          "wasmHash": "5e7b4fb8d310d67ed6966a155e748d60be771422b3e8c34bbc14485f98525574",
+          "transaction": "a1ab05725745dfd4f2827129b25599dc9bc73995bc52c29268848f6c95575f7d",
+          "ledger": 4603491
+        },
+        {
+          "wasmHash": "b6222048736f2519519a7a8ee8c57007193616c49ec3ea9f215deba82070f49a",
+          "transaction": "db10941fa9ea58d5bf95db83900e5e449f5904ad37d55b3c08f8256cd8f1a953",
+          "ledger": 4605857,
+          "codeVerifiedAt": "2026-09-10T15:17:50.384Z"
+        },
+        {
+          "wasmHash": "c6dfcd7bbf35943a13406888678334d0938d0fea54939906b00c2dc37b4a9a71",
+          "transaction": "c3a1599ced2141dfc5914200da69612e7b37ec8a9b272c6a8ca6e4bea24b1d5f",
+          "ledger": 4608223
+        }
+      ]
     },
     "primary": {
       "id": "CCSORAN7Y7ICQK2MBSVCJT3BUN5EHXKDKSTMGVB6QWSYXWMMLG2WIFJ6",
-      "wasmHash": "aa59205bff574e27469559cfcf39f1028eabc975c8f37591ea2f373682d918ee",
+      "wasmHash": "a2e977ff13604708218d6beb5b32b1295db1250b2a91b2b15ff8a637dfd3f8d6",
       "deploymentTransaction": "def1397f65056a767a15c1d090f879e9e806536ab8411cae1ff3984fee8f1be0",
       "deploymentLedger": 4602308,
-      "codeVerifiedAt": "2026-09-10T12:49:31.766Z"
+      "upgradeTransaction": "bfe07f07fa68e6c7e349fe78e0ff0547b403668b2eecad679b59d977d555f0cf",
+      "upgradeLedger": 4963965,
+      "codeVerifiedAt": "2026-10-01T08:33:02.572Z",
+      "upgradeHistory": [
+        {
+          "wasmHash": "aa59205bff574e27469559cfcf39f1028eabc975c8f37591ea2f373682d918ee",
+          "transaction": "def1397f65056a767a15c1d090f879e9e806536ab8411cae1ff3984fee8f1be0",
+          "ledger": 4602308
+        },
+        {
+          "wasmHash": "b783b0614c3ff423b47b3706a21abc6db9fdd49ab2ea2e2e5780f6fcc72dcf99",
+          "transaction": "c1db89486868ae141394f7aa106134647c96283bd9a195e4ff92f69e40ec15f0",
+          "ledger": 4605859,
+          "codeVerifiedAt": "2026-09-10T15:17:50.384Z"
+        },
+        {
+          "wasmHash": "cd1d4798be7c2a54115bc97ef83acd7b3bc26334419ee31d21d17b26cb891e7a",
+          "transaction": "362ae4e9de64c0d0746a8b2477e8de15a983a91860000220257f8686b47a9b5c",
+          "ledger": 4608225
+        },
+        {
+          "wasmHash": "58840047726ab2925593399d61b8867a13d4ea498389578ff87cb80c13c97a57",
+          "transaction": "42169053b6d19d516970cf54095b6d249cff7e9499b6c1fbdbfaa9b218c96d33",
+          "ledger": 4621065
+        },
+        {
+          "wasmHash": "a53524b45cb8037dba4cf9fe0d2ae7a3a17b31b469b962c141178db35ce0c012",
+          "transaction": "89a2933f869633febd27ef1f61cc30fb8d6e779516ff1ef214902e6c8119104b",
+          "ledger": 4936462,
+          "codeVerifiedAt": "2026-09-30T09:29:41.328Z"
+        }
+      ]
     },
     "lookup": {
       "id": "CDSORANQAJK35UV2HR63CMB6M5NYISHMUBTB6EQY2CZ3Y7HJDIOHRJWA",
-      "wasmHash": "7a9560e0451164cce018163d017581d879b4632540d1e0edd3d6c8615808c56c",
+      "wasmHash": "72bd081e61db666c0fd77efba30c35e8eced89ce9e5dd3f81098da6e45a52a3e",
       "deploymentTransaction": "d480c19edd9d101357432142a14e0d0e3e6b2c7706b01de8393cb94d6d6a63fc",
       "deploymentLedger": 4534628,
       "deploymentWasmHash": "67c2d2c7f9b80b2901426a31d4a85cf1cf56c4f70afd69d229dfe4b67db78041",
-      "upgradeTransaction": "0af7e7f66edf3f6840e6e8563c7842e8245f057b3b81d28e8aabdd14c8594d2b",
-      "upgradeLedger": 4602396,
-      "codeVerifiedAt": "2026-09-10T12:49:32.650Z",
+      "upgradeTransaction": "381229a5c15622574ef4323832ae556ec96ecbaa1f849652b517a53f9f208ce0",
+      "upgradeLedger": 4963958,
+      "codeVerifiedAt": "2026-10-01T08:33:02.572Z",
       "upgradeHistory": [
         {
           "wasmHash": "0d8ed0c9dd5f7ea4e8783ecb505f3da37ba643c632d85a52b3d9976fd11cea10",
@@ -113,6 +206,55 @@
           "transaction": "34ac6a1189a83f6ea33692b4a9dca65324e147653b9ef8d74800c6eedc7ff907",
           "ledger": 4591279,
           "codeVerifiedAt": "2026-09-09T18:53:05.250Z"
+        },
+        {
+          "wasmHash": "7a9560e0451164cce018163d017581d879b4632540d1e0edd3d6c8615808c56c",
+          "transaction": "0af7e7f66edf3f6840e6e8563c7842e8245f057b3b81d28e8aabdd14c8594d2b",
+          "ledger": 4602396
+        },
+        {
+          "wasmHash": "4233f2aee913b717f4b4bb150271d14bd707dc56a41b9a3a48fc603245e797c0",
+          "transaction": "fbcd6892b216a859d1ecab7b49692df38f866ea820bf3a21045ef2251fac01e7",
+          "ledger": 4605864,
+          "codeVerifiedAt": "2026-09-10T15:17:50.384Z"
+        },
+        {
+          "wasmHash": "b90d5a0ee983e4632ed912a974720ec6e0f539b3b421f20d6a2da6070fb2ba79",
+          "transaction": "5c444700a524c0a2454ad94cd3822562e7774a5d16c219e6c0599046d6910c91",
+          "ledger": 4608249
+        },
+        {
+          "wasmHash": "de8a40f801b854a775b2eca7c1b621339c03e0bff6f7b10e2a07e026b3e1ee3b",
+          "transaction": "57b77ddfbcd3aa34eb71b41a03c412449a09cca567826b532de63b9ed2cd4d1c",
+          "ledger": 4621064
+        },
+        {
+          "wasmHash": "4cb858d55de9004d8d07f00829732f04dfe3f7930fdbec97a7755879edd551c5",
+          "transaction": "6121452376564304a1e03bfe34677b4e06af677222ff283d32a5788570054c9e",
+          "ledger": 4936470,
+          "codeVerifiedAt": "2026-09-30T09:29:41.328Z"
+        },
+        {
+          "wasmHash": "37eb32b887ce28ad02a3a78e2461e22488ef86d9642deee72e728642e318d328",
+          "transaction": "1805a2f200e3d0beadab40ef02d7cfc86b62edf0f504f7a7d3639948dd23ae23",
+          "ledger": 4957136
+        }
+      ]
+    },
+    "funding": {
+      "id": "CBSORANSFWTCIVMMJEZPQAGASGKYQUC2KAUHMGTENTG5FOBYOQTQZ5CD",
+      "wasmHash": "fb637610b710ac51eb502618f16232a3e52fd6a1e30a87a8ce1caf5a1f3e8a16",
+      "deploymentTransaction": "27984e617be4437d636a69e603908a0412a009386d336a6e8bfc1d3fd76c3322",
+      "deploymentLedger": 4625614,
+      "deploymentWasmHash": "5cec6614d2082c22fe73a96775123f5f622cfdfbd31a7c800261ad7a2bb75933",
+      "upgradeTransaction": "87722bd806232a9ce4e3a989737929375f0e36b2f01f8a5c8c609f81ded22565",
+      "upgradeLedger": 4936561,
+      "codeVerifiedAt": "2026-09-30T09:29:41.328Z",
+      "upgradeHistory": [
+        {
+          "wasmHash": "b1a3f0a6c82609bd7e8c3e53799c2ac37e7cb824608ed9d61b1572b4bf9a35cc",
+          "transaction": "5ec1f1e32dff310ded59d8e0067ef10571de384ee77afe474ee7a35554edb8a9",
+          "ledger": 4680993
         }
       ]
     }
@@ -137,93 +279,26 @@
     "originalClaimReceiptsRetained": 34,
     "namespaceClaimWindowsPreserved": true
   },
-  "verificationScope": "Sealed on-chain migration, exact imported persistent records, original receipt lineage and preserved namespace claim escrow. Hosted-service activation is verified separately.",
-  "status": "deployed",
-  "networkPassphrase": "Test SDF Network ; September 2015",
-  "lookupUpgradeDelaySeconds": 0,
-  "lookupDestinationVersion": 2,
-  "resolverPaymentVersion": 2,
-  "resolverDestinationVersion": 2,
-  "namespace": {
-    "label": "nova",
-    "node": "857f994cc3975eda4e373f51c9f5b0f7940451a5eb3ff225edc5cd468228b430",
-    "owner": "GAAHFS7CISNAJOQK5VS447NS6ZFPRLLQQP6IM2EA4W7XZWGJNMXZ4VLK",
-    "permanent": false,
-    "reclaimable": true,
-    "ownerEpoch": "1"
+  "verificationScope": "Same-address batch upgrades, exact prior record/settings preservation and live populated batch reads. Historical migration commitments remain unchanged.",
+  "lookupPrimaryBatchReadLimit": 8,
+  "batchVerification": {
+    "sourceDigest": "41936f7e47e95847a6cddbce7ca71450f53fc0644819e89e06e94990c8448e5e",
+    "contractTests": 588,
+    "reverseIdentities": 16,
+    "primaryIdentities": 8,
+    "recordsPreserved": 258
   },
-  "publishedPackages": [
-    {
-      "name": "owner",
-      "version": "0.8.0",
-      "shasum": "7c5b10aedd88f7a23d661005d77f857b42da04e8",
-      "integrity": "sha512-bapSfgBtZhdsRIee09o1wdKQa7CANvfjwDLwjJtrObziHK0IV2JyU/hMHJkQHlDo1WK2MjALvKZ/iA4UqpCiMQ==",
-      "package": "@sorandomains/owner"
-    },
-    {
-      "name": "holder",
-      "version": "0.7.0",
-      "shasum": "db2d3eb692abcbc0e2e51f199ea9349ebbcbf14a",
-      "integrity": "sha512-P0dtc7zrmfxb9l4fjtq2RD7ovzLatjILya5gXiar3d5EwJq1luRvkL6JWWkyyKZ2W2ZBw318iM5G0Bz8b1CiBw==",
-      "package": "@sorandomains/holder"
-    },
-    {
-      "name": "lookup",
-      "version": "0.10.0",
-      "shasum": "63cd13890a425b14e95db59bac633fe741693837",
-      "integrity": "sha512-8hZ5v2Zd9AFi/KQrCX4Qpt5UHpsEoh6M3jc2uT7/4n1oOFdvVOGm6YXS8YN9zWJmr4ju43M90aCIhP+iqDlK2g==",
-      "package": "@sorandomains/lookup"
-    },
-    {
-      "name": "mcp",
-      "version": "0.9.0",
-      "shasum": "11956e547263e1ca039246f17ae553cafa2e3689",
-      "integrity": "sha512-9l6nujM3pANN9BypjWGp3fFnxGdmAtgCR7n0oMQCcWghTNMXTds4xclOUQKNpDsVj3+AB7XgrzPRcf50IQT6sw==",
-      "package": "@sorandomains/mcp"
-    }
-  ],
-  "clientVerification": {
-    "paymentTypes": [
-      "G",
-      "G with memo",
-      "M with routing ID",
-      "C"
+  "manifestRefresh": {
+    "reason": "Updated to the installed Lookup and Primary from PR72 while preserving namespace owner opt-in. Template artifact hashes are separate from installed namespace hashes.",
+    "liveCheckedAt": "2026-10-01T08:33:02.572Z",
+    "liveCheckedLedger": 4963999,
+    "scope": "Installed executable hashes from the verified Oct1 rollout; older top-level verification fields still describe the earlier deployment.",
+    "sources": [
+      "upgrades/2026-09-29-pr66.json",
+      "upgrades/2026-10-01-subnames.json"
     ],
-    "primaryIdentities": 9,
-    "muxedIdentities": 8,
-    "historicalClaimRecovery": true,
-    "freshClaim": {
-      "name": "migration-check-0910.nova",
-      "transaction": "9836dd03b7cce4c097086aa9b92f37c973eb4035690e499919fac1ec9666d597",
-      "ledger": 4604333
-    }
+    "namespaceChildren": "Read each namespace Registrar/Resolver from the chain; no namespace installations or policies were changed.",
+    "check": "node scripts/deployment-manifest.mjs --live"
   },
-  "hostedServices": {
-    "checkedAt": "2026-09-10T13:05:08.955Z",
-    "services": {
-      "api": {
-        "url": "https://api.soran.domains",
-        "deploymentVersion": "bcda5086-714b-498b-8e1d-8c301e1cd8fa"
-      },
-      "nova": {
-        "url": "https://nova-claim-app.throbbing-cloud-0f8e.workers.dev",
-        "deploymentVersion": "5ec1dffb-e116-48a1-9e33-1545c37ea7f0"
-      },
-      "studio": {
-        "url": "https://soran-studio.throbbing-cloud-0f8e.workers.dev",
-        "deploymentVersion": "0d759f38-fbf1-49b4-9c3e-5ad1e7889fcb"
-      },
-      "console": {
-        "url": "https://soran.domains",
-        "deploymentVersion": "c9cdd082-9237-444c-a55d-df46461b61dd"
-      },
-      "mcp": {
-        "url": "https://mcp.soran.domains/mcp",
-        "deploymentVersion": "8ffb9c7f-d77a-4bdc-873c-017565c9f24f"
-      }
-    },
-    "mcpVersion": "0.9.0",
-    "hostedWrites": false,
-    "paymentChecks": 15
-  }
+  "latestUpgradeRelease": "upgrades/2026-10-01-subnames.json"
 }

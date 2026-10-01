@@ -45,6 +45,8 @@
  */
 
 import { createServer } from "node:http";
+import { createHandler } from "./handler.mjs";
+import { createDecoder, pollOnce, recoverFromPollError } from "./poll.mjs";
 import { readFileSync, writeFileSync, renameSync, existsSync } from "node:fs";
 import {
   Account,
@@ -56,6 +58,7 @@ import {
   rpc,
   scValToNative,
   hash,
+  xdr,
 } from "@stellar/stellar-sdk";
 
 // ---------- config ----------
@@ -65,8 +68,10 @@ if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(NAMESPACE) || NAMESPACE.length > 63)
   process.exit(1);
 }
 const RPC_URL = process.env.SORAN_RPC_URL ?? "https://soroban-testnet.stellar.org";
+// Current live testnet Registry (deploy/testnet/deployment.json). Override for
+// another network; never point this at a sealed migration-source Registry.
 const REGISTRY_ID =
-  process.env.SORAN_REGISTRY_ID ?? "CBSORANPM664QXYMYRZKLQDQE2TXFSK4GBMC6EIRSRTAUZRZCRZRFNMK";
+  process.env.SORAN_REGISTRY_ID || "CCSORANDPQINYOYB5SVO45WJP2LBBYKC72HHUIRVXB4J6RUZKDAUW7G4";
 const PASSPHRASE = process.env.SORAN_PASSPHRASE ?? Networks.TESTNET;
 const PORT = Number(process.env.PORT ?? 8787);
 const HOST = process.env.HOST ?? "127.0.0.1";
@@ -74,9 +79,12 @@ const DATA_FILE = process.env.SORAN_DATA_FILE ?? "./hint-state.json";
 const SEED_FILE = process.env.SORAN_SEED_FILE ?? "./seed.json";
 const POLL_MS = Math.max(2_000, Number(process.env.SORAN_POLL_MS ?? 10_000));
 const MAX_EVENTS_PER_NAME = 100;
-const MAX_NAMES_PER_HOLDER = 100;
 
 const server = new rpc.Server(RPC_URL, { allowHttp: RPC_URL.startsWith("http://") });
+// poll() reads raw event pages through the SDK's internal `_getEvents` (the public getEvents fails a whole page on one
+// undecodable event). Stop at boot, not on every poll forever, if a newer SDK dropped it.
+if (typeof server._getEvents !== "function")
+  throw new Error("this @stellar/stellar-sdk has no rpc.Server#_getEvents, which this example reads raw event pages with; install @stellar/stellar-sdk 17.0.1 or update poll() in server.mjs");
 
 // ---------- state (name → holder, per-name event log, poll cursor) ----------
 /** @type {{ cursor: string | null, lastLedger: number, holders: Record<string,string>, log: Record<string, Array<{action:string,ledger:number,txHash:string,at:string}>> }} */
@@ -173,48 +181,34 @@ function applyEvent(kind, data, ledger, txHash, at) {
   if (log.length > MAX_EVENTS_PER_NAME) log.splice(0, log.length - MAX_EVENTS_PER_NAME);
 }
 
-async function pollOnce() {
+async function poll() {
   const registrarId = await resolveRegistrar();
-  const filters = [{ type: "contract", contractIds: [registrarId] }];
-  let request;
-  if (state.cursor) request = { filters, cursor: state.cursor, limit: 100 };
-  else {
-    const start = Number(process.env.SORAN_START_LEDGER ?? 0);
-    const latest = await server.getLatestLedger();
-    request = { filters, startLedger: start > 0 ? start : latest.sequence, limit: 100 };
-  }
-  for (;;) {
-    const page = await server.getEvents(request);
-    for (const ev of page.events ?? []) {
-      try {
-        const kind = scValToNative(ev.topic[0]);
-        applyEvent(kind, scValToNative(ev.value), ev.ledger, ev.txHash, ev.ledgerClosedAt);
-        state.lastLedger = ev.ledger;
-      } catch {
-        /* not an event we understand — skip */
-      }
-    }
-    state.cursor = page.cursor ?? state.cursor;
-    persist();
-    if (!page.events || page.events.length < 100) break;
-    request = { filters, cursor: page.cursor, limit: 100 };
-  }
+  await pollOnce({
+    // The RAW response, decoded event by event: the SDK's getEvents parses the
+    // whole page and one undecodable event would fail it forever.
+    rpc: { getEvents: (request) => server._getEvents(request), getLatestLedger: () => server.getLatestLedger() },
+    filters: [{ type: "contract", contractIds: [registrarId] }],
+    state,
+    persist,
+    decode: createDecoder({ xdr, scValToNative }),
+    apply: applyEvent,
+    startLedger: Number(process.env.SORAN_START_LEDGER ?? 0),
+  });
 }
 async function pollLoop() {
   for (;;) {
     try {
-      await pollOnce();
+      await poll();
     } catch (e) {
-      // SELF-HEAL: a cursor that fell out of the RPC's event-retention
-      // window would fail every future poll. Re-anchor at the current
-      // ledger and continue — events in the gap are missed (reseed if that
-      // matters).
-      if (state.cursor) {
-        console.error(`poll failed with a cursor (${e?.message ?? e}) — re-anchoring at the current ledger; events in the gap are missed`);
-        state.cursor = null;
+      // A cursor that fell out of the RPC's event-retention window would fail
+      // every future poll: re-anchor at the current ledger (events in the gap
+      // are missed, reseed if that matters). Any other failure keeps the cursor
+      // and is retried, so a network blip never skips events.
+      if (recoverFromPollError(state, e) === "reanchored") {
+        console.error(`cursor fell out of the RPC's retention window (${e?.message ?? e}) — re-anchoring at the current ledger; events in the gap are missed`);
         persist();
       } else {
-        console.error(`poll failed (will retry): ${e?.message ?? e}`);
+        console.error(`poll failed (will retry from the same cursor): ${e?.message ?? e}`);
       }
     }
     await new Promise((r) => setTimeout(r, POLL_MS));
@@ -222,74 +216,11 @@ async function pollLoop() {
 }
 
 // ---------- http ----------
-function json(res, code, body) {
-  const buf = JSON.stringify(body);
-  res.writeHead(code, {
-    "content-type": "application/json",
-    "content-length": Buffer.byteLength(buf),
-    // Browser wallets are the primary consumers — CORS is part of the hint
-    // contract (simple GETs only, so no preflight handling is needed).
-    "access-control-allow-origin": "*",
-    "x-content-type-options": "nosniff",
-  });
-  res.end(buf);
-}
-const http = createServer((req, res) => {
-  const url = new URL(req.url ?? "/", "http://x");
-  const parts = url.pathname.split("/").filter(Boolean);
-
-  if (url.pathname === "/healthz") {
-    return json(res, 200, {
-      ok: true,
-      namespace: NAMESPACE,
-      names: Object.keys(state.holders).length,
-      lastLedger: state.lastLedger,
-    });
-  }
-  if (url.pathname === "/v1/showcase") {
-    return json(res, 200, { namespaces: [NAMESPACE] });
-  }
-  // /v1/names/by-holder/:address
-  if (parts.length === 4 && parts[0] === "v1" && parts[1] === "names" && parts[2] === "by-holder") {
-    const addr = parts[3];
-    if (!StrKey.isValidEd25519PublicKey(addr) && !StrKey.isValidContract(addr)) {
-      return json(res, 400, { error: "bad_address" });
-    }
-    const all = Object.entries(state.holders)
-      .filter(([, h]) => h === addr)
-      .map(([name]) => ({ name, namespace: NAMESPACE, holder: addr }));
-    return json(res, 200, {
-      holder: addr,
-      names: all.slice(0, MAX_NAMES_PER_HOLDER),
-      truncated: all.length > MAX_NAMES_PER_HOLDER,
-    });
-  }
-  // /v1/reverse/:address
-  if (parts.length === 3 && parts[0] === "v1" && parts[1] === "reverse") {
-    const addr = parts[2];
-    const found = Object.entries(state.holders).find(([, h]) => h === addr);
-    if (!found) return json(res, 404, { error: "no_name" });
-    return json(res, 200, { name: found[0] });
-  }
-  // /v1/names/:ns/:label/history
-  if (
-    parts.length === 5 && parts[0] === "v1" && parts[1] === "names" && parts[4] === "history"
-  ) {
-    const name = `${parts[3]}.${parts[2]}`.toLowerCase();
-    const events = state.log[name];
-    if (!events && !(name in state.holders)) return json(res, 404, { error: "name_not_found", name });
-    const first = events?.find((e) => e.action === "issued");
-    return json(res, 200, {
-      name,
-      // Only what THIS server has witnessed — a from-latest start or seeded
-      // name has no issuance event; the platform indexer is the fuller source.
-      issuedAt: first?.at ?? "",
-      issuedLedger: first?.ledger ?? 0,
-      events: [...(events ?? [])].reverse(),
-    });
-  }
-  return json(res, 404, { error: "not_found" });
-});
+const http = createServer(createHandler(
+  () => state,
+  NAMESPACE,
+  (a) => StrKey.isValidEd25519PublicKey(a) || StrKey.isValidContract(a),
+));
 
 const registrarId = await resolveRegistrar();
 console.log(`hint server for .${NAMESPACE} — registrar ${registrarId}`);

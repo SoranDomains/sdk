@@ -1,0 +1,42 @@
+{
+  "format": "soran-public-release-catalog-v1",
+  "sourceRevision": "cec2d29bd392c64ac3e7f8d1d20d626736c72ce5",
+  "sourceInputs": [
+    {
+      "path": "web/lib/contractUpdates.ts",
+      "sha256": "3c95b562c05446f0f873c632dba69ed6f12f079961966f561003aab9e25c91ba"
+    },
+    {
+      "path": "deploy/testnet/upgrades/2026-10-01-subnames-candidate.json",
+      "sha256": "fb479f4dba8653e6cf08364629a456ada6a771545e82055ca320cc33266f93a1"
+    }
+  ],
+  "catalog": {
+    "registrar": {
+      "latest": "4d6d18625f4d890028acb794b24871c5c93f96dc15d94cf3d52cbf9713b07fb1",
+      "superseded": [
+        "42dc5f8b40932617d3f2667e1d26dad3e5e9a62c63de1fde7c016cb67a86c420",
+        "5c8ae72ea7370ccf19af52b9bbc0007362be94464651ccdf68a2bb1f478b6f2c",
+        "61ded153e6311075c1087c5639a5410222e23f7cade239ed2c946150af94b1c5",
+        "26e03cd1d7fbfa46fe442406fb1b88022ec8cd8bd9123bed570f971fce596a14"
+      ]
+    },
+    "resolver": {
+      "latest": "941bf87f26cb817f3c6a52a326de855cca8a1dc4477e62a38ec4ffa5c7f43806",
+      "superseded": [
+        "cb927ffa19d6b1f3f0b0187048d885e200adb6de3fddd11ee3cfeb59df9c5c48",
+        "351bf4e056b179b578fe2a4ea46f937bfafccc6538c7357ea70021b7038d91ea",
+        "c6dfcd7bbf35943a13406888678334d0938d0fea54939906b00c2dc37b4a9a71",
+        "5e7b4fb8d310d67ed6966a155e748d60be771422b3e8c34bbc14485f98525574"
+      ]
+    }
+  },
+  "artifacts": {
+    "registrar": {
+      "sha256": "4d6d18625f4d890028acb794b24871c5c93f96dc15d94cf3d52cbf9713b07fb1"
+    },
+    "resolver": {
+      "sha256": "941bf87f26cb817f3c6a52a326de855cca8a1dc4477e62a38ec4ffa5c7f43806"
+    }
+  }
+}

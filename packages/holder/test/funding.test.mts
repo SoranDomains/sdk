@@ -445,3 +445,19 @@ test("default service transport keeps the browser fetch receiver", async () => {
     globalThis.fetch = originalFetch;
   }
 });
+
+test('sponsorship adapter signs a C actor without treating its controlling G key as owner',async()=>{
+ const {SoranSponsorship}=await import('../src/funding-user.js');
+ const actor=C(21),i={...intent,actor,destination:{address:actor,memo:{type:'none' as const}}};
+ const q={...quote,actor,intentHash:sponsorIntentHash('reverse',i)};
+ const request={quote:q,intent:i},p=sponsorPlan(request,lookup,primary,100000n);
+ const auth=[new xdr.SorobanAuthorizationEntry({credentials:xdr.SorobanCredentials.sorobanCredentialsSourceAccount(),rootInvocation:authorizedInvocation(p.relayerInvocation)}),new xdr.SorobanAuthorizationEntry({credentials:xdr.SorobanCredentials.sorobanCredentialsAddress(new xdr.SorobanAddressCredentials({address:new Address(actor).toScAddress(),nonce:55n,signatureExpirationLedger:0,signature:xdr.ScVal.scvVoid()})),rootInvocation:authorizedInvocation(p.actorInvocation)})];
+ const client=new SoranSponsorship({fundingId:funding,registryId:C(6),lookupId:lookup,primaryId:primary});client.plan=async()=>p;client.server.getLatestLedger=async()=>({sequence:101}) as any;
+ let signatures=0;const adapter={address:actor,signAuthorization:async({signaturePayload}:any)=>{signatures++;return sc.bytes(user.sign(signaturePayload));}};
+ const result=await client.authorize(request,tx(auth,p.args).toXDR(),adapter,10000n,100000n);
+ validateSponsorTransaction(TransactionBuilder.fromXDR(result,client.passphrase) as any,p,101,true);
+ assert.equal(signatures,1);
+ await assert.rejects(client.authorize(request,tx(auth,p.args).toXDR(),user,10000n,100000n),/adapter/);
+ await assert.rejects(client.authorize(request,tx(auth,p.args).toXDR(),{...adapter,address:C(22)},10000n,100000n),/wallet/);
+ assert.equal(signatures,1);
+});

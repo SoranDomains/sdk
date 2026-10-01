@@ -7,7 +7,7 @@ export const MAX_PRIMARY_BATCH_READS = 16;
 export type RegisteredName = { registrar: string; node: string; holder: string; generation: bigint; expiresAt: bigint };
 export type NameState =
   | { kind: "namespaceMissing" | "registrarMissing" | "unregistered" }
-  | { kind: "active" | "expired"; record: RegisteredName };
+  | { kind: "active" | "expired" | "suspended"; record: RegisteredName };
 export type NameStatus = { name: string; ledger: number; timestamp: bigint; state: NameState };
 export type IdentityName =
   | { address: string; kind: "name"; name: string }
@@ -40,14 +40,14 @@ export function nameStatusFromNative(raw: unknown, expectedName: string, expecte
   const missing = { NamespaceMissing: "namespaceMissing", RegistrarMissing: "registrarMissing", Unregistered: "unregistered" } as const;
   if (Object.hasOwn(missing, v[0] as string) && v.length === 1) {
     state = { kind: missing[v[0] as keyof typeof missing] };
-  } else if ((v[0] === "Active" || v[0] === "Expired") && v.length === 2) {
+  } else if ((v[0] === "Active" || v[0] === "Expired" || v[0] === "Suspended") && v.length === 2) {
     const record = object(v[1], ["registrar", "node", "holder", "generation", "expires_at"]);
     if (!(record.node instanceof Uint8Array) || record.node.length !== 32) throw new Error("invalid status node");
     const node = Array.from(record.node, byte => byte.toString(16).padStart(2, "0")).join("");
     if (node !== expectedNode) throw new Error("status node mismatch");
     const expiresAt = u64(record.expires_at), active = expiresAt === 0n || timestamp <= expiresAt;
-    if (active !== (v[0] === "Active")) throw new Error("inconsistent status expiry");
-    state = { kind: active ? "active" : "expired", record: { registrar: address(record.registrar, true), node, holder: address(record.holder), generation: u64(record.generation), expiresAt } };
+    if (active !== (v[0] !== "Expired")) throw new Error("inconsistent status expiry");
+    state = { kind: v[0] === "Suspended" ? "suspended" : active ? "active" : "expired", record: { registrar: address(record.registrar, true), node, holder: address(record.holder), generation: u64(record.generation), expiresAt } };
   } else throw new Error("unknown or malformed status variant");
   return { name: expectedName, ledger, timestamp, state };
 }

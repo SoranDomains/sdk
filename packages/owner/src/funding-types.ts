@@ -18,6 +18,35 @@ import {
 import { destinationFromNative, type PaymentDestination } from "./payment.js";
 import { claimIntentToScVal, type ClaimIntent } from "./native-types.js";
 
+/** Read a response body as text, refusing more than `limit` bytes, declared or streamed, so a hostile or broken endpoint cannot make the client buffer it all. Returns null over the limit. */
+export async function readBoundedText(response: Response, limit: number): Promise<string | null> {
+  if (Number(response.headers.get("content-length") ?? 0) > limit) {
+    await response.body?.cancel().catch(() => undefined);
+    return null;
+  }
+  const reader = response.body?.getReader();
+  if (!reader) return "";
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > limit) {
+      await reader.cancel().catch(() => undefined);
+      return null;
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
+}
+
 export class FundingError extends Error {
   constructor(
     message: string,

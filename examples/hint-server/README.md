@@ -1,10 +1,5 @@
 # Self-hosted hint server
 
-This historical example exposes the earlier, unpaginated discovery format. It does
-not implement the cursor and coverage contract required for complete holdings in
-lookup 0.6.0. Use a compatible current indexer for `namesOfPage` and do not treat
-this example's holdings response as a complete inventory.
-
 A complete, self-hostable hint server for one namespace in a single file —
 the discovery source `@sorandomains/lookup` uses as its `hintUrl`.
 
@@ -42,7 +37,7 @@ they left off), and serves:
 | `/v1/reverse/:address` | reverse candidate hint |
 | `/v1/showcase` | the namespace list for `reverseLookup` |
 | `/v1/names/:ns/:label/history` | lifecycle timeline (informational — only events this server has witnessed) |
-| `/healthz` | name count + last indexed ledger |
+| `/healthz` | name count, last indexed ledger and `undecodableEvents` (events that could not be decoded; they are skipped and counted, never silently lost) |
 
 ## Bootstrapping older names
 

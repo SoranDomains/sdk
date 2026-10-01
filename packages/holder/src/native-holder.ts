@@ -1,7 +1,7 @@
 import { hash, scValToNative, xdr } from "@stellar/stellar-sdk";
 import { NativeClaimError, address, bytes32, exactObject, hex, hex32, label, namespaceNode, sc, u64, unhex, utf8 } from "./native-codec.js";
 import { authorizedInvocation, type NativeAuthorizationPlan, type NativeInvocation } from "./native-auth.js";
-import { nativeCapability, requireNative, requireReadLedger, verifyRegistrarProvenance, prepareNative, sendNative, type NativeContext, type NativeWriteOptions, type NativePrepared } from "./native-transport.js";
+import { nativeIdentity, nativeWalletPlan, nativeCapability, requireNative, requireReadLedger, verifyRegistrarProvenance, prepareNative, sendNative, type NativeContext, type NativeWriteOptions, type NativePrepared } from "./native-transport.js";
 import { claimIntentToScVal, claimIntentFromNative, claimQuoteFromNative, claimReceiptFromNative, claimResultFromNative, destinationPreviewFromNative, transferIntentToScVal, renewIntentToScVal, nativeIntentHash, claimLabelToScVal, type ClaimIntent, type ClaimQuote, type ClaimReceipt, type ClaimResult, type RequestContext, type TransferIntent, type RenewIntent, type DestinationPreview } from "./native-types.js";
 import { paymentDestinationToScVal } from "./native-codec.js";
 import { validatePaymentDestination, type PaymentDestination } from "./payment.js";
@@ -79,9 +79,17 @@ export class NativeHolderClient {
   if(version!==1)throw new NativeClaimError("unsupported native claim version","unsupported");
   if(!Array.isArray(anchors)||anchors.length!==2||anchors[0]!==this.context.registryId||hex(bytes32(anchors[1],"namespace anchor"))!==node)throw new NativeClaimError("Registrar anchors differ from intent","unavailable");
  }
+ private async requireContractClaim(registrar:string,wallet:string):Promise<void>{
+  if(!wallet.startsWith("C"))return;
+  let version:unknown;
+  try{version=await this.context.read(registrar,"contract_claim_version",[]);}
+  catch{throw new NativeClaimError("Could not verify contract-wallet claiming support. The namespace owner may need to upgrade its Registrar.","unavailable");}
+  if(version!==1)throw new NativeClaimError("This namespace needs a Registrar upgrade before a contract wallet can claim a name.","unsupported");
+ }
  async claimQuote(name:string,claimant?:string):Promise<ClaimQuote>{
   const parsed=names(name);const cap=await requireNative(this.context,parsed.namespace);
-  const wallet=address(claimant??await this.context.signer.publicKey(),"account","claimant");
+  const wallet=address(claimant??await nativeIdentity(this.context),"identity","claimant");
+  await this.requireContractClaim(cap.registrar,wallet);
   const quote=claimQuoteFromNative(await this.context.read(cap.registrar,"claim_quote",[claimLabelToScVal(parsed.label),sc.address(wallet)]));
   this.checkQuote(quote,cap.registrar,hex(namespaceNode(parsed.namespace)),parsed.label,wallet);
   if(quote.resolver!==cap.resolver)throw new NativeClaimError("quote Resolver differs from the selected native binding","unavailable");
@@ -117,8 +125,9 @@ export class NativeHolderClient {
  }
  private async planClaim(input:ClaimIntent,proof:readonly string[]=[]):Promise<{intent:ClaimIntent;plan:NativeAuthorizationPlan}>{
   const encoded=claimIntentToScVal(input);const intent=claimIntentFromNative(scValToNative(encoded));scoped(this.context,intent.context);
-  const wallet=address(await this.context.signer.publicKey(),"account","claimant");if(intent.claimant!==wallet)throw new NativeClaimError("intent claimant is not the connected wallet","authorization");
+  const wallet=await nativeIdentity(this.context);if(intent.claimant!==wallet)throw new NativeClaimError("intent claimant is not the connected wallet","authorization");
   await this.checkRegistrar(intent.context.registrar,intent.context.namespace);
+  await this.requireContractClaim(intent.context.registrar,wallet);
   const pair=await this.context.read(this.context.registryId,"native_contracts",[sc.bytes(unhex(intent.context.namespace))]);
   if(!Array.isArray(pair)||pair.length!==2||pair[0]!==intent.context.registrar||pair[1]!==intent.resolver)throw new NativeClaimError("intent differs from current clean native contract bindings","unavailable");
   const quote=claimQuoteFromNative(await this.context.read(intent.context.registrar,"claim_quote",[claimLabelToScVal(intent.label),sc.address(wallet)]));this.checkQuote(quote,intent.context.registrar,intent.context.namespace,intent.label,wallet);
@@ -133,7 +142,7 @@ export class NativeHolderClient {
   const children:NativeInvocation[]=[];
   if(intent.feeAmount>0n)children.push({contract:intent.feeToken,method:"transfer",args:[sc.address(wallet),sc.address(intent.feeRecipient),sc.i128(intent.feeAmount)]});
   children.push(initialization(intent.resolver,intent.label,wallet,intent.expectedGeneration===null?0n:intent.expectedGeneration+1n,intent.destination));
-  const plan:NativeAuthorizationPlan={source:wallet,contract:intent.context.registrar,method:"claim",args:[encoded,xdr.ScVal.scvVec(proof.map(value=>sc.bytes(unhex(value))))],sourceInvocation:{contract:intent.context.registrar,method:"claim",args:[encoded],children},maxFeeStroops:this.context.maxFeeStroops};
+  const plan:NativeAuthorizationPlan={...await nativeWalletPlan(this.context),contract:intent.context.registrar,method:"claim",args:[encoded,xdr.ScVal.scvVec(proof.map(value=>sc.bytes(unhex(value))))],sourceInvocation:{contract:intent.context.registrar,method:"claim",args:[encoded],children},maxFeeStroops:this.context.maxFeeStroops};
   if(admission.type==="approval"){
    if(admission.account===wallet||admission.account===intent.feeRecipient)throw new NativeClaimError("eligibility account must be separate from claimant and treasury","authorization");
    if(intent.context.deadline-intent.context.validAfter>config.settings.approvalTtlSecs)throw new NativeClaimError("claim lifetime exceeds the current approval lifetime");
@@ -166,7 +175,7 @@ export class NativeHolderClient {
  }
  async renewName(input:RenewIntent,options:NativeWriteOptions={}):Promise<NativeClaimSubmission>{return this.lifecycle("renew_holder",input.context,input.holder,renewIntentToScVal(input),input.label,null,options);}
  private async lifecycle(method:"accept_transfer_with_destination"|"renew_holder",request:RequestContext,holder:string,intent:xdr.ScVal,nameLabel:string,child:NativeInvocation|null,options:NativeWriteOptions):Promise<NativeClaimSubmission>{
-  request={...request};scoped(this.context,request);return this.context.serialize(async()=>{await verifyRegistrarProvenance(this.context,request.registrar,request.namespace);const old=await this.receiptAt(request.registrar,request.namespace,holder,request.requestId);if(old){receiptMatches(old,method,intent,holder);return{status:"replayed",receipt:old,transaction:null};}await this.checkRegistrar(request.registrar,request.namespace);if(child){const pair=await this.context.read(this.context.registryId,"native_contracts",[sc.bytes(unhex(request.namespace))]);if(!Array.isArray(pair)||pair.length!==2||pair[0]!==request.registrar||pair[1]!==child.contract)throw new NativeClaimError("transfer initializer differs from clean native bindings","unavailable");}const source=address(await this.context.signer.publicKey(),"account","holder source");if(source!==holder)throw new NativeClaimError("connected wallet is not the intended holder/recipient","authorization");
-   const result=await sendNative(this.context,{source,contract:request.registrar,method,args:[intent],sourceInvocation:{contract:request.registrar,method,args:[intent],children:child?[child]:[]},maxFeeStroops:this.context.maxFeeStroops},options);return confirmedResult(this.context,result,method,intent,holder);});
+  request={...request};scoped(this.context,request);return this.context.serialize(async()=>{await verifyRegistrarProvenance(this.context,request.registrar,request.namespace);const old=await this.receiptAt(request.registrar,request.namespace,holder,request.requestId);if(old){receiptMatches(old,method,intent,holder);return{status:"replayed",receipt:old,transaction:null};}await this.checkRegistrar(request.registrar,request.namespace);if(child){const pair=await this.context.read(this.context.registryId,"native_contracts",[sc.bytes(unhex(request.namespace))]);if(!Array.isArray(pair)||pair.length!==2||pair[0]!==request.registrar||pair[1]!==child.contract)throw new NativeClaimError("transfer initializer differs from clean native bindings","unavailable");}const wallet=await nativeIdentity(this.context);if(wallet!==holder)throw new NativeClaimError("connected wallet is not the intended holder/recipient","authorization");
+   const result=await sendNative(this.context,{...await nativeWalletPlan(this.context),contract:request.registrar,method,args:[intent],sourceInvocation:{contract:request.registrar,method,args:[intent],children:child?[child]:[]},maxFeeStroops:this.context.maxFeeStroops},options);return confirmedResult(this.context,result,method,intent,holder);});
  }
 }
