@@ -12,7 +12,6 @@
     "documentation"
   ],
   "notSynced": [
-    "MCP source/dependencies (second stage after core publication)",
     "private API implementation",
     "private contract source"
   ],
@@ -993,16 +992,18 @@
     {
       "source": "sdk/README.md",
       "destination": "README.md",
-      "sourceSha256": "ceae92cd73fd1eb205e298942e262ea3037fa3cdc44ec2c5f24d9d1760359a2a",
-      "destinationSha256": "20fbe04ee1c8d790d6995d1ed8837ee3d5f63c653370ca45743238745d852723",
-      "exact": false
+      "sourceSha256": "62fa96c611f0d624153460b62856748948be9ce5c11711dc38880c7ea81bf095",
+      "destinationSha256": "3e1a8bc521c74d0909cf08b52ac49e587fe15e61cff711c319a9b38797680a8d",
+      "exact": false,
+      "sourceRevision": "9cc027804f2e7363f1cabcd99eb25839355e3f0b"
     },
     {
       "source": "sdk/NATIVE-CLAIMS.md",
       "destination": "NATIVE-CLAIMS.md",
-      "sourceSha256": "3a68c2b324941bb0f45c001027181c5bacc4636c7b0336133029dba593c2e311",
-      "destinationSha256": "85b9b95724856289a2c2b3719e8ce61615c0c7e38afd1a5b1d8883d69f360929",
-      "exact": false
+      "sourceSha256": "164dd191b903577c0f089ddaa211a72a415e703d4e6725f304f3cd076d9220de",
+      "destinationSha256": "ef2f9cfabd50705d3937ad5ff26cfd90ef17039b3a916797e5da15cd236269f0",
+      "exact": false,
+      "sourceRevision": "9cc027804f2e7363f1cabcd99eb25839355e3f0b"
     },
     {
       "source": "sdk/multichain/README.md",
@@ -1029,5 +1030,10 @@
       "sha256": "8c612d7497b4e1ae175bbf04bc1d472365fb73283dd89d648d2cf173f12b64b2"
     }
   ],
-  "productionSourcesUnchanged": true
+  "productionSourcesUnchanged": true,
+  "sourceRevisions": {
+    "core": "cec2d29bd392c64ac3e7f8d1d20d626736c72ce5",
+    "mcp": "9cc027804f2e7363f1cabcd99eb25839355e3f0b"
+  },
+  "additionalSyncManifest": "mcp-sync-manifest.json"
 }

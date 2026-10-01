@@ -10,7 +10,7 @@ export async function namespaceResolverState(options: {
 }): Promise<{ registrar: string; resolver: string | null }> {
   const { registry, node, wallet, passphrase, expectedResolver } = options;
   if (!StrKey.isValidContract(registry)) throw new Error("Resolver setup requires a locally pinned Registry");
-  const server = new rpc.Server(options.rpcUrl, { timeout: 10000 });
+  const server = new rpc.Server(options.rpcUrl, { timeout: 10000, allowHttp: /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?(\/|$)/i.test(options.rpcUrl) });
   const nodeArg = xdr.ScVal.scvBytes(node);
   async function read(method: string): Promise<xdr.ScVal> {
     const tx = new TransactionBuilder(new Account(wallet, "0"), { fee: "100", networkPassphrase: passphrase })

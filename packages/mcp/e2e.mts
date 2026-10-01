@@ -14,6 +14,13 @@ const check = (n: string, ok: boolean, d = "") => {
 const textOf = (r: { content?: Array<{ type: string; text?: string }> }) =>
   r.content?.find((c) => c.type === "text")?.text ?? "";
 const jsonOf = (r: Parameters<typeof textOf>[0]) => JSON.parse(textOf(r));
+/** State-changing tools refuse until repeated with the operation-bound `confirm` code from the refusal.
+ *  This script plays the approving human: it repeats the call once with that code. */
+async function confirmed(client: Client, name: string, args: Record<string, unknown>) {
+  const first = await client.callTool({ name, arguments: args });
+  const body = first.isError ? JSON.parse(textOf(first as Parameters<typeof textOf>[0])) : null;
+  return body?.error === "ConfirmationRequired" ? client.callTool({ name, arguments: { ...args, confirm: body.confirm } }) : first;
+}
 
 async function connect(env: Record<string, string>) {
   const client = new Client({ name: "e2e", version: "0.0.0" });
@@ -51,7 +58,7 @@ check("write tools present with secret", ["issue_name", "set_profile", "claim_di
 // a namespace owner issues the agent a name (separate server instance = the owner's agent)
 const issuer = await connect({ SORAN_SECRET: process.env.SORAN_ISSUER_SECRET! });
 const label = `agent-${Date.now().toString(36).slice(-5)}`;
-const issued = jsonOf(await issuer.callTool({ name: "issue_name", arguments: { namespace: "acme", label, holder: wallet.publicKey } }));
+const issued = jsonOf(await confirmed(issuer, "issue_name", { namespace: "acme", label, holder: wallet.publicKey }));
 check("owner agent issues name", typeof issued.hash === "string", `${label}.acme`);
 
 // the agent claims it as its display name (auto setRecord-first path)
@@ -65,7 +72,7 @@ const prof = jsonOf(await c2.callTool({ name: "set_profile", arguments: { name: 
 check("set_profile", Array.isArray(prof) && prof[0]?.key === "description");
 
 // cleanup: clear primary via holder tooling is not exposed — owner reclaims (records die by generation)
-const back = jsonOf(await issuer.callTool({ name: "reclaim_name", arguments: { namespace: "acme", label } }));
+const back = jsonOf(await confirmed(issuer, "reclaim_name", { namespace: "acme", label }));
 check("cleanup reclaim", typeof back.hash === "string");
 await c2.close(); await issuer.close();
 

@@ -64,7 +64,7 @@ async function fixture(t: any, options: {version?: 0 | 1 | null; maxFee?: string
     return Response.json({ok: state.lose !== 'pending', pending: state.lose === 'pending', txHash: state.lose === 'wrong_hash' ? '0'.repeat(64) : hash, resolverId: ordinary});
   };
   await registerWriteTools({tool(name: string, _d: string, _s: any, cb: any) {handlers.set(name, cb);}} as never,
-    {secret: key.secret(), registryId: registry, registryDeploymentSaltVersion: options.version === null ? undefined : options.version ?? 1, hintUrl: 'https://fixture.invalid', maxNetworkFeeStroops: options.maxFee === undefined ? undefined : BigInt(options.maxFee)});
+    {secret: key.secret(), requireConfirmation: false, registryId: registry, registryDeploymentSaltVersion: options.version === null ? undefined : options.version ?? 1, hintUrl: 'https://fixture.invalid', maxNetworkFeeStroops: options.maxFee === undefined ? undefined : BigInt(options.maxFee)});
   return {state, deploy: () => handlers.get('deploy_namespace_resolver')!(args), confirm: (extra: any = {}) => handlers.get('confirm_namespace_resolver')!({namespace: 'nova', ...extra})};
 }
 

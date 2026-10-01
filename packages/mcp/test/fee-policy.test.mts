@@ -1,7 +1,5 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
 import { Account, Contract, Keypair, Networks, Operation, SorobanDataBuilder, StrKey, TransactionBuilder } from "@stellar/stellar-sdk";
 import { SoranOwner } from "@sorandomains/owner";
 import { feeBoundSigner, networkFeeLimit } from "../src/fee-policy.js";
@@ -32,7 +30,7 @@ test("registered legacy SDK tool cannot evade the local operator limit", async (
       throw new Error("SIGNING_SHOULD_HAVE_BEEN_BLOCKED");
     };
     const handlers = new Map<string, (args: any) => Promise<any>>();
-    await registerWriteTools({ tool(name: string, _desc: string, _schema: any, handler: any) { handlers.set(name, handler); } } as any, { secret: key.secret() });
+    await registerWriteTools({ tool(name: string, _desc: string, _schema: any, handler: any) { handlers.set(name, handler); } } as any, { secret: key.secret(), requireConfirmation: false });
     const result = await handlers.get("renew_name")!({ namespace: "nova", label: "audit", extendSecs: 60 });
     assert.equal(result.isError, true); assert.match(result.content[0].text, /operator maximum 50000000/);
   } finally { SoranOwner.prototype.renew = original; }
@@ -43,13 +41,6 @@ test("cap options keep native override compatibility and reject invalid values",
   assert.equal(networkFeeLimit({ maxNativeFeeStroops: 600_000_000n }), 600_000_000n);
   assert.equal(networkFeeLimit({ maxNetworkFeeStroops: 1000n, maxNativeFeeStroops: 600_000_000n }), 1000n);
   for (const value of [0n, -1n, 4294967296n, 1, "1"]) assert.throws(() => networkFeeLimit({ maxNetworkFeeStroops: value } as any), /maximum network fee/);
-});
-
-test("stdio rejects malformed total fee limits before write-tool registration", () => {
-  for (const value of ["0", "050000000", "4294967296", "50000000n"]) {
-    const result = spawnSync(process.execPath, [fileURLToPath(new URL("../dist/stdio.js", import.meta.url))], { env: { SORAN_MAX_NETWORK_FEE_STROOPS: value }, encoding: "utf8", timeout: 5000 });
-    assert.notEqual(result.status, 0); assert.match(result.stderr, /SORAN_MAX_NETWORK_FEE_STROOPS must be canonical decimal/);
-  }
 });
 
 test("every SDK signer rejects unbounded or expired signing requests", async () => {

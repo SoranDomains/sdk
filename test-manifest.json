@@ -4,7 +4,9 @@
   "portableSuites": {
     "lookup": "packages/lookup/package.json scripts.test (all test/*.test.mts)",
     "owner": "packages/owner/package.json scripts.test (explicit funding/native/multichain/subname suites, unchanged from source)",
-    "holder": "packages/holder/package.json scripts.test (explicit payment/funding/native/multichain/subname suites, unchanged from source)"
+    "holder": "packages/holder/package.json scripts.test (explicit payment/funding/native/multichain/subname suites, unchanged from source)",
+    "mcp": "packages/mcp/package.json scripts.test (16 source tests plus two preserved mirror-only regression files; unchanged discovery)",
+    "nativeSignup": "examples/native-signup/package.json scripts.test (unchanged source flow.test.mts against published core versions)"
   },
   "adaptations": [
     {
@@ -48,30 +50,63 @@
       "claimedAsPublicCi": false
     },
     {
+      "source": "sdk/mcp/test/api-recovery.test.mts",
+      "sourceSha256": "42ff623318ae60d5c2127050c0e2045db0f5e8a8a4f8976c307261bc0fe50551",
+      "reason": "Uses real private API auth/scope, deployment, confirmation, relay and database modules. Required full monorepo CI gate; not run or silently skipped in the public mirror.",
+      "requiredMonorepoCi": true,
       "scope": "sdk/mcp/test/api-recovery.test.mts",
-      "reason": "Imports private API implementation and dependencies. MCP is not changed in this first-stage mirror sync.",
-      "claimedAsPublicCi": false
+      "sourceRevision": "9cc027804f2e7363f1cabcd99eb25839355e3f0b",
+      "claimedAsPublicCi": false,
+      "status": "Full monorepo CI required for the recorded source or an identical Git tree before MCP publication."
     }
-  ],
-  "unchangedExistingChecks": [
-    "packages/mcp retains existing mirror0.9.5 build/typecheck/tests and critical audit",
-    "examples/native-signup retains published dependency typecheck and recovery tests"
   ],
   "newMirrorChecks": [
     "node scripts/verify-sync.mjs",
     "node --test scripts/verify-sync.test.mjs",
     "Core npm audit --audit-level=high",
-    "Core builds, typechecks, package suites and browser checks"
+    "Core builds, typechecks, package suites and browser checks",
+    "node scripts/verify-mcp-sync.mjs",
+    "node --test scripts/verify-mcp-sync.test.mjs",
+    "MCP and native-signup npm audit --audit-level=high",
+    "MCP build/typecheck and every portable test; native-signup typecheck and recovery tests"
   ],
   "publicationScope": [
-    "lookup0.11.0",
-    "owner0.12.0",
-    "holder0.10.0"
+    "mcp0.10.0 candidate"
   ],
   "notClaimed": [
     "Private API integration executed in public mirror",
     "Private Rust sources compiled in public mirror",
     "MCP0.10.0 published",
     "Provenance attestation for local npm publication"
+  ],
+  "sourceRevisions": {
+    "core": "cec2d29bd392c64ac3e7f8d1d20d626736c72ce5",
+    "mcp": "9cc027804f2e7363f1cabcd99eb25839355e3f0b"
+  },
+  "publicationState": {
+    "core": "lookup0.11.0, owner0.12.0, holder0.10.0 published 2026-10-01",
+    "mcp": "0.10.0 candidate; publication pending"
+  },
+  "retainedPublicTests": [
+    {
+      "sourceRepository": "SoranDomains/sdk",
+      "sourceRevision": "891330d5451ff3b9f3b4285c5811298a1d972846",
+      "source": "packages/mcp/test/session-scope.test.mts",
+      "destination": "packages/mcp/test/session-scope.test.mts",
+      "sourceSha256": "097668c5222657f2bcb5f7448ddb77f007455e8e336bfdb2a674b721d3d438fe",
+      "destinationSha256": "297cd76d4a26d36c5c4da5c9a0de21c51ced7af4a694ee475b0ad3dc38e936e7",
+      "exact": false,
+      "adaptation": "Disable the new confirmation gate only in this session-ordering fixture; independent confirmation.test.mts covers the gate."
+    },
+    {
+      "sourceRepository": "SoranDomains/sdk",
+      "sourceRevision": "891330d5451ff3b9f3b4285c5811298a1d972846",
+      "source": "packages/mcp/test/submission.test.mts",
+      "destination": "packages/mcp/test/submission.test.mts",
+      "sourceSha256": "d199051cbbcd28114b6dc2af9ba3a4120922e684c4553f2b4bf7f9375bab1d62",
+      "destinationSha256": "d199051cbbcd28114b6dc2af9ba3a4120922e684c4553f2b4bf7f9375bab1d62",
+      "exact": true,
+      "adaptation": "Unchanged standalone ambiguous-submission regression."
+    }
   ]
 }

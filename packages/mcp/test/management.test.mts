@@ -65,7 +65,7 @@ async function setup(prep: Record<string, unknown>, ch = challenge(), deployment
     } else throw new Error(`unexpected fetch ${path}`);
     return new Response(JSON.stringify(body), { status: 200 });
   };
-  await registerWriteTools({ tool(n: string, _d: string, _s: unknown, fn: (arg: any) => Promise<any>) { handlers.set(n, fn); schemas.set(n,_s); } } as never, { secret: key.secret(), registryId: selectedRegistry, allocatorId: allocator, ...(deploymentVersion === null ? {} : { registryDeploymentSaltVersion: deploymentVersion }) });
+  await registerWriteTools({ tool(n: string, _d: string, _s: unknown, fn: (arg: any) => Promise<any>) { handlers.set(n, fn); schemas.set(n,_s); } } as never, { secret: key.secret(), requireConfirmation: false, registryId: selectedRegistry, allocatorId: allocator, ...(deploymentVersion === null ? {} : { registryDeploymentSaltVersion: deploymentVersion }) });
   return { handlers, schemas, restore: () => { globalThis.fetch = saved; Owner.prototype.policy = savedPolicy; Owner.prototype.registrarOf = savedRegistrar; }, submissions: () => submissions, challenges: () => challenges, cancellations: () => cancellations, scopedRequests: () => scopedRequests };
 }
 test("MCP withdrawal signs only selected Allocator/label and bounded fee", async () => {

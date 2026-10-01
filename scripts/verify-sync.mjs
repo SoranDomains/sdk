@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+export const MCP_REVISION = '9cc027804f2e7363f1cabcd99eb25839355e3f0b';
 export const SOURCE_REVISION = 'cec2d29bd392c64ac3e7f8d1d20d626736c72ce5';
 const sha256 = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 const safe = value => typeof value === 'string' && /^(?:[A-Za-z0-9_.-]+\/)*[A-Za-z0-9_.-]+$/.test(value) && !value.split('/').some(x => x === '.' || x === '..');
@@ -24,6 +25,11 @@ export function verifySync(root) {
   const seen = new Set();
   for (const row of manifest.files) {
     assert(safe(row.source) && safe(row.destination), 'Unsafe mapping path');
+    if (['README.md', 'NATIVE-CLAIMS.md'].includes(row.destination)) {
+      assert.equal(row.sourceRevision, MCP_REVISION, 'Shared document source override must be explicit');
+    } else {
+      assert.equal(row.sourceRevision ?? SOURCE_REVISION, SOURCE_REVISION, 'Core source revision changed');
+    }
     assert(!seen.has(row.destination), `Duplicate mapping: ${row.destination}`);
     seen.add(row.destination);
     assert(/^[a-f0-9]{64}$/.test(row.sourceSha256) && /^[a-f0-9]{64}$/.test(row.destinationSha256));
