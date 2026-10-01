@@ -47,7 +47,7 @@ all portable tests. No test is silently skipped.
    put authentication values in source, logs or a release receipt.
 5. MCP **0.10.0** uses the three published core versions as exact registry
    dependencies. Apply the same review, CI, archive and registry verification
-   gates to this second-stage candidate before publication.
+   gates to each second-stage release before publication.
 
 The current documented route is local npm publication. It does **not** generate
 GitHub CI provenance, and this release must not claim that it does. A future
@@ -57,8 +57,10 @@ administration is introduced here.
 
 ## MCP second-stage source
 
-Lookup 0.11.0, Owner 0.12.0 and Holder 0.10.0 were published on 1 October 2026.
-MCP 0.10.0 remains a publication candidate. It is exported from monorepo commit
+Lookup 0.11.0, Owner 0.12.0, Holder 0.10.0 and MCP 0.10.0 were published on
+1 October 2026. MCP was published at 12:15:28.309 UTC; its downloaded registry
+archive and integrity exactly match the reviewed archive. The publication record
+is in `mcp-sync-manifest.json`. MCP is exported from monorepo commit
 `9cc027804f2e7363f1cabcd99eb25839355e3f0b` onto public mirror base
 `891330d5451ff3b9f3b4285c5811298a1d972846`.
 
@@ -88,3 +90,10 @@ Run `node scripts/verify-mcp-sync.mjs` and its adjacent negative tests in additi
 to the core verifier. Before MCP publication, require full monorepo CI for the
 recorded source or a merge with the same Git tree, public mirror CI, and exact
 packed JavaScript/declaration parity against the reviewed source build.
+
+The publication-status update changes shared documentation and its derived hashes
+only. All package files and their source mappings, test fixtures and the reviewed
+npm archive remain unchanged from public release merge
+`2874fe4c5cb7a4253a0f685da95339e96314bc0f`. The MCP manifest retains the prior
+shared-document hashes for that release. Hosted rollout verification is separate
+and is not implied by npm publication.

@@ -993,7 +993,7 @@
       "source": "sdk/README.md",
       "destination": "README.md",
       "sourceSha256": "62fa96c611f0d624153460b62856748948be9ce5c11711dc38880c7ea81bf095",
-      "destinationSha256": "3e1a8bc521c74d0909cf08b52ac49e587fe15e61cff711c319a9b38797680a8d",
+      "destinationSha256": "0b8ebe0b11a42b9cae3298f3547a33cfe2837d391c997429d95e821e04964d43",
       "exact": false,
       "sourceRevision": "9cc027804f2e7363f1cabcd99eb25839355e3f0b"
     },
@@ -1001,7 +1001,7 @@
       "source": "sdk/NATIVE-CLAIMS.md",
       "destination": "NATIVE-CLAIMS.md",
       "sourceSha256": "164dd191b903577c0f089ddaa211a72a415e703d4e6725f304f3cd076d9220de",
-      "destinationSha256": "ef2f9cfabd50705d3937ad5ff26cfd90ef17039b3a916797e5da15cd236269f0",
+      "destinationSha256": "be3aee8196f2ee6ba854cf0756dc16b5a0c7d9304b29d7e7a5887c05884eb67f",
       "exact": false,
       "sourceRevision": "9cc027804f2e7363f1cabcd99eb25839355e3f0b"
     },

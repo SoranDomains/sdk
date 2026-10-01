@@ -404,10 +404,18 @@
         "destination": "README.md",
         "sourceRevision": "9cc027804f2e7363f1cabcd99eb25839355e3f0b",
         "sourceSha256": "62fa96c611f0d624153460b62856748948be9ce5c11711dc38880c7ea81bf095",
-        "destinationSha256": "3e1a8bc521c74d0909cf08b52ac49e587fe15e61cff711c319a9b38797680a8d",
+        "destinationSha256": "0b8ebe0b11a42b9cae3298f3547a33cfe2837d391c997429d95e821e04964d43",
         "exact": false
       },
-      "adaptation": "Public mirror links and explicit core-published/MCP-candidate availability."
+      "adaptation": "Public mirror links and registry-verified October 1 publication status; hosted deployment tracked separately.",
+      "publicationCandidateMapping": {
+        "source": "sdk/README.md",
+        "destination": "README.md",
+        "sourceRevision": "9cc027804f2e7363f1cabcd99eb25839355e3f0b",
+        "sourceSha256": "62fa96c611f0d624153460b62856748948be9ce5c11711dc38880c7ea81bf095",
+        "destinationSha256": "3e1a8bc521c74d0909cf08b52ac49e587fe15e61cff711c319a9b38797680a8d",
+        "exact": false
+      }
     },
     {
       "previous": {
@@ -422,10 +430,18 @@
         "destination": "NATIVE-CLAIMS.md",
         "sourceRevision": "9cc027804f2e7363f1cabcd99eb25839355e3f0b",
         "sourceSha256": "164dd191b903577c0f089ddaa211a72a415e703d4e6725f304f3cd076d9220de",
-        "destinationSha256": "ef2f9cfabd50705d3937ad5ff26cfd90ef17039b3a916797e5da15cd236269f0",
+        "destinationSha256": "be3aee8196f2ee6ba854cf0756dc16b5a0c7d9304b29d7e7a5887c05884eb67f",
         "exact": false
       },
-      "adaptation": "Public mirror links and explicit core-published/MCP-candidate availability."
+      "adaptation": "Public mirror links and registry-verified October 1 publication status; hosted deployment tracked separately.",
+      "publicationCandidateMapping": {
+        "source": "sdk/NATIVE-CLAIMS.md",
+        "destination": "NATIVE-CLAIMS.md",
+        "sourceRevision": "9cc027804f2e7363f1cabcd99eb25839355e3f0b",
+        "sourceSha256": "164dd191b903577c0f089ddaa211a72a415e703d4e6725f304f3cd076d9220de",
+        "destinationSha256": "ef2f9cfabd50705d3937ad5ff26cfd90ef17039b3a916797e5da15cd236269f0",
+        "exact": false
+      }
     }
   ],
   "corePublication": {
@@ -437,9 +453,22 @@
     }
   },
   "mcpPublication": {
+    "name": "@sorandomains/mcp",
     "version": "0.10.0",
-    "status": "candidate-publication-pending",
-    "previousNpmVersion": "0.9.6"
+    "status": "published",
+    "publishedAt": "2026-10-01T12:15:28.309Z",
+    "verifiedAt": "2026-10-01T12:15:32.294Z",
+    "latestTagVerified": true,
+    "registry": "https://registry.npmjs.org/@sorandomains%2fmcp/0.10.0",
+    "integrity": "sha512-iJqMQsd29vHo7jABoxyOZHs8gzhFopFTdOlbVYeXopPQLIx27SXs1pZu7tq10VkZSrh/NtCBeXFR87Xg1yhsGg==",
+    "shasum": "aa2bbc693fba460e6c6e560896fd1f52d0b8ed00",
+    "tarballSha256": "ba710e3ec152b0c2fb5a734fd694d51f6b27a09bc285fb8fee04b1838967f73b",
+    "registryArchiveMatchesReviewed": true,
+    "sourceRevision": "9cc027804f2e7363f1cabcd99eb25839355e3f0b",
+    "publicReleaseRevision": "2874fe4c5cb7a4253a0f685da95339e96314bc0f",
+    "registryVerificationReceiptSha256": "1833114f671e4e22e0d2aa04156eacb1da7612e550f0d07a6c37c92140b39547",
+    "provenanceAttestationClaimed": false,
+    "hostedDeploymentAttestedByThisRecord": false
   },
   "monorepoCiGate": {
     "sourceRevision": "9cc027804f2e7363f1cabcd99eb25839355e3f0b",
@@ -482,5 +511,11 @@
       "exact": true,
       "adaptation": "Unchanged standalone ambiguous-submission regression."
     }
-  ]
+  ],
+  "releaseCi": {
+    "sourcePullRequest": "https://github.com/SoranDomains/soran/pull/117",
+    "sourceChecksPassed": 18,
+    "publicPullRequest": "https://github.com/SoranDomains/sdk/pull/20",
+    "publicChecksPassed": 6
+  }
 }
