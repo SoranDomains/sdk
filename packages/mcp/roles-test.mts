@@ -24,7 +24,15 @@ async function agent(secret: string) {
   await c.connect(new StdioClientTransport({ command: "npx", args: ["tsx", "src/stdio.ts"], env: { ...process.env as Record<string,string>, SORAN_SECRET: secret } }));
   return c;
 }
-const call = (c: Client, name: string, args: Record<string, unknown> = {}) => c.callTool({ name, arguments: args }) as Promise<{ content?: Array<{ type: string; text?: string }>; isError?: boolean }>;
+type ToolResult = { content?: Array<{ type: string; text?: string }>; isError?: boolean };
+/** State-changing tools refuse until repeated with the operation-bound `confirm` code from the refusal.
+ *  This script plays the approving human: it repeats the call once with that code. */
+const call = async (c: Client, name: string, args: Record<string, unknown> = {}) => {
+  const first = await c.callTool({ name, arguments: args }) as ToolResult;
+  const body = first.isError ? j(first).data : null;
+  if (body && typeof body === "object" && body.error === "ConfirmationRequired") return await c.callTool({ name, arguments: { ...args, confirm: body.confirm } }) as ToolResult;
+  return first;
+};
 
 // ---- setup ----
 const holderKp = Keypair.random(), strangerKp = Keypair.random();

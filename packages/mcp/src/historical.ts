@@ -26,7 +26,7 @@ export async function recoverHistoricalSavedClaim(intentJson: string, options: R
 
   // Discover the successor through the stable trust anchor. The SDK repeats
   // this lookup and verifies the complete sealed lineage at monotonic ledgers.
-  const server = new rpc.Server(rpcUrl);
+  const server = new rpc.Server(rpcUrl, { allowHttp: /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?(\/|$)/i.test(rpcUrl) });
   const source = "GAJCWWNMBKCSTQQISDFTHFTCEOGXYA37YTP3U3ZW7Q5CYQPHSW6TB4QX";
   const tx = new TransactionBuilder(new Account(source, "0"), { fee: BASE_FEE, networkPassphrase: passphrase })
     .addOperation(new Contract(lookupId).call("registry")).setTimeout(30).build();
@@ -37,7 +37,7 @@ export async function recoverHistoricalSavedClaim(intentJson: string, options: R
   const registryId: unknown = scValToNative(discovery.result.retval);
   if (typeof registryId !== "string" || !StrKey.isValidContract(registryId)) throw new Error("Trusted Lookup returned an invalid Registry.");
   const client = new SoranHolder({
-    rpcUrl, passphrase, registryId, lookupId,
+    rpcUrl, passphrase, allowHttp: /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?(\/|$)/i.test(rpcUrl), registryId, lookupId,
     signer: {
       publicKey: () => { throw new Error("Historical recovery cannot request a wallet."); },
       signTransaction: async () => { throw new Error("Historical recovery cannot sign."); },

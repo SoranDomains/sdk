@@ -5,6 +5,7 @@ import { registerWriteTools } from "../src/tools.js";
 
 // Standalone client regression with in-memory sessions and a disposable key.
 // The API double enforces session selection and the namespace intent header.
+// Confirmation is tested separately; this fixture exercises only session ordering.
 const policy = { default_term_secs: "0", reclaimable: true, trade_fee_bps: 0, tradeable: false, transferable: false };
 const activation = { namespace: "liberty", policy, maxNetworkFeeStroops: "50000000" };
 const payload = (result: any) => JSON.parse(result.content[0].text);
@@ -63,7 +64,7 @@ async function fixture(initialNamespace: string, options: {
   };
   try {
     await registerWriteTools({ tool(name: string, _description: string, _schema: unknown, handler: any) { handlers.set(name, handler); } } as never,
-      { secret: key.secret(), hintUrl: "https://fixture.invalid" });
+      { secret: key.secret(), hintUrl: "https://fixture.invalid", requireConfirmation: false });
   } catch (error) { globalThis.fetch = original; throw error; }
   return { handlers, trace, preparedPolicies, logins: () => logins, restore: () => { globalThis.fetch = original; } };
 }

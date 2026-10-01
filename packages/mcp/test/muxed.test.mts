@@ -20,7 +20,7 @@ for(const [label,payment] of matrix)test(`MCP full read/write/schema matrix: ${l
   Soran.prototype.record=async()=>{if(payment.memo.type!=="none")throw new SoranError("memo required","PAYMENT_REQUIRED");return {name:"alice.nova",address:payment.address,node:"00".repeat(32),resolver:C};};
   Soran.prototype.assurance=async()=>({trustworthy:false} as any);
   SoranHolder.prototype.setPayment=async(_name,value)=>{assert.deepEqual(value,payment);return {hash:"h",ledger:1};};
-  const f=fake();registerReadTools(f.server as never);await registerWriteTools(f.server as never,{secret:kp.secret()});
+  const f=fake();registerReadTools(f.server as never);await registerWriteTools(f.server as never,{secret:kp.secret(),requireConfirmation:false});
   assert.deepEqual(f.schemas.get("set_payment").payment.parse(payment),payment);
   assert.deepEqual(f.schemas.get("verify_payment").payment.parse(payment),payment);
   const resolved=JSON.parse((await f.handlers.get("resolve_payment")!({name:"alice.nova"})).content[0].text);
@@ -33,7 +33,7 @@ for(const [label,payment] of matrix)test(`MCP full read/write/schema matrix: ${l
  }finally{Soran.prototype.resolvePayment=saved.resolve;Soran.prototype.verifyPayment=saved.verify;Soran.prototype.lookup=saved.lookup;Soran.prototype.record=saved.record;Soran.prototype.assurance=saved.assurance;SoranHolder.prototype.setPayment=saved.set;}
 });
 test("MCP schema rejects separate muxed memos, bad checksums and C memos before writes",async()=>{
- const f=fake();registerReadTools(f.server as never);await registerWriteTools(f.server as never,{secret:kp.secret()});const M=encodeMuxedAddress(G,"420");
+ const f=fake();registerReadTools(f.server as never);await registerWriteTools(f.server as never,{secret:kp.secret(),requireConfirmation:false});const M=encodeMuxedAddress(G,"420");
  for(const payment of [{address:M,memo:{type:"id",value:"420"}},{address:M,memo:{type:"text",value:"hi"}},{address:M,memo:{type:"hash",value:"ab".repeat(32)}},{address:M.slice(0,-1)+(M.endsWith("A")?"B":"A"),memo:{type:"none"}},{address:C,memo:{type:"id",value:"1"}},{address:G,memo:{type:"id",value:"-1"}},{address:G,memo:{type:"id",value:"18446744073709551616"}}])for(const tool of ["set_payment","verify_payment"])assert.throws(()=>f.schemas.get(tool).payment.parse(payment));
 });
 test("MCP surfaces a v1 muxed failure, without an address-shaped result",async()=>{
@@ -50,7 +50,7 @@ test("MCP M identity tools retain the exact destination and keep elections separ
   SoranHolder.prototype.setPrimaryMuxed=async(...args)=>{calls.push(["primary",...args]);return{hash:"p",ledger:1};};
   SoranHolder.prototype.clearReverseMuxed=async(...args)=>{calls.push(["clearReverse",...args]);return{hash:"cr",ledger:1};};
   SoranHolder.prototype.clearPrimaryMuxed=async(...args)=>{calls.push(["clearPrimary",...args]);return{hash:"cp",ledger:1};};
-  const f=fake();registerReadTools(f.server as never);await registerWriteTools(f.server as never,{secret:kp.secret()});
+  const f=fake();registerReadTools(f.server as never);await registerWriteTools(f.server as never,{secret:kp.secret(),requireConfirmation:false});
   assert.equal(JSON.parse((await f.handlers.get("reverse_lookup")!({address:M})).content[0].text).address,M);
   for(const kind of ["reverse","primary"]){
    const set=await f.handlers.get("set_muxed_display_name")!({name:"alice.nova",destination:M,kind});assert.equal(set.isError,undefined);

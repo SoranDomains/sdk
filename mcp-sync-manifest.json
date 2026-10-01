@@ -1,0 +1,486 @@
+{
+  "format": "soran-public-mcp-sync-v1",
+  "sourceRevision": "9cc027804f2e7363f1cabcd99eb25839355e3f0b",
+  "coreSourceRevision": "cec2d29bd392c64ac3e7f8d1d20d626736c72ce5",
+  "mirrorBase": "891330d5451ff3b9f3b4285c5811298a1d972846",
+  "coreSyncManifestSha256": "ae6180af3d7e2cf31eb8675590301e880acea17a011731af5319cefec1693233",
+  "files": [
+    {
+      "source": "sdk/examples/native-signup/README.md",
+      "destination": "examples/native-signup/README.md",
+      "sourceSha256": "ec6984596e67c7e10ab91d48c31362cef498bb3f92493c9390eea93a85dfaa8d",
+      "destinationSha256": "ec6984596e67c7e10ab91d48c31362cef498bb3f92493c9390eea93a85dfaa8d",
+      "exact": true
+    },
+    {
+      "source": "sdk/examples/native-signup/flow.test.mts",
+      "destination": "examples/native-signup/flow.test.mts",
+      "sourceSha256": "11e1f05f877474c0061a2f2016b6949dc9fc6a0672a57a47a1b91f48654628dc",
+      "destinationSha256": "11e1f05f877474c0061a2f2016b6949dc9fc6a0672a57a47a1b91f48654628dc",
+      "exact": true
+    },
+    {
+      "source": "sdk/examples/native-signup/flow.ts",
+      "destination": "examples/native-signup/flow.ts",
+      "sourceSha256": "3f4470cd034f16ed1c9b09c6b9494097f44dfc1c077d9c94d9274189608d1d1f",
+      "destinationSha256": "3f4470cd034f16ed1c9b09c6b9494097f44dfc1c077d9c94d9274189608d1d1f",
+      "exact": true
+    },
+    {
+      "source": "sdk/examples/native-signup/native-claim-v1.json",
+      "destination": "examples/native-signup/native-claim-v1.json",
+      "sourceSha256": "ab69675c2100ad01fbf8010e88ec5fe77fc19ca643103c2605e04dd9bc875d7c",
+      "destinationSha256": "ab69675c2100ad01fbf8010e88ec5fe77fc19ca643103c2605e04dd9bc875d7c",
+      "exact": true
+    },
+    {
+      "source": "sdk/examples/native-signup/package-lock.json",
+      "destination": "examples/native-signup/package-lock.json",
+      "sourceSha256": "f19f91f7b6cbe5e6761486863e0a357777f0bab286c733358062230e01bf99c4",
+      "destinationSha256": "f19f91f7b6cbe5e6761486863e0a357777f0bab286c733358062230e01bf99c4",
+      "exact": true
+    },
+    {
+      "source": "sdk/examples/native-signup/package.json",
+      "destination": "examples/native-signup/package.json",
+      "sourceSha256": "df2e54a788310433be307ca050a53350f9bd8dff06fc11cf8b85a6c84fd1aec6",
+      "destinationSha256": "df2e54a788310433be307ca050a53350f9bd8dff06fc11cf8b85a6c84fd1aec6",
+      "exact": true
+    },
+    {
+      "source": "sdk/mcp/LICENSE",
+      "destination": "packages/mcp/LICENSE",
+      "sourceSha256": "2bf49b4cb561f5c33d2e2b52abf0cc04e13947f26c1699d65e5e6f3af9857fe0",
+      "destinationSha256": "2bf49b4cb561f5c33d2e2b52abf0cc04e13947f26c1699d65e5e6f3af9857fe0",
+      "exact": true
+    },
+    {
+      "source": "sdk/mcp/README.md",
+      "destination": "packages/mcp/README.md",
+      "sourceSha256": "f77ad9dcf0bc2476d8dca89f965013b587ebfa4006ec25b51d35d23784eb7bfb",
+      "destinationSha256": "9b62571a33c4b6f798a7022479bc84a5a58cdf0bc09ab38b09b4480810b4c284",
+      "exact": false
+    },
+    {
+      "source": "sdk/mcp/e2e.mts",
+      "destination": "packages/mcp/e2e.mts",
+      "sourceSha256": "c3ab168b567b904e82703b0a520248d9402631ef607e16582465d81ffea40600",
+      "destinationSha256": "c3ab168b567b904e82703b0a520248d9402631ef607e16582465d81ffea40600",
+      "exact": true
+    },
+    {
+      "source": "sdk/mcp/package-lock.json",
+      "destination": "packages/mcp/package-lock.json",
+      "sourceSha256": "11974d55517a0a5233d740865277dab4defb3c8c764f10e65abf530ddfa73a7a",
+      "destinationSha256": "11974d55517a0a5233d740865277dab4defb3c8c764f10e65abf530ddfa73a7a",
+      "exact": true
+    },
+    {
+      "source": "sdk/mcp/package.json",
+      "destination": "packages/mcp/package.json",
+      "sourceSha256": "e398162dfc38f10ea473361ba9234287a222f8a763a3dcc288295f9826994a82",
+      "destinationSha256": "e398162dfc38f10ea473361ba9234287a222f8a763a3dcc288295f9826994a82",
+      "exact": true
+    },
+    {
+      "source": "sdk/mcp/roles-test.mts",
+      "destination": "packages/mcp/roles-test.mts",
+      "sourceSha256": "3cd6fd3e6720c99d0c9630f413c80b8835c1625b8c5eb481471e4b6d59e928bc",
+      "destinationSha256": "3cd6fd3e6720c99d0c9630f413c80b8835c1625b8c5eb481471e4b6d59e928bc",
+      "exact": true
+    },
+    {
+      "source": "sdk/mcp/src/confirm.ts",
+      "destination": "packages/mcp/src/confirm.ts",
+      "sourceSha256": "ccaf7c679b54b32d1fbd876a51d8868f596d64dafc468cf21e6e4379ccdd4d51",
+      "destinationSha256": "ccaf7c679b54b32d1fbd876a51d8868f596d64dafc468cf21e6e4379ccdd4d51",
+      "exact": true
+    },
+    {
+      "source": "sdk/mcp/src/deployment.ts",
+      "destination": "packages/mcp/src/deployment.ts",
+      "sourceSha256": "cfb23f224551f89127a3008b70ec77761cb073f173fb0f6e6131bab3ceaad6d8",
+      "destinationSha256": "cfb23f224551f89127a3008b70ec77761cb073f173fb0f6e6131bab3ceaad6d8",
+      "exact": true
+    },
+    {
+      "source": "sdk/mcp/src/fee-policy.ts",
+      "destination": "packages/mcp/src/fee-policy.ts",
+      "sourceSha256": "67330329c576f9a965d36e5d6164515a03b6c3a96fc65137f7a5c201dc2843e1",
+      "destinationSha256": "67330329c576f9a965d36e5d6164515a03b6c3a96fc65137f7a5c201dc2843e1",
+      "exact": true
+    },
+    {
+      "source": "sdk/mcp/src/historical.ts",
+      "destination": "packages/mcp/src/historical.ts",
+      "sourceSha256": "1f9a33fbb3e475c236e4256797d55a7c520dc10abd9e1827da77ede2fc2fbe41",
+      "destinationSha256": "1f9a33fbb3e475c236e4256797d55a7c520dc10abd9e1827da77ede2fc2fbe41",
+      "exact": true
+    },
+    {
+      "source": "sdk/mcp/src/http.ts",
+      "destination": "packages/mcp/src/http.ts",
+      "sourceSha256": "53f52600387f258ecadd883ee1744242067b118be8b631f20289680151af55b2",
+      "destinationSha256": "53f52600387f258ecadd883ee1744242067b118be8b631f20289680151af55b2",
+      "exact": true
+    },
+    {
+      "source": "sdk/mcp/src/prepared.ts",
+      "destination": "packages/mcp/src/prepared.ts",
+      "sourceSha256": "33434f22a8384974e35db86bc2a82cf2a045c9dc874cf4585061d15b195f7718",
+      "destinationSha256": "33434f22a8384974e35db86bc2a82cf2a045c9dc874cf4585061d15b195f7718",
+      "exact": true
+    },
+    {
+      "source": "sdk/mcp/src/registrar-policy.ts",
+      "destination": "packages/mcp/src/registrar-policy.ts",
+      "sourceSha256": "2eebef152bb15de01ee4e55933a986ed7cfc0b1c04b148431a888f5fafe88859",
+      "destinationSha256": "2eebef152bb15de01ee4e55933a986ed7cfc0b1c04b148431a888f5fafe88859",
+      "exact": true
+    },
+    {
+      "source": "sdk/mcp/src/resolver.ts",
+      "destination": "packages/mcp/src/resolver.ts",
+      "sourceSha256": "eebb7e5985160fa6ad0fdb7272ca58ced5852ddedef34eb7f568adf4ba807fc0",
+      "destinationSha256": "eebb7e5985160fa6ad0fdb7272ca58ced5852ddedef34eb7f568adf4ba807fc0",
+      "exact": true
+    },
+    {
+      "source": "sdk/mcp/src/stdio-env.ts",
+      "destination": "packages/mcp/src/stdio-env.ts",
+      "sourceSha256": "a3e20905e9bfa19d39b16a25ef1ce9a460d66e1826642ae98812fcdd6f11acac",
+      "destinationSha256": "a3e20905e9bfa19d39b16a25ef1ce9a460d66e1826642ae98812fcdd6f11acac",
+      "exact": true
+    },
+    {
+      "source": "sdk/mcp/src/stdio.ts",
+      "destination": "packages/mcp/src/stdio.ts",
+      "sourceSha256": "572315556f8de28e939a14bbd635bb65526669d48d2f6e1d6a9f3733b31723c9",
+      "destinationSha256": "572315556f8de28e939a14bbd635bb65526669d48d2f6e1d6a9f3733b31723c9",
+      "exact": true
+    },
+    {
+      "source": "sdk/mcp/src/submission.ts",
+      "destination": "packages/mcp/src/submission.ts",
+      "sourceSha256": "4dab3e5fd2b440b748a3b9e0d839ae602a30d8108ae9b33b3dda52185c69e6e3",
+      "destinationSha256": "4dab3e5fd2b440b748a3b9e0d839ae602a30d8108ae9b33b3dda52185c69e6e3",
+      "exact": true
+    },
+    {
+      "source": "sdk/mcp/src/tools.ts",
+      "destination": "packages/mcp/src/tools.ts",
+      "sourceSha256": "4ef9e81fbd735351232db8546229a8443b1dab0efd998a484f5a832c99a38691",
+      "destinationSha256": "4ef9e81fbd735351232db8546229a8443b1dab0efd998a484f5a832c99a38691",
+      "exact": true
+    },
+    {
+      "source": "sdk/mcp/test/allocations.test.mts",
+      "destination": "packages/mcp/test/allocations.test.mts",
+      "sourceSha256": "6b83836bc5cee3e904f7501cfac7b2fde8dc32c8e303d5510766c22e69381f68",
+      "destinationSha256": "6b83836bc5cee3e904f7501cfac7b2fde8dc32c8e303d5510766c22e69381f68",
+      "exact": true
+    },
+    {
+      "source": "sdk/mcp/test/confirmation.test.mts",
+      "destination": "packages/mcp/test/confirmation.test.mts",
+      "sourceSha256": "47c4efed2ed2ae27fb5ace3e78ca4e92d26a10a008e1a77ea463d31400b84f45",
+      "destinationSha256": "47c4efed2ed2ae27fb5ace3e78ca4e92d26a10a008e1a77ea463d31400b84f45",
+      "exact": true
+    },
+    {
+      "source": "sdk/mcp/test/fee-policy.test.mts",
+      "destination": "packages/mcp/test/fee-policy.test.mts",
+      "sourceSha256": "f190b92125734ef163dcc8469a103bd7358e510ebc9e6ca86cc83555cff8bf5d",
+      "destinationSha256": "f190b92125734ef163dcc8469a103bd7358e510ebc9e6ca86cc83555cff8bf5d",
+      "exact": true
+    },
+    {
+      "source": "sdk/mcp/test/hardening.test.mts",
+      "destination": "packages/mcp/test/hardening.test.mts",
+      "sourceSha256": "90a8cc303feb2406c75f9053e61cab892295072526c40314e3eec6a34d34e07a",
+      "destinationSha256": "90a8cc303feb2406c75f9053e61cab892295072526c40314e3eec6a34d34e07a",
+      "exact": true
+    },
+    {
+      "source": "sdk/mcp/test/helpers/historical-sdk.ts",
+      "destination": "packages/mcp/test/helpers/historical-sdk.ts",
+      "sourceSha256": "7d770fe81bda009b57d13226489257e287ca55515a4479154c1373741aa7e0c8",
+      "destinationSha256": "7d770fe81bda009b57d13226489257e287ca55515a4479154c1373741aa7e0c8",
+      "exact": true
+    },
+    {
+      "source": "sdk/mcp/test/helpers/native-ledger.ts",
+      "destination": "packages/mcp/test/helpers/native-ledger.ts",
+      "sourceSha256": "899122f440ef1f086d688b9750c24f81a378edb690a293e96caf872fc8ff5930",
+      "destinationSha256": "899122f440ef1f086d688b9750c24f81a378edb690a293e96caf872fc8ff5930",
+      "exact": true
+    },
+    {
+      "source": "sdk/mcp/test/historical.test.mts",
+      "destination": "packages/mcp/test/historical.test.mts",
+      "sourceSha256": "191755d5c4ed115827e353df99036b21396f5f42739d152e5506b3cd7ed9773b",
+      "destinationSha256": "191755d5c4ed115827e353df99036b21396f5f42739d152e5506b3cd7ed9773b",
+      "exact": true
+    },
+    {
+      "source": "sdk/mcp/test/holdings-limit.test.mts",
+      "destination": "packages/mcp/test/holdings-limit.test.mts",
+      "sourceSha256": "d6a14ef223bce64f8c0f607a835da9d05420b8ff25e0e73970de195cc88f65fc",
+      "destinationSha256": "d6a14ef223bce64f8c0f607a835da9d05420b8ff25e0e73970de195cc88f65fc",
+      "exact": true
+    },
+    {
+      "source": "sdk/mcp/test/management.test.mts",
+      "destination": "packages/mcp/test/management.test.mts",
+      "sourceSha256": "39892ab1688d8a36f557edaefa0b4a15f576122d752ca75af7541d7a7ada36eb",
+      "destinationSha256": "39892ab1688d8a36f557edaefa0b4a15f576122d752ca75af7541d7a7ada36eb",
+      "exact": true
+    },
+    {
+      "source": "sdk/mcp/test/muxed.test.mts",
+      "destination": "packages/mcp/test/muxed.test.mts",
+      "sourceSha256": "c637de902d6121f9fd047a777ec5beb4f893fe076941c6ce9372dc9600ee2ee3",
+      "destinationSha256": "c637de902d6121f9fd047a777ec5beb4f893fe076941c6ce9372dc9600ee2ee3",
+      "exact": true
+    },
+    {
+      "source": "sdk/mcp/test/native-claims.test.mts",
+      "destination": "packages/mcp/test/native-claims.test.mts",
+      "sourceSha256": "d1e2a42c6900e52e64f175946fd8616de670e8ddbb8521d29119b55e2e7d3dab",
+      "destinationSha256": "d1e2a42c6900e52e64f175946fd8616de670e8ddbb8521d29119b55e2e7d3dab",
+      "exact": true
+    },
+    {
+      "source": "sdk/mcp/test/payment.test.mts",
+      "destination": "packages/mcp/test/payment.test.mts",
+      "sourceSha256": "fe89fc07570482aff7063ebddb45be1c72aafa74db67bdbc5f8a6564b012d5a5",
+      "destinationSha256": "fe89fc07570482aff7063ebddb45be1c72aafa74db67bdbc5f8a6564b012d5a5",
+      "exact": true
+    },
+    {
+      "source": "sdk/mcp/test/prepared.test.mts",
+      "destination": "packages/mcp/test/prepared.test.mts",
+      "sourceSha256": "ccfc39ebac3d4223be5bfa770de7074b84895e8232b7f993a401c305f6319926",
+      "destinationSha256": "ccfc39ebac3d4223be5bfa770de7074b84895e8232b7f993a401c305f6319926",
+      "exact": true
+    },
+    {
+      "source": "sdk/mcp/test/release-version.test.mts",
+      "destination": "packages/mcp/test/release-version.test.mts",
+      "sourceSha256": "bcf089fb27d9212804e5d2eeb86b607a821874a05375cc9106598aeb5541f93d",
+      "destinationSha256": "bcf089fb27d9212804e5d2eeb86b607a821874a05375cc9106598aeb5541f93d",
+      "exact": true
+    },
+    {
+      "source": "sdk/mcp/test/resolver.test.mts",
+      "destination": "packages/mcp/test/resolver.test.mts",
+      "sourceSha256": "29aa4721ba3b4c0f4732783a692bd503630bd72399960fba5e92eee5b288ad7a",
+      "destinationSha256": "29aa4721ba3b4c0f4732783a692bd503630bd72399960fba5e92eee5b288ad7a",
+      "exact": true
+    },
+    {
+      "source": "sdk/mcp/test/stdio-env.test.mts",
+      "destination": "packages/mcp/test/stdio-env.test.mts",
+      "sourceSha256": "fe5c92d90396018b0086f27ff0be5fe4c65ec4ee5f8a1a894b540ba70b1bbb03",
+      "destinationSha256": "fe5c92d90396018b0086f27ff0be5fe4c65ec4ee5f8a1a894b540ba70b1bbb03",
+      "exact": true
+    },
+    {
+      "source": "sdk/mcp/test/subnames.test.mts",
+      "destination": "packages/mcp/test/subnames.test.mts",
+      "sourceSha256": "c128edf83b52eb5e2453b9c48512fd9f3597c430bd66cba7488a5a29436486b0",
+      "destinationSha256": "c128edf83b52eb5e2453b9c48512fd9f3597c430bd66cba7488a5a29436486b0",
+      "exact": true
+    },
+    {
+      "source": "sdk/mcp/test/worker-compat.test.mts",
+      "destination": "packages/mcp/test/worker-compat.test.mts",
+      "sourceSha256": "12cd5d997e2307ae4611eec0d7b4cd588c1996b9001b5afe49c9fbe9458d2c37",
+      "destinationSha256": "12cd5d997e2307ae4611eec0d7b4cd588c1996b9001b5afe49c9fbe9458d2c37",
+      "exact": true
+    },
+    {
+      "source": "sdk/mcp/tsconfig.json",
+      "destination": "packages/mcp/tsconfig.json",
+      "sourceSha256": "e60a81c464c73c2ce104158d28ea61b7d2580b7f95b3e60e6e84fd2bd46015f2",
+      "destinationSha256": "e60a81c464c73c2ce104158d28ea61b7d2580b7f95b3e60e6e84fd2bd46015f2",
+      "exact": true
+    }
+  ],
+  "portableTests": [
+    {
+      "file": "packages/mcp/test/allocations.test.mts",
+      "sha256": "6b83836bc5cee3e904f7501cfac7b2fde8dc32c8e303d5510766c22e69381f68"
+    },
+    {
+      "file": "packages/mcp/test/confirmation.test.mts",
+      "sha256": "47c4efed2ed2ae27fb5ace3e78ca4e92d26a10a008e1a77ea463d31400b84f45"
+    },
+    {
+      "file": "packages/mcp/test/fee-policy.test.mts",
+      "sha256": "f190b92125734ef163dcc8469a103bd7358e510ebc9e6ca86cc83555cff8bf5d"
+    },
+    {
+      "file": "packages/mcp/test/hardening.test.mts",
+      "sha256": "90a8cc303feb2406c75f9053e61cab892295072526c40314e3eec6a34d34e07a"
+    },
+    {
+      "file": "packages/mcp/test/historical.test.mts",
+      "sha256": "191755d5c4ed115827e353df99036b21396f5f42739d152e5506b3cd7ed9773b"
+    },
+    {
+      "file": "packages/mcp/test/holdings-limit.test.mts",
+      "sha256": "d6a14ef223bce64f8c0f607a835da9d05420b8ff25e0e73970de195cc88f65fc"
+    },
+    {
+      "file": "packages/mcp/test/management.test.mts",
+      "sha256": "39892ab1688d8a36f557edaefa0b4a15f576122d752ca75af7541d7a7ada36eb"
+    },
+    {
+      "file": "packages/mcp/test/muxed.test.mts",
+      "sha256": "c637de902d6121f9fd047a777ec5beb4f893fe076941c6ce9372dc9600ee2ee3"
+    },
+    {
+      "file": "packages/mcp/test/native-claims.test.mts",
+      "sha256": "d1e2a42c6900e52e64f175946fd8616de670e8ddbb8521d29119b55e2e7d3dab"
+    },
+    {
+      "file": "packages/mcp/test/payment.test.mts",
+      "sha256": "fe89fc07570482aff7063ebddb45be1c72aafa74db67bdbc5f8a6564b012d5a5"
+    },
+    {
+      "file": "packages/mcp/test/prepared.test.mts",
+      "sha256": "ccfc39ebac3d4223be5bfa770de7074b84895e8232b7f993a401c305f6319926"
+    },
+    {
+      "file": "packages/mcp/test/release-version.test.mts",
+      "sha256": "bcf089fb27d9212804e5d2eeb86b607a821874a05375cc9106598aeb5541f93d"
+    },
+    {
+      "file": "packages/mcp/test/resolver.test.mts",
+      "sha256": "29aa4721ba3b4c0f4732783a692bd503630bd72399960fba5e92eee5b288ad7a"
+    },
+    {
+      "file": "packages/mcp/test/stdio-env.test.mts",
+      "sha256": "fe5c92d90396018b0086f27ff0be5fe4c65ec4ee5f8a1a894b540ba70b1bbb03"
+    },
+    {
+      "file": "packages/mcp/test/subnames.test.mts",
+      "sha256": "c128edf83b52eb5e2453b9c48512fd9f3597c430bd66cba7488a5a29436486b0"
+    },
+    {
+      "file": "packages/mcp/test/worker-compat.test.mts",
+      "sha256": "12cd5d997e2307ae4611eec0d7b4cd588c1996b9001b5afe49c9fbe9458d2c37"
+    }
+  ],
+  "omitted": [
+    {
+      "source": "sdk/mcp/test/api-recovery.test.mts",
+      "sourceSha256": "42ff623318ae60d5c2127050c0e2045db0f5e8a8a4f8976c307261bc0fe50551",
+      "reason": "Uses real private API auth/scope, deployment, confirmation, relay and database modules. Required full monorepo CI gate; not run or silently skipped in the public mirror.",
+      "requiredMonorepoCi": true
+    }
+  ],
+  "sharedFixture": {
+    "source": "sdk/holder/test/fixtures/native-claim-v1.json",
+    "destination": "packages/holder/test/fixtures/native-claim-v1.json",
+    "sha256": "ab69675c2100ad01fbf8010e88ec5fe77fc19ca643103c2605e04dd9bc875d7c",
+    "unchanged": true
+  },
+  "productionSourceByteIdentical": true,
+  "testScriptUnchanged": true,
+  "publishFileListUnchanged": true,
+  "sharedDocumentationOverrides": [
+    {
+      "previous": {
+        "source": "sdk/README.md",
+        "destination": "README.md",
+        "sourceSha256": "ceae92cd73fd1eb205e298942e262ea3037fa3cdc44ec2c5f24d9d1760359a2a",
+        "destinationSha256": "20fbe04ee1c8d790d6995d1ed8837ee3d5f63c653370ca45743238745d852723",
+        "exact": false
+      },
+      "current": {
+        "source": "sdk/README.md",
+        "destination": "README.md",
+        "sourceRevision": "9cc027804f2e7363f1cabcd99eb25839355e3f0b",
+        "sourceSha256": "62fa96c611f0d624153460b62856748948be9ce5c11711dc38880c7ea81bf095",
+        "destinationSha256": "3e1a8bc521c74d0909cf08b52ac49e587fe15e61cff711c319a9b38797680a8d",
+        "exact": false
+      },
+      "adaptation": "Public mirror links and explicit core-published/MCP-candidate availability."
+    },
+    {
+      "previous": {
+        "source": "sdk/NATIVE-CLAIMS.md",
+        "destination": "NATIVE-CLAIMS.md",
+        "sourceSha256": "3a68c2b324941bb0f45c001027181c5bacc4636c7b0336133029dba593c2e311",
+        "destinationSha256": "85b9b95724856289a2c2b3719e8ce61615c0c7e38afd1a5b1d8883d69f360929",
+        "exact": false
+      },
+      "current": {
+        "source": "sdk/NATIVE-CLAIMS.md",
+        "destination": "NATIVE-CLAIMS.md",
+        "sourceRevision": "9cc027804f2e7363f1cabcd99eb25839355e3f0b",
+        "sourceSha256": "164dd191b903577c0f089ddaa211a72a415e703d4e6725f304f3cd076d9220de",
+        "destinationSha256": "ef2f9cfabd50705d3937ad5ff26cfd90ef17039b3a916797e5da15cd236269f0",
+        "exact": false
+      },
+      "adaptation": "Public mirror links and explicit core-published/MCP-candidate availability."
+    }
+  ],
+  "corePublication": {
+    "date": "2026-10-01",
+    "versions": {
+      "@sorandomains/lookup": "0.11.0",
+      "@sorandomains/owner": "0.12.0",
+      "@sorandomains/holder": "0.10.0"
+    }
+  },
+  "mcpPublication": {
+    "version": "0.10.0",
+    "status": "candidate-publication-pending",
+    "previousNpmVersion": "0.9.6"
+  },
+  "monorepoCiGate": {
+    "sourceRevision": "9cc027804f2e7363f1cabcd99eb25839355e3f0b",
+    "pullRequest": "https://github.com/SoranDomains/soran/pull/117",
+    "requiredBeforePublication": true,
+    "publicMirrorDoesNotRunPrivateApiIntegration": true
+  },
+  "coreDependencies": {
+    "node_modules/@sorandomains/holder": {
+      "version": "0.10.0",
+      "integrity": "sha512-znVi8maRBlJk/X1qprBZVGVGVK6mX3d2ImuL+fpMRVmTTzTX9yFY75QB3+bIT+YYbhV5y/mAXAReEAPhXOks1A=="
+    },
+    "node_modules/@sorandomains/lookup": {
+      "version": "0.11.0",
+      "integrity": "sha512-kGstaH8Ub2Le/rHH9ORjD2fX1xJ/cC818U+Z9mTOf0sWc/hCCAvdu2M6jwgt/JiHRkzgVfEMq6QxeYUaatA+gw=="
+    },
+    "node_modules/@sorandomains/owner": {
+      "version": "0.12.0",
+      "integrity": "sha512-tLy0P2JJeC6ub8+zWYdYE+c4fCFR98UZG83fXh90RWYtl3lRmF4XRGa1kmwU1uF1RWx2OW9NouSe+g7/AFkzhQ=="
+    }
+  },
+  "retainedPublicTests": [
+    {
+      "sourceRepository": "SoranDomains/sdk",
+      "sourceRevision": "891330d5451ff3b9f3b4285c5811298a1d972846",
+      "source": "packages/mcp/test/session-scope.test.mts",
+      "destination": "packages/mcp/test/session-scope.test.mts",
+      "sourceSha256": "097668c5222657f2bcb5f7448ddb77f007455e8e336bfdb2a674b721d3d438fe",
+      "destinationSha256": "297cd76d4a26d36c5c4da5c9a0de21c51ced7af4a694ee475b0ad3dc38e936e7",
+      "exact": false,
+      "adaptation": "Disable the new confirmation gate only in this session-ordering fixture; independent confirmation.test.mts covers the gate."
+    },
+    {
+      "sourceRepository": "SoranDomains/sdk",
+      "sourceRevision": "891330d5451ff3b9f3b4285c5811298a1d972846",
+      "source": "packages/mcp/test/submission.test.mts",
+      "destination": "packages/mcp/test/submission.test.mts",
+      "sourceSha256": "d199051cbbcd28114b6dc2af9ba3a4120922e684c4553f2b4bf7f9375bab1d62",
+      "destinationSha256": "d199051cbbcd28114b6dc2af9ba3a4120922e684c4553f2b4bf7f9375bab1d62",
+      "exact": true,
+      "adaptation": "Unchanged standalone ambiguous-submission regression."
+    }
+  ]
+}

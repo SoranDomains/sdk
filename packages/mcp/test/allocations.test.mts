@@ -38,7 +38,7 @@ test("allocation tool includes disputes and exposes continuation through every a
 test("claim_status reads the exact disputed label rather than a bounded pending queue", async () => {
   const original = globalThis.fetch;
   const f = fixture();
-  await registerWriteTools(f.server as never, { secret: Keypair.random().secret(), hintUrl });
+  await registerWriteTools(f.server as never, { secret: Keypair.random().secret(), hintUrl, requireConfirmation: false });
   const calls: string[] = [];
   globalThis.fetch = (async url => {
     calls.push(String(url));

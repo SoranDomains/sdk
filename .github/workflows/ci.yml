@@ -15,6 +15,8 @@ jobs:
           node-version: "22.22.1"
       - run: node scripts/verify-sync.mjs
       - run: node --test scripts/verify-sync.test.mjs
+      - run: node scripts/verify-mcp-sync.mjs
+      - run: node --test scripts/verify-mcp-sync.test.mjs
   validate:
     timeout-minutes: 20
     runs-on: ubuntu-latest
@@ -34,12 +36,8 @@ jobs:
           cache-dependency-path: packages/${{ matrix.pkg }}/package-lock.json
       - name: Install from lockfile
         run: npm ci
-      - name: Audit new core releases (high and critical)
-        if: matrix.pkg != 'mcp'
+      - name: Audit releases (high and critical)
         run: npm audit --audit-level=high
-      - name: Audit retained MCP baseline (critical)
-        if: matrix.pkg == 'mcp'
-        run: npm audit --audit-level=critical
       - name: Build
         run: npm run build
       - name: Typecheck
@@ -68,3 +66,5 @@ jobs:
         run: npm run typecheck
       - name: Recovery tests
         run: npm test
+      - name: Audit published example dependencies
+        run: npm audit --audit-level=high

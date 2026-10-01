@@ -8,12 +8,15 @@
     "test": "node --import tsx --test flow.test.mts"
   },
   "dependencies": {
-    "@sorandomains/holder": "0.5.1",
-    "@sorandomains/lookup": "0.7.0",
+    "@sorandomains/holder": "0.10.0",
+    "@sorandomains/lookup": "0.11.0",
     "@stellar/stellar-sdk": "17.0.1"
   },
   "devDependencies": {
     "tsx": "^4.19.2",
     "typescript": "^5.7.3"
+  },
+  "overrides": {
+    "axios": "1.20.0"
   }
 }

@@ -60,7 +60,7 @@ test("MCP set_payment carries Registry/network configuration and rejects malform
       return { hash: "hash", ledger: 1 };
     };
     const { server, handlers, schemas } = fakeServer();
-    await registerWriteTools(server as never, { secret: Keypair.random().secret(), registryId: C, passphrase: "custom network" });
+    await registerWriteTools(server as never, { secret: Keypair.random().secret(), requireConfirmation: false, registryId: C, passphrase: "custom network" });
     const result = await handlers.get("set_payment")!({ name: "alice.nova", payment }) as { content: Array<{ text: string }> };
     assert.equal(JSON.parse(result.content[0].text).hash, "hash");
     assert.throws(() => schemas.get("set_payment")!.payment.parse({ address: G, memo: { type: "id", value: 42 } }));

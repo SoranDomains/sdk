@@ -13,7 +13,7 @@ The allowlist contains these three package trees, the public hint-server example
 the SDK README/native-claims/network documentation and the reviewed testnet
 manifest. Private API implementation and Rust contract source are not exported.
 No generated `dist`, dependencies, local environment files or credentials enter
-this source sync. Existing MCP and native-signup example trees stay unchanged.
+this source sync. MCP and native-signup are exported separately as described below.
 
 ## Portable tests
 
@@ -45,11 +45,46 @@ all portable tests. No test is silently skipped.
 4. Publish the exact reviewed tarballs under the authenticated account, honoring
    any npm 2FA challenge. Check each version and integrity in the registry. Never
    put authentication values in source, logs or a release receipt.
-5. Only after these three versions are available, prepare MCP **0.10.0** with
-   exact published dependencies in a separate reviewed sync and publication.
+5. MCP **0.10.0** uses the three published core versions as exact registry
+   dependencies. Apply the same review, CI, archive and registry verification
+   gates to this second-stage candidate before publication.
 
 The current documented route is local npm publication. It does **not** generate
 GitHub CI provenance, and this release must not claim that it does. A future
 trusted-publisher workflow needs separate reviewed configuration and a matching
 public repository/workflow identity. No publishing workflow or credential
 administration is introduced here.
+
+## MCP second-stage source
+
+Lookup 0.11.0, Owner 0.12.0 and Holder 0.10.0 were published on 1 October 2026.
+MCP 0.10.0 remains a publication candidate. It is exported from monorepo commit
+`9cc027804f2e7363f1cabcd99eb25839355e3f0b` onto public mirror base
+`891330d5451ff3b9f3b4285c5811298a1d972846`.
+
+`mcp-sync-manifest.json` records all 37 MCP and six native-signup files, exact
+source/destination hashes, the core dependency versions/integrities, and the
+shared Holder fixture. Every MCP runtime and portable test byte is unchanged;
+the MCP README has one public-layout link correction. The native-signup example
+is byte-identical to the same source commit and uses the published core packages.
+
+The shared README/native-claims documents have explicit per-file source revisions
+and retained previous mappings. The default core source revision, its production
+files and ABI/catalog fixture provenance remain pinned to `cec2d29`. This second
+stage does not republish or alter the three core archives.
+
+The one omitted MCP test, `sdk/mcp/test/api-recovery.test.mts`, imports private API
+implementation. Its hash and required source-CI gate are explicit in both
+manifests; public CI does not claim to run it. All 16 other MCP test files are
+exported unchanged. Two existing public-only regression files also remain: the
+submission test is unchanged; the session-ordering fixture explicitly disables
+the new confirmation gate, which has its own source test suite. Both retain their
+public source hashes and adaptation details in the manifests. All 18 files run
+through the unchanged package test command. Public
+CI verifies both projections, builds/types/tests all four packages, audits all
+packages at the high/critical threshold and checks the native-signup example.
+
+Run `node scripts/verify-mcp-sync.mjs` and its adjacent negative tests in addition
+to the core verifier. Before MCP publication, require full monorepo CI for the
+recorded source or a merge with the same Git tree, public mirror CI, and exact
+packed JavaScript/declaration parity against the reviewed source build.
