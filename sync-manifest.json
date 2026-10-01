@@ -1,0 +1,1033 @@
+{
+  "format": "soran-public-sdk-sync-v1",
+  "sourceRepository": "SoranDomains/soran",
+  "sourceRevision": "cec2d29bd392c64ac3e7f8d1d20d626736c72ce5",
+  "mirrorBaseline": "70b702194cbb349a0bc3a6221109dd978e57babc",
+  "scope": [
+    "lookup",
+    "owner",
+    "holder",
+    "public hint examples",
+    "deployment metadata",
+    "documentation"
+  ],
+  "notSynced": [
+    "MCP source/dependencies (second stage after core publication)",
+    "private API implementation",
+    "private contract source"
+  ],
+  "files": [
+    {
+      "source": "sdk/examples/hint-server-cloudflare/README.md",
+      "destination": "examples/hint-server-cloudflare/README.md",
+      "sourceSha256": "ee8a41c76d16bae728e0ecb3747ece0b3266be20ffac4384a1e1c4cdb0c0450d",
+      "destinationSha256": "ee8a41c76d16bae728e0ecb3747ece0b3266be20ffac4384a1e1c4cdb0c0450d",
+      "exact": true
+    },
+    {
+      "source": "sdk/examples/hint-server-cloudflare/worker.mjs",
+      "destination": "examples/hint-server-cloudflare/worker.mjs",
+      "sourceSha256": "01137f29bf645a2866df5b462d0aeb87b4d875af30f811389d628d0665293a8a",
+      "destinationSha256": "01137f29bf645a2866df5b462d0aeb87b4d875af30f811389d628d0665293a8a",
+      "exact": true
+    },
+    {
+      "source": "sdk/examples/hint-server-cloudflare/wrangler.toml",
+      "destination": "examples/hint-server-cloudflare/wrangler.toml",
+      "sourceSha256": "18f95a49395624959dc49c84fc8a191a46785c59800e4795b147a1b111ba15b1",
+      "destinationSha256": "18f95a49395624959dc49c84fc8a191a46785c59800e4795b147a1b111ba15b1",
+      "exact": true
+    },
+    {
+      "source": "sdk/examples/hint-server/.gitignore",
+      "destination": "examples/hint-server/.gitignore",
+      "sourceSha256": "291d184c22ea301616ede8ec93fac788b3d8d1e13d37fde3b244ec8167943563",
+      "destinationSha256": "291d184c22ea301616ede8ec93fac788b3d8d1e13d37fde3b244ec8167943563",
+      "exact": true
+    },
+    {
+      "source": "sdk/examples/hint-server/README.md",
+      "destination": "examples/hint-server/README.md",
+      "sourceSha256": "af7ab16996772c3f5c5ae75d719c4e49eefd12f0d3ad5935629af82519537ae1",
+      "destinationSha256": "af7ab16996772c3f5c5ae75d719c4e49eefd12f0d3ad5935629af82519537ae1",
+      "exact": true
+    },
+    {
+      "source": "sdk/examples/hint-server/handler.mjs",
+      "destination": "examples/hint-server/handler.mjs",
+      "sourceSha256": "7629a8dc8bcb67595b4fb35a7876027cb155016436e7fb374ea73a77a81467f8",
+      "destinationSha256": "7629a8dc8bcb67595b4fb35a7876027cb155016436e7fb374ea73a77a81467f8",
+      "exact": true
+    },
+    {
+      "source": "sdk/examples/hint-server/package-lock.json",
+      "destination": "examples/hint-server/package-lock.json",
+      "sourceSha256": "5ca40ef3cb7fa9add3eb406fe615eb83743fd442733f3e65320cb63ec8e5aaab",
+      "destinationSha256": "5ca40ef3cb7fa9add3eb406fe615eb83743fd442733f3e65320cb63ec8e5aaab",
+      "exact": true
+    },
+    {
+      "source": "sdk/examples/hint-server/package.json",
+      "destination": "examples/hint-server/package.json",
+      "sourceSha256": "567db205803c53ae9116961479b1785d2c2f55a52c8165e85612f779752b0a1e",
+      "destinationSha256": "567db205803c53ae9116961479b1785d2c2f55a52c8165e85612f779752b0a1e",
+      "exact": true
+    },
+    {
+      "source": "sdk/examples/hint-server/poll.mjs",
+      "destination": "examples/hint-server/poll.mjs",
+      "sourceSha256": "aacdcda12230231d8f5eed0b18b6198c35168e5a33e9c6bd2f118d9ff3c49244",
+      "destinationSha256": "aacdcda12230231d8f5eed0b18b6198c35168e5a33e9c6bd2f118d9ff3c49244",
+      "exact": true
+    },
+    {
+      "source": "sdk/examples/hint-server/server.mjs",
+      "destination": "examples/hint-server/server.mjs",
+      "sourceSha256": "9871b823dd4ca0b276ee4d09042701e08aa287561447ca6b9fbc82973da136fd",
+      "destinationSha256": "9871b823dd4ca0b276ee4d09042701e08aa287561447ca6b9fbc82973da136fd",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/LICENSE",
+      "destination": "packages/holder/LICENSE",
+      "sourceSha256": "2bf49b4cb561f5c33d2e2b52abf0cc04e13947f26c1699d65e5e6f3af9857fe0",
+      "destinationSha256": "2bf49b4cb561f5c33d2e2b52abf0cc04e13947f26c1699d65e5e6f3af9857fe0",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/README.md",
+      "destination": "packages/holder/README.md",
+      "sourceSha256": "15c76db41ede259caf99d4a17ae569213cdf17c0914742b866ccacc34469a00a",
+      "destinationSha256": "4822abee6ccf328cf98b6b3006b85a8278ebc57f4a1a0a3b8d63fa9fdf4b9620",
+      "exact": false
+    },
+    {
+      "source": "sdk/holder/e2e.ts",
+      "destination": "packages/holder/e2e.ts",
+      "sourceSha256": "9657648760ccad032cc0671160a6f11cb86dc6078cfaf11b159e18b09dae4561",
+      "destinationSha256": "9657648760ccad032cc0671160a6f11cb86dc6078cfaf11b159e18b09dae4561",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/package-lock.json",
+      "destination": "packages/holder/package-lock.json",
+      "sourceSha256": "159e08ac4b1a418f88948e0a24d3eb50c4e5cbe2657be9dabad06a4150e07c94",
+      "destinationSha256": "159e08ac4b1a418f88948e0a24d3eb50c4e5cbe2657be9dabad06a4150e07c94",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/package.json",
+      "destination": "packages/holder/package.json",
+      "sourceSha256": "40dc1ed24c600efffa82802285816027c7e4e8efb486c0bcdd27f09799ec112c",
+      "destinationSha256": "40dc1ed24c600efffa82802285816027c7e4e8efb486c0bcdd27f09799ec112c",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/src/contract-wallet.ts",
+      "destination": "packages/holder/src/contract-wallet.ts",
+      "sourceSha256": "0535d088f8110b941c8dd448300fec39b30a22a131d9ee0a9cebfa8fa61d0add",
+      "destinationSha256": "0535d088f8110b941c8dd448300fec39b30a22a131d9ee0a9cebfa8fa61d0add",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/src/funding-history.ts",
+      "destination": "packages/holder/src/funding-history.ts",
+      "sourceSha256": "4559aeb61e513916083345c8f1fb77e9a9c0474e9164fc7c5ba86a1c3a11d470",
+      "destinationSha256": "4559aeb61e513916083345c8f1fb77e9a9c0474e9164fc7c5ba86a1c3a11d470",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/src/funding-owner.ts",
+      "destination": "packages/holder/src/funding-owner.ts",
+      "sourceSha256": "2a1c697177739eca37ae4fd2b34acbdd324d41c1f72ff4d693bc34d8202eb7c2",
+      "destinationSha256": "2a1c697177739eca37ae4fd2b34acbdd324d41c1f72ff4d693bc34d8202eb7c2",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/src/funding-reader.ts",
+      "destination": "packages/holder/src/funding-reader.ts",
+      "sourceSha256": "81b32e4093c31bffa96f36c512521e63ee677997c4ff26fb94cbd03cdb55d9b4",
+      "destinationSha256": "81b32e4093c31bffa96f36c512521e63ee677997c4ff26fb94cbd03cdb55d9b4",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/src/funding-service.ts",
+      "destination": "packages/holder/src/funding-service.ts",
+      "sourceSha256": "22006a2ee02307ec00dd4021e8c806687c1babc2208c7f9c956a224739df75d3",
+      "destinationSha256": "22006a2ee02307ec00dd4021e8c806687c1babc2208c7f9c956a224739df75d3",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/src/funding-types.ts",
+      "destination": "packages/holder/src/funding-types.ts",
+      "sourceSha256": "b62e8d7323b6a18251fedb01916e7fb4de1a1920e31dca9c006e1f2f1bb47b01",
+      "destinationSha256": "b62e8d7323b6a18251fedb01916e7fb4de1a1920e31dca9c006e1f2f1bb47b01",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/src/funding-user.ts",
+      "destination": "packages/holder/src/funding-user.ts",
+      "sourceSha256": "50e5d29c68ca23e3d91a12b0c5937c1b67c126d901cda711ff011767682945ca",
+      "destinationSha256": "50e5d29c68ca23e3d91a12b0c5937c1b67c126d901cda711ff011767682945ca",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/src/index.ts",
+      "destination": "packages/holder/src/index.ts",
+      "sourceSha256": "1d8a99756f7bb035717756ff0e77f76ea3416e15dda591cdfb2ed76fe6ff9718",
+      "destinationSha256": "1d8a99756f7bb035717756ff0e77f76ea3416e15dda591cdfb2ed76fe6ff9718",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/src/multichain.ts",
+      "destination": "packages/holder/src/multichain.ts",
+      "sourceSha256": "c6ac42e0ec93220dec269a1190f92e4f748dde7b46677f24d48c988a4853ecd6",
+      "destinationSha256": "c6ac42e0ec93220dec269a1190f92e4f748dde7b46677f24d48c988a4853ecd6",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/src/names.ts",
+      "destination": "packages/holder/src/names.ts",
+      "sourceSha256": "219d3db49a9d4db725a43c4eea08c0253f62dc1f5ae21bc1038fef79b882c182",
+      "destinationSha256": "219d3db49a9d4db725a43c4eea08c0253f62dc1f5ae21bc1038fef79b882c182",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/src/native-allowlist.ts",
+      "destination": "packages/holder/src/native-allowlist.ts",
+      "sourceSha256": "e66bd3563373d8f0342177cc36473d6586ac4dd5b364af34bcc6f50c9e3faef5",
+      "destinationSha256": "e66bd3563373d8f0342177cc36473d6586ac4dd5b364af34bcc6f50c9e3faef5",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/src/native-approver.ts",
+      "destination": "packages/holder/src/native-approver.ts",
+      "sourceSha256": "c08f463e231813ffa8b90d6e4be0e04cb5e3003fc3a140e9fb80086e7acbf8f6",
+      "destinationSha256": "c08f463e231813ffa8b90d6e4be0e04cb5e3003fc3a140e9fb80086e7acbf8f6",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/src/native-auth.ts",
+      "destination": "packages/holder/src/native-auth.ts",
+      "sourceSha256": "b48e3ae2603b88c63f055c5f92a178088a4aecff58f6f28ffc95119caddade19",
+      "destinationSha256": "b48e3ae2603b88c63f055c5f92a178088a4aecff58f6f28ffc95119caddade19",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/src/native-code-policy.ts",
+      "destination": "packages/holder/src/native-code-policy.ts",
+      "sourceSha256": "ecedd732a26328988b63c0af638b93be2e8686ed0abf16793a3809a336e823b0",
+      "destinationSha256": "ecedd732a26328988b63c0af638b93be2e8686ed0abf16793a3809a336e823b0",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/src/native-codec.ts",
+      "destination": "packages/holder/src/native-codec.ts",
+      "sourceSha256": "cd49a10d87befb4ada520082ba53008c6175e35eb0a4185b94ca51b2bf2ac6c5",
+      "destinationSha256": "cd49a10d87befb4ada520082ba53008c6175e35eb0a4185b94ca51b2bf2ac6c5",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/src/native-history.ts",
+      "destination": "packages/holder/src/native-history.ts",
+      "sourceSha256": "b02ce3df6474695c0e4c1c6f538f353b648152382ecb5106ce1fb737f1202ed3",
+      "destinationSha256": "b02ce3df6474695c0e4c1c6f538f353b648152382ecb5106ce1fb737f1202ed3",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/src/native-holder.ts",
+      "destination": "packages/holder/src/native-holder.ts",
+      "sourceSha256": "cfd19440920487984e62ef594737542406c2bd95abc9e633603cf2e4e606aacb",
+      "destinationSha256": "cfd19440920487984e62ef594737542406c2bd95abc9e633603cf2e4e606aacb",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/src/native-transport.ts",
+      "destination": "packages/holder/src/native-transport.ts",
+      "sourceSha256": "6de091ea95486d7dedca01ae6187d535d42e42a24cd8e0f857b0d8687ecffc28",
+      "destinationSha256": "6de091ea95486d7dedca01ae6187d535d42e42a24cd8e0f857b0d8687ecffc28",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/src/native-types.ts",
+      "destination": "packages/holder/src/native-types.ts",
+      "sourceSha256": "4e5d00ed3c41c0ba9f7c7df28692dc4347cfc22ad83950a7522fa08d42c0e51e",
+      "destinationSha256": "4e5d00ed3c41c0ba9f7c7df28692dc4347cfc22ad83950a7522fa08d42c0e51e",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/src/payment.ts",
+      "destination": "packages/holder/src/payment.ts",
+      "sourceSha256": "20494b8e99ae3d0de87d7aaaf738212947358ed162725a91dea90a616d78ad87",
+      "destinationSha256": "20494b8e99ae3d0de87d7aaaf738212947358ed162725a91dea90a616d78ad87",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/src/subnames-client.ts",
+      "destination": "packages/holder/src/subnames-client.ts",
+      "sourceSha256": "03a78567f4a076a0d73ec6f64893c662a1a4b5f533b951f2dfcdbf7bfbea95d8",
+      "destinationSha256": "03a78567f4a076a0d73ec6f64893c662a1a4b5f533b951f2dfcdbf7bfbea95d8",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/test/decode-failure.test.mts",
+      "destination": "packages/holder/test/decode-failure.test.mts",
+      "sourceSha256": "5ac32531345d279d8a03a5761e9cfd04cf7095ed5e6b9ca6dc0d35c9a43a62f0",
+      "destinationSha256": "5ac32531345d279d8a03a5761e9cfd04cf7095ed5e6b9ca6dc0d35c9a43a62f0",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/test/error-codes.test.mts",
+      "destination": "packages/holder/test/error-codes.test.mts",
+      "sourceSha256": "1297c7c7f347f56ebfcb7ff27efb9a54a57329a5ab85def4dd2b77aa70fdf278",
+      "destinationSha256": "1297c7c7f347f56ebfcb7ff27efb9a54a57329a5ab85def4dd2b77aa70fdf278",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/test/fixtures/funding-interop.json",
+      "destination": "packages/holder/test/fixtures/funding-interop.json",
+      "sourceSha256": "26751e81eef894241d690c0d7d06b56a396c6d0e591120d021ccbac7acaeb604",
+      "destinationSha256": "26751e81eef894241d690c0d7d06b56a396c6d0e591120d021ccbac7acaeb604",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/test/fixtures/native-claim-v1.json",
+      "destination": "packages/holder/test/fixtures/native-claim-v1.json",
+      "sourceSha256": "ab69675c2100ad01fbf8010e88ec5fe77fc19ca643103c2605e04dd9bc875d7c",
+      "destinationSha256": "ab69675c2100ad01fbf8010e88ec5fe77fc19ca643103c2605e04dd9bc875d7c",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/test/fixtures/native-quote-v1.json",
+      "destination": "packages/holder/test/fixtures/native-quote-v1.json",
+      "sourceSha256": "58848980c04928a72e4d218ff89b4933206eee7efee780a5083773263945c5bc",
+      "destinationSha256": "58848980c04928a72e4d218ff89b4933206eee7efee780a5083773263945c5bc",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/test/funding-bounds.test.mts",
+      "destination": "packages/holder/test/funding-bounds.test.mts",
+      "sourceSha256": "8b283e682d622bd7ce7ae6068cd086a7c1a5efc34ab7753e01e1dd3e5ef6a25b",
+      "destinationSha256": "8b283e682d622bd7ce7ae6068cd086a7c1a5efc34ab7753e01e1dd3e5ef6a25b",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/test/funding-history.test.mts",
+      "destination": "packages/holder/test/funding-history.test.mts",
+      "sourceSha256": "38a8d3b7c86a623c5b95b5b8aa4776d2b852ccfad42954da878844f17915f10c",
+      "destinationSha256": "38a8d3b7c86a623c5b95b5b8aa4776d2b852ccfad42954da878844f17915f10c",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/test/funding.test.mts",
+      "destination": "packages/holder/test/funding.test.mts",
+      "sourceSha256": "9369887afb02ad6b0af3dd5401418e046e84c955d7d1f417cf7644575bd1c008",
+      "destinationSha256": "9369887afb02ad6b0af3dd5401418e046e84c955d7d1f417cf7644575bd1c008",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/test/hardening.test.mts",
+      "destination": "packages/holder/test/hardening.test.mts",
+      "sourceSha256": "6a3ffa64fa520868359610eab1406eaa45420849dbb57ebc7b9a78853fb7418a",
+      "destinationSha256": "6a3ffa64fa520868359610eab1406eaa45420849dbb57ebc7b9a78853fb7418a",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/test/helpers/native-ledger.mts",
+      "destination": "packages/holder/test/helpers/native-ledger.mts",
+      "sourceSha256": "d672be81b46c216f6698dc2c2dce73af8aa57423c22a2e7e123c8730ddf47348",
+      "destinationSha256": "d672be81b46c216f6698dc2c2dce73af8aa57423c22a2e7e123c8730ddf47348",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/test/integration.test.mts",
+      "destination": "packages/holder/test/integration.test.mts",
+      "sourceSha256": "e4151cd89b2c7f420d8e1d428832801121f6c5578459a74fbbc9e11435abf7e2",
+      "destinationSha256": "e4151cd89b2c7f420d8e1d428832801121f6c5578459a74fbbc9e11435abf7e2",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/test/multichain.test.mts",
+      "destination": "packages/holder/test/multichain.test.mts",
+      "sourceSha256": "c6bec311fb6de324608b68d08aa40b72a35fb072d49e803493ff210b246c7ed7",
+      "destinationSha256": "c6bec311fb6de324608b68d08aa40b72a35fb072d49e803493ff210b246c7ed7",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/test/muxed-identity.test.mts",
+      "destination": "packages/holder/test/muxed-identity.test.mts",
+      "sourceSha256": "137c1e2d41615fcfa75149f4a669126997adb8f0546dd978a46da75cdd58267e",
+      "destinationSha256": "137c1e2d41615fcfa75149f4a669126997adb8f0546dd978a46da75cdd58267e",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/test/muxed.test.mts",
+      "destination": "packages/holder/test/muxed.test.mts",
+      "sourceSha256": "3131dd4c0598b50d83695e36ba7b140b1d2b88e73cf95aeef54637fa2ee0a111",
+      "destinationSha256": "3131dd4c0598b50d83695e36ba7b140b1d2b88e73cf95aeef54637fa2ee0a111",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/test/native-auth.test.mts",
+      "destination": "packages/holder/test/native-auth.test.mts",
+      "sourceSha256": "ade23e72adea93ebe7e5eb1fe7ee911df02776c7113611bc9b2c3f7e203b73f9",
+      "destinationSha256": "ade23e72adea93ebe7e5eb1fe7ee911df02776c7113611bc9b2c3f7e203b73f9",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/test/native-claims.test.mts",
+      "destination": "packages/holder/test/native-claims.test.mts",
+      "sourceSha256": "caaebae289fe91aed0e48ac73a8e65a9a35b2ef8ca1306fdb2518ddac7ca48d2",
+      "destinationSha256": "caaebae289fe91aed0e48ac73a8e65a9a35b2ef8ca1306fdb2518ddac7ca48d2",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/test/native-code-policy.test.mts",
+      "destination": "packages/holder/test/native-code-policy.test.mts",
+      "sourceSha256": "665e6ede4af9cc290ada8d67d185dcbfce3c94c36eb0678ec32ab2d2b82ebb00",
+      "destinationSha256": "665e6ede4af9cc290ada8d67d185dcbfce3c94c36eb0678ec32ab2d2b82ebb00",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/test/native-contract-wallet.test.mts",
+      "destination": "packages/holder/test/native-contract-wallet.test.mts",
+      "sourceSha256": "1b800e2f276b928a983579d25a964699c3300b1b608ba142b0b7cdf016ed0395",
+      "destinationSha256": "1b800e2f276b928a983579d25a964699c3300b1b608ba142b0b7cdf016ed0395",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/test/native-fee-limits.test.mts",
+      "destination": "packages/holder/test/native-fee-limits.test.mts",
+      "sourceSha256": "8f32cb4d2964eec967c2c1d10cae18c166938dd9b3cfebb43c3a759eb3020e25",
+      "destinationSha256": "8f32cb4d2964eec967c2c1d10cae18c166938dd9b3cfebb43c3a759eb3020e25",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/test/native-history.test.mts",
+      "destination": "packages/holder/test/native-history.test.mts",
+      "sourceSha256": "34b79ca579b96f22ca18ded322037e595b5ffc146c155a5859850576452ba836",
+      "destinationSha256": "34b79ca579b96f22ca18ded322037e595b5ffc146c155a5859850576452ba836",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/test/native-lifecycle.test.mts",
+      "destination": "packages/holder/test/native-lifecycle.test.mts",
+      "sourceSha256": "66b904834b8db62dd23a652e16ebca09e0083312f73d88de8986e05953f1ee30",
+      "destinationSha256": "66b904834b8db62dd23a652e16ebca09e0083312f73d88de8986e05953f1ee30",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/test/native-receipt-provenance.test.mts",
+      "destination": "packages/holder/test/native-receipt-provenance.test.mts",
+      "sourceSha256": "f07fc2dc6c51e2ffb19323ca0960f4a8f9058627672a25eada9df1b9d8078385",
+      "destinationSha256": "f07fc2dc6c51e2ffb19323ca0960f4a8f9058627672a25eada9df1b9d8078385",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/test/native-receipt.test.mts",
+      "destination": "packages/holder/test/native-receipt.test.mts",
+      "sourceSha256": "ba0de05826b3916ae4bd9f04225650587250d9c6a1ab32c7703afab47cf4a86d",
+      "destinationSha256": "ba0de05826b3916ae4bd9f04225650587250d9c6a1ab32c7703afab47cf4a86d",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/test/native-wire.test.mts",
+      "destination": "packages/holder/test/native-wire.test.mts",
+      "sourceSha256": "a1d358ef5e0cd3c6cb9ce1a672a1cfa5b91f71d8e29739db04464281f16b0830",
+      "destinationSha256": "a1d358ef5e0cd3c6cb9ce1a672a1cfa5b91f71d8e29739db04464281f16b0830",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/test/payment.test.mts",
+      "destination": "packages/holder/test/payment.test.mts",
+      "sourceSha256": "410020ef43e3e568ca3020f72563f3882ac10555737caa19dbe75118ccfecf46",
+      "destinationSha256": "410020ef43e3e568ca3020f72563f3882ac10555737caa19dbe75118ccfecf46",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/test/subnames.test.mts",
+      "destination": "packages/holder/test/subnames.test.mts",
+      "sourceSha256": "c019ceff13c3fdcb1fbb1fca9c5dc5cc5ea593bcfe6824161659a2e4e46f9166",
+      "destinationSha256": "c019ceff13c3fdcb1fbb1fca9c5dc5cc5ea593bcfe6824161659a2e4e46f9166",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/tsconfig.json",
+      "destination": "packages/holder/tsconfig.json",
+      "sourceSha256": "e60a81c464c73c2ce104158d28ea61b7d2580b7f95b3e60e6e84fd2bd46015f2",
+      "destinationSha256": "e60a81c464c73c2ce104158d28ea61b7d2580b7f95b3e60e6e84fd2bd46015f2",
+      "exact": true
+    },
+    {
+      "source": "sdk/lookup/LICENSE",
+      "destination": "packages/lookup/LICENSE",
+      "sourceSha256": "2bf49b4cb561f5c33d2e2b52abf0cc04e13947f26c1699d65e5e6f3af9857fe0",
+      "destinationSha256": "2bf49b4cb561f5c33d2e2b52abf0cc04e13947f26c1699d65e5e6f3af9857fe0",
+      "exact": true
+    },
+    {
+      "source": "sdk/lookup/README.md",
+      "destination": "packages/lookup/README.md",
+      "sourceSha256": "51060acbe683a41ccf7bc53c00df175cbff1a3597237946bbec8a1684429fa6b",
+      "destinationSha256": "f840270da6379afb6eefa0df1e19f3e03d56db33f8781257168d6d68743c2884",
+      "exact": false
+    },
+    {
+      "source": "sdk/lookup/demo.ts",
+      "destination": "packages/lookup/demo.ts",
+      "sourceSha256": "814a07a8654325b27378f7375fde77e6551c3edd4177d3e89234d7a01215e83b",
+      "destinationSha256": "814a07a8654325b27378f7375fde77e6551c3edd4177d3e89234d7a01215e83b",
+      "exact": true
+    },
+    {
+      "source": "sdk/lookup/package-lock.json",
+      "destination": "packages/lookup/package-lock.json",
+      "sourceSha256": "1bdfd85287c48cf1bb4dc43c6351c6209c80cb2bfc1f9ccf73354c70fca7c2fd",
+      "destinationSha256": "1bdfd85287c48cf1bb4dc43c6351c6209c80cb2bfc1f9ccf73354c70fca7c2fd",
+      "exact": true
+    },
+    {
+      "source": "sdk/lookup/package.json",
+      "destination": "packages/lookup/package.json",
+      "sourceSha256": "66a8110aa25941a48a2973c20aa0c76ada467b64e6aeb049a5306d8520a9839f",
+      "destinationSha256": "66a8110aa25941a48a2973c20aa0c76ada467b64e6aeb049a5306d8520a9839f",
+      "exact": true
+    },
+    {
+      "source": "sdk/lookup/smoke.mts",
+      "destination": "packages/lookup/smoke.mts",
+      "sourceSha256": "f7c48eee01a54df623f43fe4177ec9f20d21e905c1a1c2184acb6aaf99637acc",
+      "destinationSha256": "f7c48eee01a54df623f43fe4177ec9f20d21e905c1a1c2184acb6aaf99637acc",
+      "exact": true
+    },
+    {
+      "source": "sdk/lookup/src/index.ts",
+      "destination": "packages/lookup/src/index.ts",
+      "sourceSha256": "d17309c853a9b1da65d579cd0ba718ba4bb4771d2186b570a81a7955896e4581",
+      "destinationSha256": "d17309c853a9b1da65d579cd0ba718ba4bb4771d2186b570a81a7955896e4581",
+      "exact": true
+    },
+    {
+      "source": "sdk/lookup/src/lookup.ts",
+      "destination": "packages/lookup/src/lookup.ts",
+      "sourceSha256": "d36f1409a2768e9ac47572ba7390230b4242d5f0aa3a7368ec7440d6f6b50487",
+      "destinationSha256": "d36f1409a2768e9ac47572ba7390230b4242d5f0aa3a7368ec7440d6f6b50487",
+      "exact": true
+    },
+    {
+      "source": "sdk/lookup/src/multichain.ts",
+      "destination": "packages/lookup/src/multichain.ts",
+      "sourceSha256": "c6ac42e0ec93220dec269a1190f92e4f748dde7b46677f24d48c988a4853ecd6",
+      "destinationSha256": "c6ac42e0ec93220dec269a1190f92e4f748dde7b46677f24d48c988a4853ecd6",
+      "exact": true
+    },
+    {
+      "source": "sdk/lookup/src/names.ts",
+      "destination": "packages/lookup/src/names.ts",
+      "sourceSha256": "219d3db49a9d4db725a43c4eea08c0253f62dc1f5ae21bc1038fef79b882c182",
+      "destinationSha256": "219d3db49a9d4db725a43c4eea08c0253f62dc1f5ae21bc1038fef79b882c182",
+      "exact": true
+    },
+    {
+      "source": "sdk/lookup/src/payment.ts",
+      "destination": "packages/lookup/src/payment.ts",
+      "sourceSha256": "20494b8e99ae3d0de87d7aaaf738212947358ed162725a91dea90a616d78ad87",
+      "destinationSha256": "20494b8e99ae3d0de87d7aaaf738212947358ed162725a91dea90a616d78ad87",
+      "exact": true
+    },
+    {
+      "source": "sdk/lookup/src/read-extensions.ts",
+      "destination": "packages/lookup/src/read-extensions.ts",
+      "sourceSha256": "652c97f32da387a43e147bde51378f917ae4f918501c7e49444dddddf744b884",
+      "destinationSha256": "652c97f32da387a43e147bde51378f917ae4f918501c7e49444dddddf744b884",
+      "exact": true
+    },
+    {
+      "source": "sdk/lookup/src/subnames-client.ts",
+      "destination": "packages/lookup/src/subnames-client.ts",
+      "sourceSha256": "03a78567f4a076a0d73ec6f64893c662a1a4b5f533b951f2dfcdbf7bfbea95d8",
+      "destinationSha256": "03a78567f4a076a0d73ec6f64893c662a1a4b5f533b951f2dfcdbf7bfbea95d8",
+      "exact": true
+    },
+    {
+      "source": "sdk/lookup/src/views.ts",
+      "destination": "packages/lookup/src/views.ts",
+      "sourceSha256": "6a814a535fe0b1002878eca7428f9d643ee33f7e4970a72cf47ea65d9b537ec1",
+      "destinationSha256": "6a814a535fe0b1002878eca7428f9d643ee33f7e4970a72cf47ea65d9b537ec1",
+      "exact": true
+    },
+    {
+      "source": "sdk/lookup/test/error-codes.test.mts",
+      "destination": "packages/lookup/test/error-codes.test.mts",
+      "sourceSha256": "e5c85536adf08f9a6b3341b194d77ac613875a9658ada00ed3fbeabf7603e500",
+      "destinationSha256": "e5c85536adf08f9a6b3341b194d77ac613875a9658ada00ed3fbeabf7603e500",
+      "exact": true
+    },
+    {
+      "source": "sdk/lookup/test/helpers/contract-errors.mts",
+      "destination": "packages/lookup/test/helpers/contract-errors.mts",
+      "sourceSha256": "8e20369ebb35be00f59ad5d789edbdbaa58f66e93cd5819b108744ab87c67f3a",
+      "destinationSha256": "cc81efbe5cddba4f6d85e7981556d92c2511fe6ddca11f973f7b2f2a037b29ba",
+      "exact": false
+    },
+    {
+      "source": "sdk/lookup/test/hint-fetch.test.mts",
+      "destination": "packages/lookup/test/hint-fetch.test.mts",
+      "sourceSha256": "582486cd7e938b51061b9efd34ef6502c2006ce4901a7f4eae2624601e512e43",
+      "destinationSha256": "582486cd7e938b51061b9efd34ef6502c2006ce4901a7f4eae2624601e512e43",
+      "exact": true
+    },
+    {
+      "source": "sdk/lookup/test/hint-server-compat.test.mts",
+      "destination": "packages/lookup/test/hint-server-compat.test.mts",
+      "sourceSha256": "f8f2872ffe4a3b1452c1b93786f9329ad51f79e3c2c9122f41cdc079783dc21e",
+      "destinationSha256": "00e70f5014c52a5f9ad8f44eaccbd45e309102d10a7eb9e55b133608af73de1f",
+      "exact": false
+    },
+    {
+      "source": "sdk/lookup/test/hint-server-poll.test.mts",
+      "destination": "packages/lookup/test/hint-server-poll.test.mts",
+      "sourceSha256": "0b3c18f34cc757cda1bf8f69d540752ca7aae7841480b19948e64f0c18c206e8",
+      "destinationSha256": "0327bb2318fef35687e9f08616c1a7790e2a678394359554662c456b2ba05425",
+      "exact": false
+    },
+    {
+      "source": "sdk/lookup/test/integration.test.mts",
+      "destination": "packages/lookup/test/integration.test.mts",
+      "sourceSha256": "e9168d6fe6d5e578b1a37dc25937426e1baa445dfd38617d2426185f9b081143",
+      "destinationSha256": "e9168d6fe6d5e578b1a37dc25937426e1baa445dfd38617d2426185f9b081143",
+      "exact": true
+    },
+    {
+      "source": "sdk/lookup/test/legacy-deployment.test.mts",
+      "destination": "packages/lookup/test/legacy-deployment.test.mts",
+      "sourceSha256": "8d54f9086224878d7297f99f380e9e337ee14ea734d9bda2200f8a665d99e5a2",
+      "destinationSha256": "8d54f9086224878d7297f99f380e9e337ee14ea734d9bda2200f8a665d99e5a2",
+      "exact": true
+    },
+    {
+      "source": "sdk/lookup/test/lookup.test.mts",
+      "destination": "packages/lookup/test/lookup.test.mts",
+      "sourceSha256": "0c86d3d88c4c77c9d7af8a2524328e1f5be92dc875908fc417503b5c8ea8076d",
+      "destinationSha256": "0c86d3d88c4c77c9d7af8a2524328e1f5be92dc875908fc417503b5c8ea8076d",
+      "exact": true
+    },
+    {
+      "source": "sdk/lookup/test/multichain-codec.test.mts",
+      "destination": "packages/lookup/test/multichain-codec.test.mts",
+      "sourceSha256": "89f4c4f4a3a0ede95086ad8650c867dd9855e3902ca9dbef71dc417203343043",
+      "destinationSha256": "89f4c4f4a3a0ede95086ad8650c867dd9855e3902ca9dbef71dc417203343043",
+      "exact": true
+    },
+    {
+      "source": "sdk/lookup/test/multichain.test.mts",
+      "destination": "packages/lookup/test/multichain.test.mts",
+      "sourceSha256": "9868af9ae6599d32ac57b033ded8ff2d655317d10c7264983fa0a39742b8dcdc",
+      "destinationSha256": "9868af9ae6599d32ac57b033ded8ff2d655317d10c7264983fa0a39742b8dcdc",
+      "exact": true
+    },
+    {
+      "source": "sdk/lookup/test/muxed-identity.test.mts",
+      "destination": "packages/lookup/test/muxed-identity.test.mts",
+      "sourceSha256": "aa313de365557ac15e4c5e25b5fd2034aea1e5e941645406773e3348b9e5f22a",
+      "destinationSha256": "aa313de365557ac15e4c5e25b5fd2034aea1e5e941645406773e3348b9e5f22a",
+      "exact": true
+    },
+    {
+      "source": "sdk/lookup/test/muxed.test.mts",
+      "destination": "packages/lookup/test/muxed.test.mts",
+      "sourceSha256": "f1b76af1fbaf1978ff6a303cdc2e242e52d9af8cd231a3bf156c074b97fc3a0e",
+      "destinationSha256": "f1b76af1fbaf1978ff6a303cdc2e242e52d9af8cd231a3bf156c074b97fc3a0e",
+      "exact": true
+    },
+    {
+      "source": "sdk/lookup/test/package-metadata.test.mts",
+      "destination": "packages/lookup/test/package-metadata.test.mts",
+      "sourceSha256": "5a53fddde39dba394fc15b9b415d830e33981e4f19ffc73c5bae8290ed780d01",
+      "destinationSha256": "78519ad1c06c8af7432a3c6ed1326ab82bc157b8398168376f9453b8384d0ef1",
+      "exact": false
+    },
+    {
+      "source": "sdk/lookup/test/payment-copies.test.mts",
+      "destination": "packages/lookup/test/payment-copies.test.mts",
+      "sourceSha256": "ca0704460f98338fd216ecc8bd920b99796616cb49fd7643ae24a5d87b8b5758",
+      "destinationSha256": "ca0704460f98338fd216ecc8bd920b99796616cb49fd7643ae24a5d87b8b5758",
+      "exact": true
+    },
+    {
+      "source": "sdk/lookup/test/payment.test.mts",
+      "destination": "packages/lookup/test/payment.test.mts",
+      "sourceSha256": "740a493aaedb3c9b5a00bbcfc59445d4d7ada7d78ee8bde7d50968c8c91e4f4e",
+      "destinationSha256": "740a493aaedb3c9b5a00bbcfc59445d4d7ada7d78ee8bde7d50968c8c91e4f4e",
+      "exact": true
+    },
+    {
+      "source": "sdk/lookup/test/read-amplification.test.mts",
+      "destination": "packages/lookup/test/read-amplification.test.mts",
+      "sourceSha256": "0e245beb99ebb047deeba57b277beaf7bb2bd69ac8db77165a106a4ddce8e356",
+      "destinationSha256": "0e245beb99ebb047deeba57b277beaf7bb2bd69ac8db77165a106a4ddce8e356",
+      "exact": true
+    },
+    {
+      "source": "sdk/lookup/test/read-extensions.test.mts",
+      "destination": "packages/lookup/test/read-extensions.test.mts",
+      "sourceSha256": "cb63897b3bcb6e5888abd71d97063502f203fcba25c0ccbd7f0eb9f9cca89ce2",
+      "destinationSha256": "cb63897b3bcb6e5888abd71d97063502f203fcba25c0ccbd7f0eb9f9cca89ce2",
+      "exact": true
+    },
+    {
+      "source": "sdk/lookup/test/subnames.test.mts",
+      "destination": "packages/lookup/test/subnames.test.mts",
+      "sourceSha256": "1735a1aba4064065a9eff6f1dfcec9d277b2776950906ee2e6e83cbb4e6a0def",
+      "destinationSha256": "1735a1aba4064065a9eff6f1dfcec9d277b2776950906ee2e6e83cbb4e6a0def",
+      "exact": true
+    },
+    {
+      "source": "sdk/lookup/tsconfig.json",
+      "destination": "packages/lookup/tsconfig.json",
+      "sourceSha256": "e60a81c464c73c2ce104158d28ea61b7d2580b7f95b3e60e6e84fd2bd46015f2",
+      "destinationSha256": "e60a81c464c73c2ce104158d28ea61b7d2580b7f95b3e60e6e84fd2bd46015f2",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/LICENSE",
+      "destination": "packages/owner/LICENSE",
+      "sourceSha256": "2bf49b4cb561f5c33d2e2b52abf0cc04e13947f26c1699d65e5e6f3af9857fe0",
+      "destinationSha256": "2bf49b4cb561f5c33d2e2b52abf0cc04e13947f26c1699d65e5e6f3af9857fe0",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/README.md",
+      "destination": "packages/owner/README.md",
+      "sourceSha256": "848b7891d04938302644014d200b4dd0c1f8cb8f979dcd49d78ebe6278bcf5f1",
+      "destinationSha256": "e3036aa3ae8d394d41a558434dc5e77c22fe560bdcb5e13bb758466759c06e72",
+      "exact": false
+    },
+    {
+      "source": "sdk/owner/e2e.ts",
+      "destination": "packages/owner/e2e.ts",
+      "sourceSha256": "689cbd1542853220f87c783a87c244fa8ec1b49fc191f3b12467548bfd7a5d21",
+      "destinationSha256": "689cbd1542853220f87c783a87c244fa8ec1b49fc191f3b12467548bfd7a5d21",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/package-lock.json",
+      "destination": "packages/owner/package-lock.json",
+      "sourceSha256": "27c77b697cdebb3d925d0091c5534023a05096a45879ab1016c8827b8590a8ec",
+      "destinationSha256": "27c77b697cdebb3d925d0091c5534023a05096a45879ab1016c8827b8590a8ec",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/package.json",
+      "destination": "packages/owner/package.json",
+      "sourceSha256": "7a214019f05cd4f09ff18333efd61c94686960078ed3060cb11e3e64d0f294b8",
+      "destinationSha256": "7a214019f05cd4f09ff18333efd61c94686960078ed3060cb11e3e64d0f294b8",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/src/contract-wallet.ts",
+      "destination": "packages/owner/src/contract-wallet.ts",
+      "sourceSha256": "0535d088f8110b941c8dd448300fec39b30a22a131d9ee0a9cebfa8fa61d0add",
+      "destinationSha256": "0535d088f8110b941c8dd448300fec39b30a22a131d9ee0a9cebfa8fa61d0add",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/src/funding-history.ts",
+      "destination": "packages/owner/src/funding-history.ts",
+      "sourceSha256": "4559aeb61e513916083345c8f1fb77e9a9c0474e9164fc7c5ba86a1c3a11d470",
+      "destinationSha256": "4559aeb61e513916083345c8f1fb77e9a9c0474e9164fc7c5ba86a1c3a11d470",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/src/funding-owner.ts",
+      "destination": "packages/owner/src/funding-owner.ts",
+      "sourceSha256": "2a1c697177739eca37ae4fd2b34acbdd324d41c1f72ff4d693bc34d8202eb7c2",
+      "destinationSha256": "2a1c697177739eca37ae4fd2b34acbdd324d41c1f72ff4d693bc34d8202eb7c2",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/src/funding-reader.ts",
+      "destination": "packages/owner/src/funding-reader.ts",
+      "sourceSha256": "81b32e4093c31bffa96f36c512521e63ee677997c4ff26fb94cbd03cdb55d9b4",
+      "destinationSha256": "81b32e4093c31bffa96f36c512521e63ee677997c4ff26fb94cbd03cdb55d9b4",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/src/funding-service.ts",
+      "destination": "packages/owner/src/funding-service.ts",
+      "sourceSha256": "22006a2ee02307ec00dd4021e8c806687c1babc2208c7f9c956a224739df75d3",
+      "destinationSha256": "22006a2ee02307ec00dd4021e8c806687c1babc2208c7f9c956a224739df75d3",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/src/funding-types.ts",
+      "destination": "packages/owner/src/funding-types.ts",
+      "sourceSha256": "b62e8d7323b6a18251fedb01916e7fb4de1a1920e31dca9c006e1f2f1bb47b01",
+      "destinationSha256": "b62e8d7323b6a18251fedb01916e7fb4de1a1920e31dca9c006e1f2f1bb47b01",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/src/funding-user.ts",
+      "destination": "packages/owner/src/funding-user.ts",
+      "sourceSha256": "50e5d29c68ca23e3d91a12b0c5937c1b67c126d901cda711ff011767682945ca",
+      "destinationSha256": "50e5d29c68ca23e3d91a12b0c5937c1b67c126d901cda711ff011767682945ca",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/src/index.ts",
+      "destination": "packages/owner/src/index.ts",
+      "sourceSha256": "1375ca583a5683709967916897fa28f1043ebbf9ec56f538b61843028098af21",
+      "destinationSha256": "1375ca583a5683709967916897fa28f1043ebbf9ec56f538b61843028098af21",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/src/multichain.ts",
+      "destination": "packages/owner/src/multichain.ts",
+      "sourceSha256": "c6ac42e0ec93220dec269a1190f92e4f748dde7b46677f24d48c988a4853ecd6",
+      "destinationSha256": "c6ac42e0ec93220dec269a1190f92e4f748dde7b46677f24d48c988a4853ecd6",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/src/names.ts",
+      "destination": "packages/owner/src/names.ts",
+      "sourceSha256": "219d3db49a9d4db725a43c4eea08c0253f62dc1f5ae21bc1038fef79b882c182",
+      "destinationSha256": "219d3db49a9d4db725a43c4eea08c0253f62dc1f5ae21bc1038fef79b882c182",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/src/native-allowlist.ts",
+      "destination": "packages/owner/src/native-allowlist.ts",
+      "sourceSha256": "e66bd3563373d8f0342177cc36473d6586ac4dd5b364af34bcc6f50c9e3faef5",
+      "destinationSha256": "e66bd3563373d8f0342177cc36473d6586ac4dd5b364af34bcc6f50c9e3faef5",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/src/native-auth.ts",
+      "destination": "packages/owner/src/native-auth.ts",
+      "sourceSha256": "b48e3ae2603b88c63f055c5f92a178088a4aecff58f6f28ffc95119caddade19",
+      "destinationSha256": "b48e3ae2603b88c63f055c5f92a178088a4aecff58f6f28ffc95119caddade19",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/src/native-code-policy.ts",
+      "destination": "packages/owner/src/native-code-policy.ts",
+      "sourceSha256": "ecedd732a26328988b63c0af638b93be2e8686ed0abf16793a3809a336e823b0",
+      "destinationSha256": "ecedd732a26328988b63c0af638b93be2e8686ed0abf16793a3809a336e823b0",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/src/native-codec.ts",
+      "destination": "packages/owner/src/native-codec.ts",
+      "sourceSha256": "cd49a10d87befb4ada520082ba53008c6175e35eb0a4185b94ca51b2bf2ac6c5",
+      "destinationSha256": "cd49a10d87befb4ada520082ba53008c6175e35eb0a4185b94ca51b2bf2ac6c5",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/src/native-history.ts",
+      "destination": "packages/owner/src/native-history.ts",
+      "sourceSha256": "b02ce3df6474695c0e4c1c6f538f353b648152382ecb5106ce1fb737f1202ed3",
+      "destinationSha256": "b02ce3df6474695c0e4c1c6f538f353b648152382ecb5106ce1fb737f1202ed3",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/src/native-transport.ts",
+      "destination": "packages/owner/src/native-transport.ts",
+      "sourceSha256": "1ba904b438120cb2802b9b80ff05b7f93bada819cd01c58a6b868efbc7bac1eb",
+      "destinationSha256": "1ba904b438120cb2802b9b80ff05b7f93bada819cd01c58a6b868efbc7bac1eb",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/src/native-types.ts",
+      "destination": "packages/owner/src/native-types.ts",
+      "sourceSha256": "4e5d00ed3c41c0ba9f7c7df28692dc4347cfc22ad83950a7522fa08d42c0e51e",
+      "destinationSha256": "4e5d00ed3c41c0ba9f7c7df28692dc4347cfc22ad83950a7522fa08d42c0e51e",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/src/native-upgrades.ts",
+      "destination": "packages/owner/src/native-upgrades.ts",
+      "sourceSha256": "137b09261917b57d60f1abbf6acc260066079575ec4430a5727b5dc42b28b0af",
+      "destinationSha256": "137b09261917b57d60f1abbf6acc260066079575ec4430a5727b5dc42b28b0af",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/src/payment.ts",
+      "destination": "packages/owner/src/payment.ts",
+      "sourceSha256": "20494b8e99ae3d0de87d7aaaf738212947358ed162725a91dea90a616d78ad87",
+      "destinationSha256": "20494b8e99ae3d0de87d7aaaf738212947358ed162725a91dea90a616d78ad87",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/src/subnames-client.ts",
+      "destination": "packages/owner/src/subnames-client.ts",
+      "sourceSha256": "03a78567f4a076a0d73ec6f64893c662a1a4b5f533b951f2dfcdbf7bfbea95d8",
+      "destinationSha256": "03a78567f4a076a0d73ec6f64893c662a1a4b5f533b951f2dfcdbf7bfbea95d8",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/test/decode-failure.test.mts",
+      "destination": "packages/owner/test/decode-failure.test.mts",
+      "sourceSha256": "669c8be4cfe209ceeb8e3575aa0762544f80e3f37008d73d55cd5a8e23b8ab28",
+      "destinationSha256": "669c8be4cfe209ceeb8e3575aa0762544f80e3f37008d73d55cd5a8e23b8ab28",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/test/error-codes.test.mts",
+      "destination": "packages/owner/test/error-codes.test.mts",
+      "sourceSha256": "4a6b55d17d7d5fbcebd9a9553b56f597596d11a54d475863479978f17dbdda7c",
+      "destinationSha256": "4a6b55d17d7d5fbcebd9a9553b56f597596d11a54d475863479978f17dbdda7c",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/test/fixtures/funding-interop.json",
+      "destination": "packages/owner/test/fixtures/funding-interop.json",
+      "sourceSha256": "26751e81eef894241d690c0d7d06b56a396c6d0e591120d021ccbac7acaeb604",
+      "destinationSha256": "26751e81eef894241d690c0d7d06b56a396c6d0e591120d021ccbac7acaeb604",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/test/funding-bounds.test.mts",
+      "destination": "packages/owner/test/funding-bounds.test.mts",
+      "sourceSha256": "8b283e682d622bd7ce7ae6068cd086a7c1a5efc34ab7753e01e1dd3e5ef6a25b",
+      "destinationSha256": "8b283e682d622bd7ce7ae6068cd086a7c1a5efc34ab7753e01e1dd3e5ef6a25b",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/test/funding-history.test.mts",
+      "destination": "packages/owner/test/funding-history.test.mts",
+      "sourceSha256": "38a8d3b7c86a623c5b95b5b8aa4776d2b852ccfad42954da878844f17915f10c",
+      "destinationSha256": "38a8d3b7c86a623c5b95b5b8aa4776d2b852ccfad42954da878844f17915f10c",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/test/funding.test.mts",
+      "destination": "packages/owner/test/funding.test.mts",
+      "sourceSha256": "c61fd073381a3d2abe4384a20a146060103dab58e46a9325a85560e8d83b7005",
+      "destinationSha256": "c61fd073381a3d2abe4384a20a146060103dab58e46a9325a85560e8d83b7005",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/test/hardening.test.mts",
+      "destination": "packages/owner/test/hardening.test.mts",
+      "sourceSha256": "2d959afc23a293e93549477ff0e573d9be30b22701d7c0d0a19149324e31bd84",
+      "destinationSha256": "2d959afc23a293e93549477ff0e573d9be30b22701d7c0d0a19149324e31bd84",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/test/helpers/native-ledger.mts",
+      "destination": "packages/owner/test/helpers/native-ledger.mts",
+      "sourceSha256": "d672be81b46c216f6698dc2c2dce73af8aa57423c22a2e7e123c8730ddf47348",
+      "destinationSha256": "d672be81b46c216f6698dc2c2dce73af8aa57423c22a2e7e123c8730ddf47348",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/test/integration.test.mts",
+      "destination": "packages/owner/test/integration.test.mts",
+      "sourceSha256": "b4534552f76d7db127e862753bc2968210e9c0df3049f67dcff1f819c22c3fa8",
+      "destinationSha256": "b4534552f76d7db127e862753bc2968210e9c0df3049f67dcff1f819c22c3fa8",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/test/multichain.test.mts",
+      "destination": "packages/owner/test/multichain.test.mts",
+      "sourceSha256": "1fb43e5183362c99f3365add4f30d9f25e5088cfac073f92863e39a40eb6878a",
+      "destinationSha256": "1fb43e5183362c99f3365add4f30d9f25e5088cfac073f92863e39a40eb6878a",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/test/native-claims.test.mts",
+      "destination": "packages/owner/test/native-claims.test.mts",
+      "sourceSha256": "db908bd9a56c045be9ae1313d24e0f8146d7ca18a143151e3aa659d62f823175",
+      "destinationSha256": "db908bd9a56c045be9ae1313d24e0f8146d7ca18a143151e3aa659d62f823175",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/test/native-code-policy-copies.test.mts",
+      "destination": "packages/owner/test/native-code-policy-copies.test.mts",
+      "sourceSha256": "e569230f0161c4f1d087cfbebf93884706ba5e06838bbd9eb75eec559d4ebc16",
+      "destinationSha256": "cbc357362fddae28e2897fa6ab5356b44600f085f1084769e62b68643138112c",
+      "exact": false
+    },
+    {
+      "source": "sdk/owner/test/native-code-policy.test.mts",
+      "destination": "packages/owner/test/native-code-policy.test.mts",
+      "sourceSha256": "665e6ede4af9cc290ada8d67d185dcbfce3c94c36eb0678ec32ab2d2b82ebb00",
+      "destinationSha256": "665e6ede4af9cc290ada8d67d185dcbfce3c94c36eb0678ec32ab2d2b82ebb00",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/test/native-fee-limits.test.mts",
+      "destination": "packages/owner/test/native-fee-limits.test.mts",
+      "sourceSha256": "21e09d284ef5ab0e5bcaa96c15053306f5b81129421c1c29dc8df6c36a0d736c",
+      "destinationSha256": "21e09d284ef5ab0e5bcaa96c15053306f5b81129421c1c29dc8df6c36a0d736c",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/test/native-history.test.mts",
+      "destination": "packages/owner/test/native-history.test.mts",
+      "sourceSha256": "704f4d2a4726eed13699967d2bcf472c88cd456607152d21d07d008951c03d2d",
+      "destinationSha256": "704f4d2a4726eed13699967d2bcf472c88cd456607152d21d07d008951c03d2d",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/test/native-upgrades.test.mts",
+      "destination": "packages/owner/test/native-upgrades.test.mts",
+      "sourceSha256": "aa83ab48cd80aca676c1966dccde63cd6261a03b0039dd3a2006e7da8af296a7",
+      "destinationSha256": "4e0c216308a76641d8aa2448252de3f11d9b3dba14c5911b1de796ef780cedab",
+      "exact": false
+    },
+    {
+      "source": "sdk/owner/test/subnames.test.mts",
+      "destination": "packages/owner/test/subnames.test.mts",
+      "sourceSha256": "96b817bd93486c06cbfc2e3541daacb84e5a997c8a4fb1d701aa16761b3a6d83",
+      "destinationSha256": "96b817bd93486c06cbfc2e3541daacb84e5a997c8a4fb1d701aa16761b3a6d83",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/tsconfig.json",
+      "destination": "packages/owner/tsconfig.json",
+      "sourceSha256": "e60a81c464c73c2ce104158d28ea61b7d2580b7f95b3e60e6e84fd2bd46015f2",
+      "destinationSha256": "e60a81c464c73c2ce104158d28ea61b7d2580b7f95b3e60e6e84fd2bd46015f2",
+      "exact": true
+    },
+    {
+      "source": "sdk/README.md",
+      "destination": "README.md",
+      "sourceSha256": "ceae92cd73fd1eb205e298942e262ea3037fa3cdc44ec2c5f24d9d1760359a2a",
+      "destinationSha256": "20fbe04ee1c8d790d6995d1ed8837ee3d5f63c653370ca45743238745d852723",
+      "exact": false
+    },
+    {
+      "source": "sdk/NATIVE-CLAIMS.md",
+      "destination": "NATIVE-CLAIMS.md",
+      "sourceSha256": "3a68c2b324941bb0f45c001027181c5bacc4636c7b0336133029dba593c2e311",
+      "destinationSha256": "85b9b95724856289a2c2b3719e8ce61615c0c7e38afd1a5b1d8883d69f360929",
+      "exact": false
+    },
+    {
+      "source": "sdk/multichain/README.md",
+      "destination": "packages/multichain/README.md",
+      "sourceSha256": "27535112699dc8900593c1063dc71264d0e8ae0ac23d977e30a9089d42471e9a",
+      "destinationSha256": "27535112699dc8900593c1063dc71264d0e8ae0ac23d977e30a9089d42471e9a",
+      "exact": true
+    },
+    {
+      "source": "deploy/testnet/deployment.json",
+      "destination": "deployments/testnet.json",
+      "sourceSha256": "bfba01c38aeb205db45d3deeeb55e8f67c156542c9607fd1c5fc603ac6d59a2c",
+      "destinationSha256": "bfba01c38aeb205db45d3deeeb55e8f67c156542c9607fd1c5fc603ac6d59a2c",
+      "exact": true
+    }
+  ],
+  "generatedFixtures": [
+    {
+      "file": "fixtures/public-abi-errors.json",
+      "sha256": "cc4e523b2da2c27f3ea907a703f83619396d71417a508f2f9bdf38223dddadca"
+    },
+    {
+      "file": "fixtures/release-catalog.json",
+      "sha256": "8c612d7497b4e1ae175bbf04bc1d472365fb73283dd89d648d2cf173f12b64b2"
+    }
+  ],
+  "productionSourcesUnchanged": true
+}

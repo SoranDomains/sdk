@@ -5,12 +5,14 @@
 > [release status](https://docs.soran.domains/reference/release-status) for package and service availability.
 
 
-Version 0.7.0 targets Stellar SDK17 (`>=17 <18`). ASCII names
+Version 0.10.0 targets Stellar SDK17 (`>=17 <18`). ASCII names
 and labels are validated before lowercase normalization; Unicode lookalikes are
 rejected. Payment and ownership writes target the owning Registry/Registrar/Resolver.
-Complete-M display-name writes target Universal Lookup; Lookup 0.10.0 provides
+Complete-M display-name writes target Universal Lookup; Lookup 0.10.0 or later provides
 the corresponding read interface. Check the release status before enabling the
 new capability on a deployment.
+
+Releases older than 0.9.1 (and any built against Lookup 0.6.0 to 0.9.0) default to the retired 5 and 6 September 2026 testnet stacks; upgrade rather than pinning a retired Registry. See [Older versions and retired stacks](../../README.md#older-versions-and-retired-stacks).
 
 Your Soran name, managed with your own key. The third piece of the SDK
 trilogy: [`@sorandomains/lookup`](https://www.npmjs.com/package/@sorandomains/lookup)
@@ -33,6 +35,29 @@ await me.setProfile("alice.nova", {  // the standard keys every wallet reads
   url: "https://alice.dev",
 });
 ```
+
+## Network address records (unreleased native extension)
+
+```ts
+await me.setChainAddress("fred.solo", "ethereum", "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed");
+await me.setChainAddress("fred.solo", "bitcoin", "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa");
+await me.clearChainAddress("fred.solo", "bitcoin");
+```
+
+The namespace owner must first enable each network for all holders. Publishing
+validates the address, freshly checks the native route/version and policy, then
+signs one holder-authorized binary record write. Clearing works while disabled.
+No custom text record is read or modified; Stellar continues to use `setPayment`.
+`HolderError.codeName === "ChainDisabled"` identifies a disabled network.
+
+All methods require `multichain_version() == 1`; the existing published deployment
+presets are not upgraded by installing this SDK. The source change does not deploy
+contracts or publish packages. See [network formats and integration rules](../multichain/README.md)
+for all 14 supported mainnets, binary formats, and shared codec exports. XRP Ledger
+`xrp` preserves full mainnet X-addresses and their destination tags; `xrpl-evm` is a
+separate EVM network. Never strip an X-address tag. For Stellar use the dedicated
+payment API.
+
 
 ## Publish payment instructions
 
@@ -191,9 +216,9 @@ supply the matching `primaryId` explicitly.
 
 ## Native username claiming
 
-Native username claiming uses `claimQuote`, `createClaimIntent`, `buildClaim` and `claim`. The current namespace owner must first enable the public policy. The claimant's G wallet authorizes the exact username, complete receiving destination, owner price, policy version and deadline. `recoverClaim` reads the original immutable receipt; it never silently retries an uncertain transaction. Receipt reads, receipt absence and confirmed transaction results are accepted only after a clean Registrar attestation and executable check with RPC ledger context at least as recent as the receipt read or transaction inclusion. Missing or older context stops recovery; retain the original request and transaction hash. This check trusts the configured RPC to report its state and ledger honestly. Later namespace-owner, claim-policy or Resolver changes alone do not invalidate a historical receipt, while tainted or unapproved Registrar code cannot supply authoritative history. On governed deployments, approved code is verified against the namespace-specific Registry pin. `acceptNameTransferWithDestination` and `renewName` cover separately authorized holder lifecycle actions.
+Native username claiming uses `claimQuote`, `createClaimIntent`, `buildClaim` and `claim`. The current namespace owner must first enable the public policy. The claimant's G or C wallet authorizes the exact username, complete receiving destination, owner price, policy version and deadline. `recoverClaim` reads the original immutable receipt; it never silently retries an uncertain transaction. Receipt reads, receipt absence and confirmed transaction results are accepted only after a clean Registrar attestation and executable check with RPC ledger context at least as recent as the receipt read or transaction inclusion. Missing or older context stops recovery; retain the original request and transaction hash. This check trusts the configured RPC to report its state and ledger honestly. Later namespace-owner, claim-policy or Resolver changes alone do not invalidate a historical receipt, while tainted or unapproved Registrar code cannot supply authoritative history. On governed deployments, approved code is verified against the namespace-specific Registry pin. `acceptNameTransferWithDestination` and `renewName` cover separately authorized holder lifecycle actions.
 
-Read the [native claim APIs, security boundaries and complete signup flow](https://github.com/SoranDomains/sdk/blob/main/NATIVE-CLAIMS.md). G/no memo, G with ID/Text/Hash, full M/no separate memo and C/no memo remain supported payment destinations. Current transaction-signing adapters use classic G accounts.
+Read the [native claim APIs, security boundaries and complete signup flow](https://github.com/SoranDomains/sdk/blob/main/NATIVE-CLAIMS.md). G/no memo, G with ID/Text/Hash, full M/no separate memo and C/no memo remain supported payment destinations. Transaction envelopes still use a G fee payer. A C owner supplies `contractWallet` authorization; see the example below.
 
 ## Verified testnet deployment
 
@@ -231,20 +256,55 @@ On a governed Registry, native verification reads the exact per-namespace Regist
 Historical claim recovery is read-only and binds the original intent to the frozen source Registrar and sealed migration commitments. It never rewrites the intent to a successor Registry or treats an unavailable receipt as permission to submit again. Deployment migration and package publication are separate; check the release status for the active addresses.
 
 
-## Namespace sponsorship
+### Claim and manage a name with a contract wallet
 
-This package supports on-chain funding and sponsored actions on Stellar testnet.
-`SoranFunding` manages an owner's deposit, spending limits, pause controls and withdrawals.
-`SoranSponsorship` builds and checks an exact sponsored action, while `FundingServiceClient`
-requests quotes and recovers transaction outcomes from a compatible service.
+```ts
+import { SoranHolder, type ContractWallet, type TxSigner } from "@sorandomains/holder";
 
-The Soran service uses fixed quotes based on live Stellar fee estimates. A successful action
-charges the agreed amount; Soran retains any difference from the actual network fee.
-There is no separate refund transaction or later debit. Failed actions do not debit the
-namespace's funding position. A separate username price remains payable by the claimant.
+// These adapters come from your wallet integration. The C wallet signs Soroban
+// authorizations in the format its deployed __check_auth understands.
+export function namesForContractWallet(wallet: ContractWallet, feePayer: TxSigner) {
+  return new SoranHolder({ signer: feePayer, contractWallet: wallet });
+}
+```
 
-User authorization remains required. A wallet must support Soroban authorization-entry
-signing; a transaction-only wallet cannot silently switch to a user-paid transaction.
-Always preserve the canonical quote before submission and recover its status after a timeout.
-Funding balances and permissions are verified on chain, and terminal outcomes are checked
-against trusted Stellar RPC/history providers.
+The C wallet becomes the name's holder. It authorizes the reviewed action; the G payer signs the transaction after the chain verifies the wallet signature and estimates the complete fee. Existing names in older namespaces need their Registrar upgraded before C claiming is available. `buildClaim` stays unsigned; `claim` handles authorization and submission. Sponsored users pass the C adapter to `SoranSponsorship.authorize`; Soran supplies the relayer. See the native guide for fee refresh and recovery.
+
+### Child names
+
+An upgraded namespace can allow one child level, such as `mail.fred.solo`.
+The current holder of `fred.solo` controls its children; their destination wallets
+receive no ownership rights. Children share the parent's expiry and stop working
+when its ownership generation changes. They are not independently transferable.
+
+```ts
+const parent = await lookup.nameMetadata("fred.solo");
+const previous = await holder.subnameRecord("mail.fred.solo");
+await holder.createSubname("mail.fred.solo", receivingAddress, {
+  parentGeneration: parent!.generation,
+  previousGeneration: previous?.generation ?? null,
+});
+await holder.setPayment("mail.fred.solo", {
+  address: receivingAddress, memo: { type: "id", value: "123" },
+});
+```
+
+Creation stores a G/C destination with **no memo**. Use a holder-controlled
+address initially when the intended destination requires a memo, then publish
+its complete instructions atomically with `setPayment`. Existing text, profile,
+network-address, payment, reverse and primary methods accept child names.
+`setAddress`, claims, renewals and name transfers remain top-level operations.
+`parseName` keeps its existing two-label grammar; `parseResolvableName` accepts
+both forms and validates every label before lowercasing.
+
+`removeSubname(name, { parentGeneration, generation })` removes the reviewed
+incarnation; `touchSubname(name)` maintains its storage.
+`touchSubnamePage("fred.solo", page)` maintains an existing listing page and its
+parent/count storage. Pages are zero-based groups of 16 labels; use
+`Math.floor(offset / 16)` for a listing offset. Page upkeep is permissionless,
+charges the signer's network fee, and rejects nonexistent pages. Maintaining a
+child alone does not renew its listing page. Raw `subnameRecord`
+and bounded `subnames(parent, { offset, limit })` reads include removed and stale
+rows, and are not payment answers. Always resolve payment instructions again.
+A failed or archived read is an error, never a missing child. The maximum page
+size is 16; pages may change between reads and across a Registrar migration.

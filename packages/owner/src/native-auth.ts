@@ -1,10 +1,13 @@
 import { Address, Transaction, TransactionBuilder, authorizeEntry, xdr } from "@stellar/stellar-sdk";
 import { NativeClaimError, address, hex, sc, u32 } from "./native-codec.js";
+import { validateContractAuthorization, type ContractAuthorization } from "./contract-wallet.js";
 
 export type NativeInvocation = { contract: string; method: string; args: xdr.ScVal[]; children?: NativeInvocation[] };
 /** Derive this plan locally from a validated intent, never from a remote envelope. */
 export type NativeAuthorizationPlan = {
   source: string;
+  /** When present, this contract wallet authorizes the holder invocation. */
+  actor?: ContractAuthorization;
   contract: string;
   method: string;
   args: xdr.ScVal[];
@@ -63,7 +66,7 @@ export async function signEligibilityAuthorization(
 }
 
 /** Exact local intent and native role scope; does not relax ordinary SDK authorization. */
-export function validateNativeTransaction(tx: Transaction, plan: NativeAuthorizationPlan, requireEligibilitySigned = true): void {
+export function validateNativeTransaction(tx: Transaction, plan: NativeAuthorizationPlan, requireEligibilitySigned = true, requireActorSigned = true): void {
   address(plan.source, "account", "claim transaction source");
   if (tx.source !== plan.source) throw new NativeClaimError(`native transaction source ${tx.source} differs from reviewed source ${plan.source}`, "authorization");
   if (tx.operations.length !== 1) throw new NativeClaimError(`native transaction has ${tx.operations.length} operations; exactly one was reviewed`, "authorization");
@@ -78,11 +81,19 @@ export function validateNativeTransaction(tx: Transaction, plan: NativeAuthoriza
   const entries = op.auth ?? [];
   if (entries.length !== (plan.eligibility ? 2 : 1)) throw new NativeClaimError("unexpected native authorization count", "authorization");
   const sources = entries.filter(entry => entry.credentials.type === "sorobanCredentialsSourceAccount");
-  if (sources.length !== 1 || !sameInvocation(sources[0].rootInvocation, plan.sourceInvocation))
+  if (plan.actor) {
+    const actors = entries.filter(entry => entry.credentials.type === "sorobanCredentialsAddress" &&
+      Address.fromScAddress(entry.credentials.address.address).toString() === plan.actor!.account);
+    if (sources.length || actors.length !== 1 || !sameInvocation(actors[0].rootInvocation, plan.sourceInvocation))
+      throw new NativeClaimError("contract wallet authorization differs from exact reviewed intent", "authorization");
+    validateContractAuthorization(actors[0], plan.actor, requireActorSigned);
+  } else if (sources.length !== 1 || !sameInvocation(sources[0].rootInvocation, plan.sourceInvocation)) {
     throw new NativeClaimError("holder or owner authorization differs from exact reviewed intent", "authorization");
+  }
   if (plan.eligibility) {
-    if (plan.eligibility.account === plan.source) throw new NativeClaimError("eligibility account must be separate from claimant", "authorization");
-    const separate = entries.filter(entry => entry.credentials.type !== "sorobanCredentialsSourceAccount");
+    if (plan.eligibility.account === plan.source || plan.eligibility.account === plan.actor?.account) throw new NativeClaimError("eligibility account must be separate from claimant and transaction source", "authorization");
+    const separate = entries.filter(entry => entry.credentials.type === "sorobanCredentialsAddress" &&
+      Address.fromScAddress(entry.credentials.address.address).toString() === plan.eligibility!.account);
     if (separate.length !== 1) throw new NativeClaimError("unexpected second authorizer", "authorization");
     validateEligibilityAuthorization(separate[0], plan.eligibility, requireEligibilitySigned);
   }

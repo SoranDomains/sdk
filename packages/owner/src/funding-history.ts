@@ -11,6 +11,7 @@ import {
 import { hex } from "./native-codec.js";
 import {
   FundingError,
+  readBoundedText,
   sponsorQuoteToScVal,
   type SponsorQuote,
 } from "./funding-types.js";
@@ -199,8 +200,8 @@ export class TestnetSponsorHistory implements SponsorHistory {
         "Sponsorship history unavailable; preserve the quote reference",
         "unavailable",
       );
-    const body = await response.text();
-    if (body.length > 600000)
+    const body = await readBoundedText(response, 600000);
+    if (body === null)
       throw new FundingError(
         "Sponsorship history response is too large",
         "unavailable",

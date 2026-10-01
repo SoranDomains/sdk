@@ -1,3 +1,6 @@
+import { createSubnameReader, subnameParent, subnameParts, subnameLabelArg, SUBNAME_REGISTRAR_ERRORS } from "./subnames-client.js";
+import { parseResolvableName as parseResolutionParts, resolvableNameNode, subnamePolicyFromNative, subnamePolicyToNative, subnameRecordFromNative, subnameLabelsFromNative, subnamePageInput, exactGeneration, type SubnamePolicy, type SubnameRecord } from "./names.js";
+export { type SubnamePolicy, type SubnameRecord } from "./names.js";
 import { recoverFrozenClaim, type HistoricalRecoveryOptions } from "./native-history.js";
 export type { HistoricalRecoveryOptions } from "./native-history.js";
 /**
@@ -34,6 +37,9 @@ export type { HistoricalRecoveryOptions } from "./native-history.js";
  * calls cannot race the account sequence number.
  */
 
+import { chainNetwork, chainPolicyFromNative, chainPolicyToNative, encodeChainAddress, decodeChainAddress, type ChainNetwork } from "./multichain.js";
+export { CHAIN_NETWORKS, ChainAddressError, chainNetwork, chainPolicyFromNative, chainPolicyToNative, encodeChainAddress, decodeChainAddress, type ChainNetwork, type ChainAddressErrorCode } from "./multichain.js";
+
 import {
   Account,
   Address,
@@ -59,7 +65,7 @@ import { validateNativeTransaction, assertSignedBodyUnchanged } from "./native-a
 import { NativeHolderClient, type ClaimSubmitOptions } from "./native-holder.js";
 import { NativeClaimError } from "./native-codec.js";
 import type { ClaimIntent, TransferIntent, RenewIntent } from "./native-types.js";
-import { requireReadLedger, type NativeRead, type NativeWriteOptions } from "./native-transport.js";
+import { nativeWalletPlan, sendNative, requireReadLedger, type NativeContext, type NativeRead, type NativeWriteOptions } from "./native-transport.js";
 export * from "./native-types.js";
 export * from "./native-allowlist.js";
 export * from "./native-approver.js";
@@ -67,6 +73,9 @@ export { NativeClaimError, paymentDestinationToScVal, namespaceNode as nativeNam
 export { createClaimIntent, type ClaimRequestOptions, type ClaimSubmitOptions, type NativeClaimSubmission, type PreparedClaim } from "./native-holder.js";
 export { signEligibilityAuthorization, validateEligibilityAuthorization, validateNativeTransaction, authorizedInvocation, type NativeAuthorizationPlan, type EligibilitySigner } from "./native-auth.js";
 export type { NativeCapability, NativePrepared, NativeWriteOptions } from "./native-transport.js";
+
+import type { ContractWallet } from "./contract-wallet.js";
+export type { ContractWallet } from "./contract-wallet.js";
 
 type Invoked = { hash: string; ledger: number; returnValue: unknown };
 
@@ -177,6 +186,9 @@ const REGISTRAR_ERRORS: Record<number, string> = {
   49: "MigrationUnavailable",
   50: "MigrationUnsupported",
   51: "PermanentLockDisabled",
+  52: "InvalidRenewalGrace",
+  53: "SubnameCreationDisabled", 54: "SubnamesSuspended",
+  55: "SubnameGenerationMismatch", 56: "SubnameIndexUnavailable",
 };
 
 const RESOLVER_ERRORS: Record<number, string> = {
@@ -210,6 +222,9 @@ const RESOLVER_ERRORS: Record<number, string> = {
   28: "MigrationUnavailable",
   29: "MigrationDuplicate",
   30: "MigrationIncomplete",
+  31: "BatchTooLarge", 32: "TextTooLarge",
+  33: "UnsupportedCoinType", 34: "ChainDisabled", 35: "InvalidChainAddress",
+  36: "InvalidChainPolicy", 37: "ChainContextMismatch", 38: "ChainUnavailable",
 };
 
 const LOOKUP_IDENTITY_ERRORS: Record<number, string> = {
@@ -217,6 +232,8 @@ const LOOKUP_IDENTITY_ERRORS: Record<number, string> = {
   6: "RegistrarMissing", 7: "NameInactive", 8: "ContextMismatch", 9: "UnsupportedImplementation", 10: "DependencyUnavailable",
   11: "InvalidPayment", 12: "LegacyMemoUnknown", 13: "MemoRequired", 14: "UpgradePending", 15: "NoPendingUpgrade",
   16: "UpgradeNotReady", 17: "UpgradeHashMismatch", 18: "TimestampOverflow", 19: "PrimaryNotConfigured", 20: "InvalidPrimary", 21: "ReadTooLarge", 22: "MuxedDestination", 23: "InvalidMuxedAccount", 24: "MuxedForwardMismatch", 25: "NotMuxedDisplayName", 26: "InvalidMuxedRecord",
+  27: "BatchTooLarge", 28: "MigrationMismatch",
+  29: "UnsupportedCoinType", 30: "ChainDisabled", 31: "InvalidChainAddress", 32: "InvalidChainPolicy",
 };
 
 const PRIMARY_ERRORS: Record<number, string> = {
@@ -232,7 +249,38 @@ const PRIMARY_ERRORS: Record<number, string> = {
   10: "MigrationIncomplete",
   11: "MigrationUnavailable",
   12: "UpgradeUnavailable",
+  13: "BatchTooLarge",
 };
+
+/** Errors for a submit the network REJECTED as a stale sequence: nothing was included, so one retry with a fresh sequence is safe. */
+const BAD_SEQ_REJECTED = new WeakSet<object>();
+function isBadSeqResult(result: unknown): boolean {
+  try {
+    const field = (result as { result?: unknown } | undefined)?.result;
+    const inner = (typeof field === "function" ? field.call(result) : field) as { type?: unknown } | undefined;
+    if (inner && typeof inner === "object" && "type" in inner) return inner.type === "txBadSeq";
+    throw new Error("unrecognised result");
+  } catch {
+    try {
+      return /txBadSeq|bad_seq/i.test(String((result as { toXDR?: () => unknown } | undefined)?.toXDR?.() ?? ""));
+    } catch {
+      return false;
+    }
+  }
+}
+
+const MAX_TEXT_VALUE_BYTES = 4096;
+/** Shared setText/setProfile pre-flight: nothing paid may happen before this passes. */
+function assertTextRecord(key: string, value: string): void {
+  if (key === "payment") throw new HolderError("payment records must be written atomically with setPayment");
+  if (!SYMBOL_RE.test(key)) {
+    throw new HolderError(`invalid text-record key "${key}" — 1-32 chars of A-Za-z0-9_`);
+  }
+  if (typeof value !== "string") throw new HolderError(`text-record "${key}" must be a string`);
+  if (new TextEncoder().encode(value).length > MAX_TEXT_VALUE_BYTES) {
+    throw new HolderError(`text-record "${key}" exceeds ${MAX_TEXT_VALUE_BYTES} bytes`);
+  }
+}
 
 /**
  * A failed holder operation. `code`/`codeName` carry the contract's typed
@@ -335,10 +383,7 @@ function namehash(namespace: string): Uint8Array {
   const labelHash = new Uint8Array(hash(utf8(namespace) as Buffer));
   return new Uint8Array(hash(concatBytes(new Uint8Array(32), labelHash) as Buffer));
 }
-function nameNode(label: string, namespace: string): Uint8Array {
-  const labelHash = new Uint8Array(hash(utf8(label) as Buffer));
-  return new Uint8Array(hash(concatBytes(namehash(namespace), labelHash) as Buffer));
-}
+function nameNode(label: string, namespace: string): Uint8Array { return resolvableNameNode(`${label}.${namespace}`); }
 
 const labelArg = (label: string) => nativeToScVal(utf8(label), { type: "bytes" });
 const addrArg = (address: string) => {
@@ -377,6 +422,8 @@ export type HolderOptions = {
   /** Signs every transaction: the name HOLDER's account (or, for
    *  `acceptNameTransfer`, the proposed new holder's). */
   signer: TxSigner;
+  /** Optional C-account owner. signer remains the separate G transaction payer. */
+  contractWallet?: ContractWallet;
   /** Named deployment preset; defaults to "testnet". Override the individual
    *  fields below as a SET for custom deployments. */
   network?: keyof typeof DEPLOYMENTS;
@@ -408,6 +455,7 @@ export class SoranHolder {
   private primaryId: string | null;
   private lookupId: string | null;
   private signer: TxSigner;
+  private contractWallet?: ContractWallet;
   private timeoutSecs: number;
   private fee: string;
   private queue: Promise<unknown> = Promise.resolve();
@@ -437,6 +485,8 @@ export class SoranHolder {
     this.lookupId = opts.lookupId === null ? null : (opts.lookupId ?? presetLookup ?? null);
     if (this.lookupId && !StrKey.isValidContract(this.lookupId)) throw new HolderError("invalid Lookup contract address");
     this.signer = opts.signer;
+    if (opts.contractWallet && (!StrKey.isValidContract(opts.contractWallet.address) || typeof opts.contractWallet.signAuthorization !== "function")) throw new HolderError("contractWallet requires a C address and signAuthorization adapter");
+    this.contractWallet = opts.contractWallet ? { address: opts.contractWallet.address, signAuthorization: request => opts.contractWallet!.signAuthorization(request) } : undefined;
     const t = opts.timeoutSecs ?? 60;
     if (!Number.isInteger(t) || t < 1 || t > 300) {
       throw new HolderError(`timeoutSecs must be an integer between 1 and 300 (got ${t})`);
@@ -447,11 +497,55 @@ export class SoranHolder {
       throw new HolderError("base network fee must be canonical decimal stroops between 1 and 4294967295");
   }
 
-  private nativeClient(): NativeHolderClient {
-    return new NativeHolderClient({ registryId: this.registryId, passphrase: this.passphrase, server: this.server, signer: this.signer, fee: this.fee, timeoutSecs: this.timeoutSecs, maxFeeStroops: this.maxNativeFeeStroops,
-      read: (id, method, args) => this.read(id, method, args),
-      readWithLedger: (id, method, args) => this.readWithLedger(id, method, args), serialize: work => this.serialize(work) });
+  private async requireSubnameSupport(name: string, id: string) {
+    if (parseResolvableName(name).childLabel && await this.read(id, "subname_version", []) !== 1) throw new HolderError("subnames unsupported");
   }
+  private subnameReader() { return createSubnameReader({ registryId: this.registryId, error: message => new HolderError(message), read: (id, fn, args) => this.read(id, fn, args) }); }
+  /** Live namespace policy. Creation-disabled keeps existing children usable; suspended hides them. */
+  async subnamePolicy(namespace: string): Promise<SubnamePolicy> { return this.subnameReader().policy(namespace); }
+  /** Raw child state, including tombstones and stale parent generations; this is not payment resolution. */
+  async subnameRecord(name: string): Promise<SubnameRecord | null> { return this.subnameReader().record(name); }
+  /** Bounded on-chain historical labels, including removed children. Re-read metadata before treating a child as active. */
+  async subnames(parent: string, options: { offset?: number; limit?: number } = {}) { return this.subnameReader().list(parent, options); }
+
+  /** Create a child controlled by this parent holder; destination may differ. Generations pin the reviewed state. */
+  async createSubname(name: string, address: string, expected: { parentGeneration: bigint; previousGeneration: bigint | null }): Promise<Submitted> {
+    const parsed = subnameParts(name), destination = addrArg(address);
+    const parentGeneration = exactGeneration(expected.parentGeneration);
+    const previous = expected.previousGeneration === null ? xdr.ScVal.scvVoid() : nativeToScVal(exactGeneration(expected.previousGeneration), { type: "u64" });
+    const ctx = await this.subnameReader().creationContext(parsed.namespace);
+    if (ctx.policy !== "enabled") throw new HolderError("child creation is disabled", ctx.registrar, "create_subname", ctx.policy === "suspended" ? 54 : 53, ctx.policy === "suspended" ? "SubnamesSuspended" : "SubnameCreationDisabled");
+    const result = await this.invoke(ctx.registrar, "create_subname", [subnameLabelArg(parsed.parentLabel), subnameLabelArg(parsed.childLabel!), nativeToScVal(parentGeneration, { type: "u64" }), previous, destination], { ...REGISTRAR_ERRORS, ...SUBNAME_REGISTRAR_ERRORS });
+    return { hash: result.hash, ledger: result.ledger };
+  }
+  async touchSubname(name: string): Promise<Submitted> {
+    const parsed = subnameParts(name), ctx = await this.subnameReader().context(parsed.namespace);
+    const result = await this.invoke(ctx.registrar, "touch_subname", [subnameLabelArg(parsed.parentLabel), subnameLabelArg(parsed.childLabel!)], { ...REGISTRAR_ERRORS, ...SUBNAME_REGISTRAR_ERRORS });
+    return { hash: result.hash, ledger: result.ledger };
+  }
+  /** Maintain an existing zero-based, 16-label listing page. Permissionless; the signer pays its network fee. */
+  async touchSubnamePage(parentName: string, page: number): Promise<Submitted> {
+    const parsed = subnameParent(parentName);
+    if (!Number.isInteger(page) || page < 0 || page > 0xffff_ffff) throw new HolderError("subname page must be a u32 integer");
+    const ctx = await this.subnameReader().context(parsed.namespace);
+    const result = await this.invoke(ctx.registrar, "touch_subname_page", [subnameLabelArg(parsed.parentLabel), nativeToScVal(page, { type: "u32" })], { ...REGISTRAR_ERRORS, ...SUBNAME_REGISTRAR_ERRORS });
+    return { hash: result.hash, ledger: result.ledger };
+  }
+  /** Removal remains available during suspension and pins both generations. */
+  async removeSubname(name: string, expected: { parentGeneration: bigint; generation: bigint }): Promise<Submitted> {
+    const parsed = subnameParts(name), parentGeneration = exactGeneration(expected.parentGeneration), generation = exactGeneration(expected.generation);
+    const ctx = await this.subnameReader().context(parsed.namespace);
+    const result = await this.invoke(ctx.registrar, "remove_subname", [subnameLabelArg(parsed.parentLabel), subnameLabelArg(parsed.childLabel!), nativeToScVal(parentGeneration, { type: "u64" }), nativeToScVal(generation, { type: "u64" })], { ...REGISTRAR_ERRORS, ...SUBNAME_REGISTRAR_ERRORS });
+    return { hash: result.hash, ledger: result.ledger };
+  }
+
+  private nativeContext(): NativeContext {
+    return { contractWallet: this.contractWallet, registryId: this.registryId, passphrase: this.passphrase, server: this.server, signer: this.signer, fee: this.fee, timeoutSecs: this.timeoutSecs, maxFeeStroops: this.maxNativeFeeStroops,
+      read: (id, method, args) => this.read(id, method, args),
+      readWithLedger: (id, method, args) => this.readWithLedger(id, method, args), serialize: work => this.serialize(work) };
+  }
+  private nativeClient(): NativeHolderClient { return new NativeHolderClient(this.nativeContext()); }
+  private async holderAddress(): Promise<string> { return this.contractWallet?.address ?? await this.signer.publicKey(); }
   nativeClaimCapability(namespace: string) { return this.nativeClient().nativeClaimCapability(namespace); }
   claimQuote(name: string, claimant?: string) { return this.nativeClient().claimQuote(name, claimant); }
   claimReceipt(namespace: string, claimant: string, requestId: string) { return this.nativeClient().claimReceipt(namespace, claimant, requestId); }
@@ -468,6 +562,55 @@ export class SoranHolder {
   acceptNameTransferWithDestination(intent: TransferIntent, options: NativeWriteOptions = {}) { return this.nativeClient().acceptNameTransferWithDestination(intent, options); }
   renewName(intent: RenewIntent, options: NativeWriteOptions = {}) { return this.nativeClient().renewName(intent, options); }
 
+  /** Publish one network-specific destination. Namespace policy applies to every holder. */
+  async setChainAddress(name: string, network: ChainNetwork, address: string): Promise<Submitted> {
+    const { label, namespace } = parseResolvableName(name);
+    const metadata = chainNetwork(network);
+    const encoded = encodeChainAddress(network, address);
+    const resolver = await this.multichainResolverOf(namespace);
+    await this.requireSubnameSupport(name, resolver);
+    const policy = chainPolicyFromNative(await this.read(resolver, "chain_policy", []));
+    if (!policy.includes(network)) throw new HolderError(`${metadata.name} addresses are disabled by the namespace`, resolver, "chain_policy", 34, "ChainDisabled");
+    const result = await this.invoke(resolver, "set_chain_address", [
+      nativeToScVal(`${label}.${namespace}`, { type: "string" }), addrArg(await this.signer.publicKey()),
+      nativeToScVal(metadata.coinType, { type: "u32" }), bytesArg(encoded),
+    ], RESOLVER_ERRORS);
+    return { hash: result.hash, ledger: result.ledger };
+  }
+
+  /** Remove a published network destination, including while that network is disabled. */
+  async clearChainAddress(name: string, network: ChainNetwork): Promise<Submitted> {
+    const { label, namespace } = parseResolvableName(name);
+    const metadata = chainNetwork(network);
+    const resolver = await this.multichainResolverOf(namespace);
+    await this.requireSubnameSupport(name, resolver);
+    const result = await this.invoke(resolver, "clear_chain_address", [
+      nativeToScVal(`${label}.${namespace}`, { type: "string" }), addrArg(await this.signer.publicKey()),
+      nativeToScVal(metadata.coinType, { type: "u32" }),
+    ], RESOLVER_ERRORS);
+    return { hash: result.hash, ledger: result.ledger };
+  }
+
+  private async multichainResolverOf(namespace: string): Promise<string> {
+    const nsNode = namehash(namespace);
+    const args = [bytesArg(nsNode)];
+    const [resolver, registrar] = await Promise.all([
+      this.read(this.registryId, "resolver_of", args), this.read(this.registryId, "registrar_of", args),
+    ]);
+    if (typeof resolver !== "string" || !StrKey.isValidContract(resolver) || typeof registrar !== "string" || !StrKey.isValidContract(registrar))
+      throw new HolderError("namespace has no native multichain route", this.registryId, "resolver_of", null, "UnsupportedImplementation");
+    const [anchor, authority, version, anchors] = await Promise.all([
+      this.read(resolver, "registry", []), this.read(resolver, "authority", []),
+      this.read(resolver, "multichain_version", []), this.read(registrar, "anchors", []),
+    ]);
+    if (anchor !== this.registryId || authority !== registrar || !Array.isArray(anchors) || anchors.length !== 2 ||
+        anchors[0] !== this.registryId || !(anchors[1] instanceof Uint8Array) || anchors[1].length !== 32 ||
+        !nsNode.every((byte, index) => byte === anchors[1][index]))
+      throw new HolderError("multichain Resolver route does not match this Registry and namespace", resolver, "registry", 37, "ChainContextMismatch");
+    if (version !== 1) throw new HolderError("unsupported multichain Resolver version", resolver, "multichain_version", null, "UnsupportedImplementation");
+    return resolver;
+  }
+
   // ---- resolution targets --------------------------------------------------
 
   /** Atomically update the forward address and complete payment instruction.
@@ -475,12 +618,13 @@ export class SoranHolder {
    * The native Resolver updates its own records atomically. This method never
    * retries as separate set_addr/set_text calls. */
   async setPayment(name: string, destination: PaymentDestination): Promise<Submitted> {
-    const { label, namespace } = parseName(name);
+    const { label, namespace } = parseResolvableName(name);
     let payment: PaymentDestination;
     try { payment = validatePaymentDestination(destination); }
     catch (e) { throw new HolderError(String(e)); }
     const { resolver, version } = await this.paymentResolverOf(namespace);
-    const holder = await this.signer.publicKey();
+    await this.requireSubnameSupport(name, resolver);
+    const holder = await this.holderAddress();
     if (StrKey.isValidMed25519PublicKey(payment.address)) {
       if (version !== 2) throw new HolderError("muxed destinations require native Resolver v2", resolver, "payment_version");
       const muxed = decodeMuxedAddress(payment.address);
@@ -526,9 +670,10 @@ export class SoranHolder {
    * No client preflight is converted into a later setPayment(None).
    */
   async setRecord(name: string, address: string): Promise<Submitted> {
-    const { label, namespace } = parseName(name);
+    const { label, namespace } = parseResolvableName(name);
     const { resolver: resolverId } = await this.paymentResolverOf(namespace);
-    const pub = await this.signer.publicKey();
+    await this.requireSubnameSupport(name, resolverId);
+    const pub = await this.holderAddress();
     const r = await this.invoke(
       resolverId,
       "set_addr",
@@ -550,13 +695,11 @@ export class SoranHolder {
    * accordingly — treat every value as permanent-ish public data.
    */
   async setText(name: string, key: string, value: string): Promise<Submitted> {
-    const { label, namespace } = parseName(name);
-    if (key === "payment") throw new HolderError("payment records must be written atomically with setPayment");
-    if (!SYMBOL_RE.test(key)) {
-      throw new HolderError(`invalid text-record key "${key}" — 1-32 chars of A-Za-z0-9_`);
-    }
+    const { label, namespace } = parseResolvableName(name);
+    assertTextRecord(key, value);
     const resolverId = await this.resolverOf(namespace);
-    const pub = await this.signer.publicKey();
+    await this.requireSubnameSupport(name, resolverId);
+    const pub = await this.holderAddress();
     const r = await this.invoke(
       resolverId,
       "set_text",
@@ -593,10 +736,10 @@ export class SoranHolder {
   ): Promise<Array<Submitted & { key: string }>> {
     const entries = Object.entries(profile);
     if (entries.length === 0) throw new HolderError("setProfile: empty profile");
-    for (const [key] of entries) {
-      if (!SYMBOL_RE.test(key)) {
-        throw new HolderError(`invalid text-record key "${key}" — 1-32 chars of A-Za-z0-9_`);
-      }
+    // Validate EVERYTHING before the first paid write, using the same rules
+    // as setText, so a bad entry can never strand a half-written profile.
+    for (const [key, value] of entries) {
+      assertTextRecord(key, value);
     }
     const done: Array<Submitted & { key: string }> = [];
     for (const [key, value] of entries) {
@@ -633,9 +776,10 @@ export class SoranHolder {
    * `setRecord(name, yourAddress)` first, then `setReverse(name)`.
    */
   async setReverse(name: string): Promise<Submitted> {
-    const { namespace } = parseName(name);
+    const { namespace } = parseResolvableName(name);
     const resolverId = await this.resolverOf(namespace);
-    const pub = await this.signer.publicKey();
+    await this.requireSubnameSupport(name, resolverId);
+    const pub = await this.holderAddress();
     let r: Invoked;
     try {
       r = await this.invoke(
@@ -664,7 +808,7 @@ export class SoranHolder {
   async clearReverse(namespace: string): Promise<Submitted> {
     assertLabel(normalizeLabel(namespace));
     const resolverId = await this.resolverOf(normalizeLabel(namespace));
-    const pub = await this.signer.publicKey();
+    const pub = await this.holderAddress();
     const r = await this.invoke(resolverId, "clear_reverse", [addrArg(pub)], RESOLVER_ERRORS);
     return { hash: r.hash, ledger: r.ledger };
   }
@@ -681,9 +825,10 @@ export class SoranHolder {
         "setPrimary needs the PrimaryName contract — configure primaryId (the testnet preset supplies one)",
       );
     }
-    parseName(name); // validate shape before spending anything
+    parseResolvableName(name); // validate shape before spending anything
+    await this.requireSubnameSupport(name, this.primaryId);
     if (await this.read(this.primaryId, "registry", []) !== this.registryId) throw new HolderError("Primary is anchored to a different Registry");
-    const pub = await this.signer.publicKey();
+    const pub = await this.holderAddress();
     const r = await this.invoke(
       this.primaryId,
       "set_primary",
@@ -701,14 +846,16 @@ export class SoranHolder {
       );
     }
     if (await this.read(this.primaryId, "registry", []) !== this.registryId) throw new HolderError("Primary is anchored to a different Registry");
-    const pub = await this.signer.publicKey();
+    const pub = await this.holderAddress();
     const r = await this.invoke(this.primaryId, "clear_primary", [addrArg(pub)], PRIMARY_ERRORS);
     return { hash: r.hash, ledger: r.ledger };
   }
 
   /** Elect the exact M destination; its underlying G account must sign. */
   async setReverseMuxed(name: string, muxedAddress: string): Promise<Submitted> {
-    const parsed = parseName(name);
+    const parsed = parseResolvableName(name);
+    if (!this.lookupId) throw new HolderError("muxed identity requires a configured Universal Lookup contract");
+    await this.requireSubnameSupport(name, this.lookupId);
     return this.muxedIdentityWrite("set_reverse_muxed", muxedAddress, [], [nativeToScVal(`${parsed.label}.${parsed.namespace}`, { type: "string" })]);
   }
   async clearReverseMuxed(namespace: string, muxedAddress: string): Promise<Submitted> {
@@ -716,7 +863,9 @@ export class SoranHolder {
   }
   /** Requires a current election for this exact M address in the name's namespace. */
   async setPrimaryMuxed(name: string, muxedAddress: string): Promise<Submitted> {
-    const parsed = parseName(name);
+    const parsed = parseResolvableName(name);
+    if (!this.lookupId) throw new HolderError("muxed identity requires a configured Universal Lookup contract");
+    await this.requireSubnameSupport(name, this.lookupId);
     return this.muxedIdentityWrite("set_primary_muxed", muxedAddress, [], [nativeToScVal(`${parsed.label}.${parsed.namespace}`, { type: "string" })]);
   }
   async clearPrimaryMuxed(muxedAddress: string): Promise<Submitted> {
@@ -725,7 +874,7 @@ export class SoranHolder {
   private async muxedIdentityWrite(fn: string, address: string, prefix: xdr.ScVal[] = [], suffix: xdr.ScVal[] = []): Promise<Submitted> {
     let muxed: { account: string; id: string };
     try { muxed = decodeMuxedAddress(address); } catch { throw new HolderError("a canonical full M destination is required"); }
-    const pub = await this.signer.publicKey();
+    const pub = await this.holderAddress();
     if (pub !== muxed.account) throw new HolderError("the muxed destination's underlying G account must sign");
     if (!this.lookupId) throw new HolderError("muxed identity requires a configured Universal Lookup contract");
     if (await this.read(this.lookupId, "registry", []) !== this.registryId) throw new HolderError("Lookup is anchored to a different Registry");
@@ -872,7 +1021,7 @@ export class SoranHolder {
   }
 
   private async assertMemoFree(name: string): Promise<string> {
-    const { label, namespace } = parseName(name);
+    const { label, namespace } = parseResolvableName(name);
     const { resolver, registrar, version } = await this.paymentResolverOf(namespace);
     const fn = version === 2 ? "resolve_destination" : "resolve_payment";
     const raw = await this.read(resolver, fn, [nativeToScVal(`${label}.${namespace}`, { type: "string" })]);
@@ -904,7 +1053,10 @@ export class SoranHolder {
       .setTimeout(30)
       .build();
     const sim = await this.server.simulateTransaction(tx);
-    if (rpc.Api.isSimulationError(sim)) throw typedError(contractId, fn, sim.error, {});
+    if (rpc.Api.isSimulationError(sim)) {
+      const errors = fn.startsWith("subname_") ? SUBNAME_REGISTRAR_ERRORS : ["chain_policy", "chain_address", "multichain_version"].includes(fn) ? RESOLVER_ERRORS : {};
+      throw typedError(contractId, fn, sim.error, errors);
+    }
     if (rpc.Api.isSimulationRestore(sim)) {
       throw new HolderError(
         `${fn}: the on-chain entry is archived (rent lapsed) — any write restores it automatically`,
@@ -977,9 +1129,9 @@ export class SoranHolder {
     }
   }
 
-  /** Native payment writes authorize exactly the locally selected destination. */
+  /** Record and upkeep writes must match the selected operation and authorization. */
   private assertPaymentIntent(prepared: { source: string; operations: unknown[] }, pub: string, contractId: string, fn: string, args: xdr.ScVal[]): void {
-    if (fn !== "set_payment" && fn !== "set_muxed") return;
+    if (!["set_payment", "set_muxed", "set_chain_address", "clear_chain_address", "create_subname", "remove_subname", "touch_subname_page"].includes(fn)) return;
     if (prepared.source !== pub || prepared.operations.length !== 1) throw new HolderError("unexpected payment transaction source or operation count", contractId, fn);
     const op = prepared.operations[0] as {
       type: string; source?: string; func: xdr.HostFunction; auth?: xdr.SorobanAuthorizationEntry[];
@@ -990,6 +1142,10 @@ export class SoranHolder {
     if (Address.fromScAddress(call.contractAddress).toString() !== contractId || call.functionName.toString() !== fn ||
         call.args.length !== args.length || call.args.some((value, i) => value.toXDR("base64") !== args[i].toXDR("base64")))
       throw new HolderError("payment operation differs from selected intent", contractId, fn);
+    if (fn === "touch_subname_page") {
+      if (op.auth?.length) throw new HolderError("subname page upkeep must not require authorization", contractId, fn);
+      return;
+    }
     if (!op.auth || op.auth.length !== 1 || op.auth[0].credentials.type !== "sorobanCredentialsSourceAccount")
       throw new HolderError("payment requires exactly the source holder authorization", contractId, fn);
     const root = op.auth[0].rootInvocation;
@@ -1008,7 +1164,7 @@ export class SoranHolder {
       try {
         return await this.attempt(contractId, fn, args, errNames);
       } catch (e) {
-        if (!this.isMuxedIdentityWrite(fn) && !(e instanceof HolderError && e.txHash) && /txBadSeq|bad_seq/i.test(String(e))) {
+        if (!this.contractWallet && !this.isMuxedIdentityWrite(fn) && (BAD_SEQ_REJECTED.has(e as object) || (!(e instanceof HolderError && e.txHash) && /txBadSeq|bad_seq/i.test(String(e))))) {
           return await this.attempt(contractId, fn, args, errNames);
         }
         throw e;
@@ -1026,6 +1182,13 @@ export class SoranHolder {
     args: xdr.ScVal[],
     errNames: Record<number, string>,
   ): Promise<Invoked> {
+    if (this.contractWallet && fn !== "touch_subname_page") {
+      if (this.isMuxedIdentityWrite(fn)) throw new HolderError("muxed identity elections require the underlying G account");
+      const context = this.nativeContext();
+      const result = await sendNative(context, { ...await nativeWalletPlan(context), contract: contractId, method: fn, args,
+        sourceInvocation: { contract: contractId, method: fn, args, children: [] }, maxFeeStroops: this.maxNativeFeeStroops });
+      return { hash: result.hash, ledger: result.ledger, returnValue: result.value };
+    }
     const pub = await this.signer.publicKey();
     const contract = new Contract(contractId);
     const build = (source: Account) =>
@@ -1083,7 +1246,7 @@ export class SoranHolder {
       );
     }
     if (sent.status === "ERROR") {
-      throw new HolderError(
+      const rejected = new HolderError(
         `${fn}: submit rejected: ${JSON.stringify(sent.errorResult ?? sent.status)}`,
         contractId,
         fn,
@@ -1091,6 +1254,8 @@ export class SoranHolder {
         null,
         txHash,
       );
+      if (isBadSeqResult(sent.errorResult)) BAD_SEQ_REJECTED.add(rejected);
+      throw rejected;
     }
     if (sent.status === "TRY_AGAIN_LATER") {
       throw new HolderError(
@@ -1266,3 +1431,8 @@ export { SoranSponsorship, sponsorPlan, validateSponsorTransaction, type Sponsor
 export { FundingServiceClient } from "./funding-service.js";
 
 export { TestnetSponsorHistory, type SponsorHistory, type FundingReceipt } from "./funding-history.js";
+
+/** Resolve a root name or one child level; root lifecycle APIs still require parseName. */
+export function parseResolvableName(name: string) {
+  try { return parseResolutionParts(name); } catch (error) { throw new HolderError(String(error)); }
+}

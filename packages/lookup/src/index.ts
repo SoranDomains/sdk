@@ -1,7 +1,13 @@
+import { createSubnameReader, subnameParent, subnameParts, subnameLabelArg, SUBNAME_REGISTRAR_ERRORS } from "./subnames-client.js";
+import { parseResolvableName as parseResolutionParts, resolvableNameNode, subnamePolicyFromNative, subnamePolicyToNative, subnameRecordFromNative, subnameLabelsFromNative, subnamePageInput, exactGeneration, type SubnamePolicy, type SubnameRecord } from "./names.js";
+export { type SubnamePolicy, type SubnameRecord } from "./names.js";
 /** Read Soran names through Universal Lookup by default. Set resolutionMode:
  * "direct" only for a deliberately selected native Resolver integration.
  * Payment tuples are strict; legacy addresses never establish memo safety.
  * Lookup governance may replace its code immediately. */
+
+import { chainNetwork, chainPolicyFromNative, chainPolicyToNative, encodeChainAddress, decodeChainAddress, type ChainNetwork } from "./multichain.js";
+export { CHAIN_NETWORKS, ChainAddressError, chainNetwork, chainPolicyFromNative, chainPolicyToNative, encodeChainAddress, decodeChainAddress, type ChainNetwork, type ChainAddressErrorCode } from "./multichain.js";
 
 import {
   Account,
@@ -310,7 +316,10 @@ export type SoranErrorCode =
   | "TIMEOUT"
   | "PAYMENT_REQUIRED"
   | "LEGACY_MEMO_UNKNOWN"
-  | "INCOMPLETE";
+  | "INCOMPLETE"
+  | "UNSUPPORTED_NETWORK"
+  | "SUBNAMES_UNSUPPORTED" | "MULTICHAIN_UNSUPPORTED"
+  | "CHAIN_DISABLED";
 
 export class SoranError extends Error {
   constructor(
@@ -324,6 +333,8 @@ export class SoranError extends Error {
   }
 }
 
+type UniversalContext = { id: string; version: 1 | 2 };
+
 const LABEL_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
 
 // Simulation needs a source account object but never touches it on-chain for
@@ -334,14 +345,30 @@ const SIM_SOURCE = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
 // liveness-only, so a slow/offline hint service must degrade reverseLookup to
 // null quickly rather than hang the caller.
 const HINT_TIMEOUT_MS = 5_000;
+// A read joins a shared anchor verification only while it is this young (SM-05): an older one is
+// presumed stalled and the read verifies for itself instead of waiting on it.
+const UNIVERSAL_JOIN_MAX_AGE_MS = 5_000;
+/** Fetch errors echo the request URL, and a hint URL may carry credentials (`https://user:pass@host`): the failure
+ *  reason reaches MCP clients and their models, so never let the userinfo through. A raw password may hold any
+ *  character (`@`, `/`, `?`, `#`, a space), which no pattern can delimit, so the configured URL is replaced as a whole
+ *  first (fetch echoes its input verbatim); the pattern then catches a re-serialised echo, and runs to the LAST `@` of
+ *  the URL-shaped token so a password with an `@` in it is not left half showing. */
+const redactUserinfo = (text: string, hintUrl?: string) => {
+  const masked = (url: string) => url.replace(/^([a-z][a-z0-9+.-]*:\/\/)[^]*@/i, "$1***@");
+  const exact = hintUrl?.includes("@") ? text.split(hintUrl).join(masked(hintUrl)) : text;
+  return exact.replace(/(\b[a-z][a-z0-9+.-]*:\/\/)\S*@/gi, "$1***@");
+};
 const HINT_MAX_BODY_BYTES = 4_096; // the namespace list is tiny; anything bigger is not a hint
 /** Client-side cap on hint-supplied namespace lists — the
  * server endpoint caps at 12, but the hint is untrusted; never fan out more
  * probes than the designed bound. */
 const HINT_MAX_NAMESPACES = 12;
-// namesOf: candidate-list hint cap (100 names ≈ 20KB JSON) and how many
-// candidates are chain-verified per call (2 simulations each).
-const HISTORY_MAX_BODY_BYTES = 32_768;
+// history(): every API page embeds the indexer's full coverage envelope
+// (first 100 gaps plus one row per enrolled contract), about 26 KB before the
+// first event and growing by roughly 400 bytes per namespace; each event is
+// about 450 bytes. 128 KiB (the holdings page cap) holds 100 events with room
+// for hundreds of namespaces; anything larger is refused with a clear error.
+const HISTORY_MAX_BODY_BYTES = 131_072;
 
 export class Soran {
   private server: rpc.Server;
@@ -354,6 +381,7 @@ export class Soran {
   private explicitPrimaryId?: string;
   private hintUrl?: string;
   private reverseNamespaces: string[];
+  private universalPending?: { startedAt: number; promise: Promise<UniversalContext> };
   private resolverCache = new Map<string, { value: string | null; at: number }>();
   private registrarCache = new Map<string, { value: string | null; at: number }>();
   private timeoutMs?: number;
@@ -412,6 +440,17 @@ export class Soran {
     this.timeoutMs = opts.timeoutMs;
   }
 
+  private async requireSubnameSupport(name: string, id: string) {
+    if (parseResolvableName(name).childLabel && await this.read(id, "subname_version", []) !== 1) throw new SoranError("subnames unsupported", "SUBNAMES_UNSUPPORTED");
+  }
+  private subnameReader() { return createSubnameReader({ registryId: this.registryId, error: message => new SoranError(message, message.includes("unsupported") ? "SUBNAMES_UNSUPPORTED" : "ABI"), read: (id, fn, args) => this.read(id, fn, args) }); }
+  /** Live namespace policy. Creation-disabled keeps existing children usable; suspended hides them. */
+  async subnamePolicy(namespace: string): Promise<SubnamePolicy> { return this.subnameReader().policy(namespace); }
+  /** Raw child state, including tombstones and stale parent generations; this is not payment resolution. */
+  async subnameRecord(name: string): Promise<SubnameRecord | null> { return this.subnameReader().record(name); }
+  /** Bounded on-chain historical labels, including removed children. Re-read metadata before treating a child as active. */
+  async subnames(parent: string, options: { offset?: number; limit?: number } = {}) { return this.subnameReader().list(parent, options); }
+
   // ---- hashing (mirrors the contracts byte-for-byte) ----
 
   /** Registry namehash of a top-level namespace: sha256(ZERO32 ‖ sha256(ns)). */
@@ -423,9 +462,7 @@ export class Soran {
 
   /** Full node of `label.namespace`: sha256(nsNode ‖ sha256(label)). */
   async node(name: string): Promise<Uint8Array> {
-    const { label, namespace } = parseName(name);
-    const nsNode = await this.namehash(namespace);
-    return sha256(concat(nsNode, await sha256(utf8(label))));
+    return resolvableNameNode(name);
   }
 
   /** Fresh universal namespace context; None means an unallocated namespace. */
@@ -438,9 +475,16 @@ export class Soran {
 
   /** Ownership metadata is distinct from the effective payment destination. */
   async nameMetadata(name: string): Promise<NameMetadata | null> {
-    const { label, namespace } = parseName(name);
+    return this.nameMetadataIn(name, () => this.universalContext());
+  }
+
+  /** `context` supplies the verified Lookup context, so a page of candidates can verify it once. */
+  private async nameMetadataIn(name: string, context: () => Promise<UniversalContext>): Promise<NameMetadata | null> {
+    const { label, namespace } = parseResolvableName(name);
     const canonical = `${label}.${namespace}`;
-    const raw = await this.universalRead("name_metadata", [nativeToScVal(canonical, { type: "string" })]);
+    const { id } = await context();
+    await this.requireSubnameSupport(canonical, id);
+    const raw = await this.read(id, "name_metadata", [nativeToScVal(canonical, { type: "string" })]);
     try { return nameFromNative(raw, canonical, hex(await this.node(canonical))); }
     catch (e) { throw new SoranError(`invalid name metadata: ${String(e)}`, "ABI"); }
   }
@@ -452,9 +496,10 @@ export class Soran {
   /** Registration state from one ledger observation. This does not promise
    * claimability or payment readiness. Requires name_status_version() == 1. */
   async nameStatus(name: string): Promise<NameStatus> {
-    const { label, namespace } = parseName(name), canonical = `${label}.${namespace}`;
+    const { label, namespace } = parseResolvableName(name), canonical = `${label}.${namespace}`;
     const { id, version } = await this.universalContext();
     if (version !== 2 || await this.read(id, "name_status_version", []) !== 1) throw new SoranError("Lookup does not support name status", "ABI");
+    await this.requireSubnameSupport(canonical, id);
     const raw = await this.read(id, "name_status", [nativeToScVal(canonical, { type: "string" })]);
     try { return nameStatusFromNative(raw, canonical, hex(await this.node(canonical))); }
     catch (e) { throw new SoranError(`invalid name status: ${String(e)}`, "ABI"); }
@@ -618,26 +663,115 @@ export class Soran {
     if (raw === null) return null;
     try {
       if (typeof raw !== "string") throw new Error("non-string name");
-      const parsed = parseName(raw);
+      const parsed = parseResolvableName(raw);
       if (`${parsed.label}.${parsed.namespace}` !== raw || (namespace !== undefined && parsed.namespace !== namespace)) throw new Error("noncanonical or wrong-namespace name");
       return raw;
     } catch (e) { throw new SoranError(`invalid display name: ${String(e)}`, "ABI"); }
   }
 
-  private async universalContext(): Promise<{ id: string; version: 1 | 2 }> {
+  /** Verify Lookup's Registry anchor and versions (up to three simulations).
+   *  Reads that start while a verification is in flight share it, so a
+   *  Promise.all fan-out (details, profile, reverse probes) pays once. A read
+   *  that starts after it settled verifies again: nothing is cached across
+   *  sequential calls, and fan-outs that run sequentially (a holdings page)
+   *  hold one verified context for their whole operation instead.
+   *
+   *  Only a YOUNG verification is joined (UNIVERSAL_JOIN_MAX_AGE_MS). Without
+   *  `timeoutMs` a stalled RPC read never settles, and every later read on the
+   *  instance would otherwise wait on that one promise forever; a read that
+   *  finds an old one verifies for itself, as every read did before sharing. */
+  private universalContext(): Promise<UniversalContext> {
     if (this.resolutionMode !== "universal" || !this.lookupId)
-      throw new SoranError("Universal Lookup is not deployed/configured for this network; supply a verified lookupId or explicitly select resolutionMode: direct", "CONFIG");
-    const [anchor, version] = await Promise.all([this.read(this.lookupId, "registry", []), this.read(this.lookupId, "version", [])]);
+      return Promise.reject(new SoranError("Universal Lookup is not deployed/configured for this network; supply a verified lookupId or explicitly select resolutionMode: direct", "CONFIG"));
+    const running = this.universalPending;
+    if (running && Date.now() - running.startedAt <= UNIVERSAL_JOIN_MAX_AGE_MS) return running.promise;
+    const entry = { startedAt: Date.now(), promise: undefined as unknown as Promise<UniversalContext> };
+    entry.promise = this.verifyUniversalContext(this.lookupId).finally(() => { if (this.universalPending === entry) this.universalPending = undefined; });
+    this.universalPending = entry;
+    return entry.promise;
+  }
+
+  private async verifyUniversalContext(lookupId: string): Promise<UniversalContext> {
+    const [anchor, version] = await Promise.all([this.read(lookupId, "registry", []), this.read(lookupId, "version", [])]);
     if (typeof anchor !== "string" || !StrKey.isValidContract(anchor) || anchor !== this.registryId) throw new SoranError("Lookup has an invalid or different Registry anchor", "CONFIG");
     if (version !== 1 && version !== 2) throw new SoranError("unsupported universal Lookup version", "ABI");
-    if (version === 2 && await this.read(this.lookupId, "destination_version", []) !== 2)
+    if (version === 2 && await this.read(lookupId, "destination_version", []) !== 2)
       throw new SoranError("unsupported Lookup destination version", "ABI");
-    return { id: this.lookupId, version };
+    return { id: lookupId, version };
   }
 
   private async universalRead(fn: string, args: xdr.ScVal[]): Promise<unknown> {
     const { id } = await this.universalContext();
+    if (["name_metadata", "text"].includes(fn) && args[0]) await this.requireSubnameSupport(scValToNative(args[0]) as string, id);
     return this.read(id, fn, args);
+  }
+
+  /** Networks currently permitted by the namespace owner's live policy. */
+  async chainPolicy(namespace: string): Promise<ChainNetwork[]> {
+    namespace = normalizeLabel(namespace);
+    const { id, universal } = await this.multichainContext(namespace);
+    const raw = await this.multichainRead(id, "chain_policy", universal ? [nativeToScVal(namespace, { type: "string" })] : []);
+    try { return chainPolicyFromNative(raw); }
+    catch (error) { throw new SoranError(`invalid multichain policy: ${String(error)}`, "ABI"); }
+  }
+
+  /** Resolve only the explicitly requested network. null means no current record;
+   * disabled, unsupported, expired and unavailable remain errors, never fallbacks. */
+  async chainAddress(name: string, network: ChainNetwork): Promise<string | null> {
+    const { label, namespace } = parseResolvableName(name);
+    let coinType: number;
+    try { coinType = chainNetwork(network).coinType; }
+    catch (error) { throw new SoranError(String(error), "UNSUPPORTED_NETWORK"); }
+    const { id, universal } = await this.multichainContext(namespace);
+    const policyRaw = await this.multichainRead(id, "chain_policy", universal ? [nativeToScVal(namespace, { type: "string" })] : []);
+    let policy: ChainNetwork[];
+    try { policy = chainPolicyFromNative(policyRaw); }
+    catch (error) { throw new SoranError(`invalid multichain policy: ${String(error)}`, "ABI"); }
+    if (!policy.includes(network)) throw new SoranError(`${network} addresses are disabled by the namespace`, "CHAIN_DISABLED");
+    await this.requireSubnameSupport(name, id);
+    const raw = await this.multichainRead(id, "chain_address", [
+      nativeToScVal(`${label}.${namespace}`, { type: "string" }), nativeToScVal(coinType, { type: "u32" }),
+    ]);
+    if (raw === null) return null;
+    try { return decodeChainAddress(network, raw as Uint8Array); }
+    catch (error) { throw new SoranError(`invalid ${network} address result: ${String(error)}`, "ABI"); }
+  }
+
+  private async multichainRead(id: string, fn: string, args: xdr.ScVal[]): Promise<unknown> {
+    try { return await this.read(id, fn, args); }
+    catch (error) {
+      if (error instanceof SoranError && error.contractError === "ChainDisabled")
+        throw new SoranError(error.message, "CHAIN_DISABLED", error.contractCode, error.contractError);
+      if (error instanceof SoranError && error.contractError === "UnsupportedImplementation")
+        throw new SoranError(error.message, "MULTICHAIN_UNSUPPORTED", error.contractCode, error.contractError);
+      throw error;
+    }
+  }
+
+  private async multichainContext(namespace: string): Promise<{ id: string; universal: boolean }> {
+    if (this.resolutionMode === "universal") {
+      const { id } = await this.universalContext();
+      if (await this.read(id, "multichain_version", []) !== 1)
+        throw new SoranError("unsupported multichain Lookup version", "MULTICHAIN_UNSUPPORTED");
+      return { id, universal: true };
+    }
+    const nsNode = await this.namehash(namespace);
+    const args = [bytes(nsNode)];
+    const [resolver, registrar] = await Promise.all([
+      this.read(this.registryId, "resolver_of", args), this.read(this.registryId, "registrar_of", args),
+    ]);
+    if (typeof resolver !== "string" || !StrKey.isValidContract(resolver) || typeof registrar !== "string" || !StrKey.isValidContract(registrar))
+      throw new SoranError("namespace has no native multichain route", "MULTICHAIN_UNSUPPORTED");
+    const [anchor, authority, version, anchors] = await Promise.all([
+      this.read(resolver, "registry", []), this.read(resolver, "authority", []),
+      this.read(resolver, "multichain_version", []), this.read(registrar, "anchors", []),
+    ]);
+    if (anchor !== this.registryId || authority !== registrar || !Array.isArray(anchors) || anchors.length !== 2 ||
+        anchors[0] !== this.registryId || !(anchors[1] instanceof Uint8Array) || anchors[1].length !== 32 ||
+        !nsNode.every((byte, index) => byte === anchors[1][index]))
+      throw new SoranError("multichain Resolver route does not match this Registry and namespace", "CONFIG");
+    if (version !== 1) throw new SoranError("unsupported multichain Resolver version", "MULTICHAIN_UNSUPPORTED");
+    return { id: resolver, universal: false };
   }
 
   // ---- resolution ----
@@ -648,9 +782,10 @@ export class Soran {
   async lookup(name: string): Promise<LookupResult> {
     if (this.resolutionMode !== "universal") throw new SoranError("lookup requires universal mode", "CONFIG");
     if (typeof name !== "string") throw new SoranError("name must be a string", "INVALID_INPUT");
-    const { label, namespace } = parseName(name);
+    const { label, namespace } = parseResolvableName(name);
     const canonical = `${label}.${namespace}`;
     const { id, version } = await this.universalContext();
+    await this.requireSubnameSupport(canonical, id);
     const raw = await this.read(id, version === 2 ? "resolve_v2" : "resolve", [nativeToScVal(canonical, { type: "string" })]);
     try { return lookupFromNative(raw, canonical, version); }
     catch (e) { throw new SoranError(`invalid universal lookup result: ${String(e)}`, "ABI"); }
@@ -671,7 +806,7 @@ export class Soran {
         throw new SoranError("legacy address has unknown memo capability; native payment instructions are required", "LEGACY_MEMO_UNKNOWN");
       return { payment: result.payment, resolver: result.resolver, generation: result.generation, registrar: result.registrar };
     }
-    const { label, namespace } = parseName(name);
+    const { label, namespace } = parseResolvableName(name);
     const nsNode = await this.namehash(namespace);
     // Payment discovery is always fresh, independent of metadata/reverse caches.
     const [resolver, registrar] = await Promise.all([
@@ -697,6 +832,7 @@ export class Soran {
     if (version !== 1 && version !== 2) throw new SoranError("unsupported native payment Resolver version", "ABI");
     if (version === 2 && await this.read(resolver, "destination_version", []) !== 2)
       throw new SoranError("unsupported Resolver destination version", "ABI");
+    await this.requireSubnameSupport(name, resolver);
     const raw = await this.read(resolver, version === 2 ? "resolve_destination" : "resolve_payment", [nativeToScVal(`${label}.${namespace}`, { type: "string" })]);
     try { return { payment: version === 2 ? destinationFromNative(raw) : paymentFromNative(raw), resolver }; }
     catch (e) { throw new SoranError(`invalid payment result: ${String(e)}`, "ABI"); }
@@ -728,7 +864,7 @@ export class Soran {
 
   /** A text record (e.g. "url", "avatar") for a name, or null. */
   async text(name: string, key: string): Promise<string | null> {
-    const { label, namespace } = parseName(name);
+    const { label, namespace } = parseResolvableName(name);
     if (!/^[A-Za-z0-9_]{1,32}$/.test(key)) throw new SoranError("invalid text record key", "INVALID_INPUT");
     if (this.resolutionMode === "universal") {
       const raw = await this.universalRead("text", [nativeToScVal(`${label}.${namespace}`, { type: "string" }), nativeToScVal(key, { type: "symbol" })]);
@@ -738,6 +874,7 @@ export class Soran {
     }
     const resolverId = await this.resolverOf(namespace);
     if (!resolverId) return null;
+    await this.requireSubnameSupport(name, resolverId);
     const nameNode = await this.node(name);
     return ((await this.read(resolverId, "text", [
       bytes(nameNode),
@@ -759,7 +896,7 @@ export class Soran {
    * this verdict does not bind a later payment to a prior lookup.
    */
   async assurance(name: string): Promise<NameAssurance> {
-    const { namespace } = parseName(name);
+    const { namespace } = parseResolvableName(name);
     if (this.resolutionMode === "universal") {
       const meta = await this.namespaceMetadata(namespace);
       return { resolverAttested: meta?.resolverAttested ?? false, resolverLocked: meta?.resolverLocked ?? false,
@@ -795,7 +932,7 @@ export class Soran {
   async reverseVerify(address: string, name: string): Promise<boolean> {
     if (!this.isIdentityAddress(address)) return false;
     // Cheap client-side shape check (throws SoranError on malformed names).
-    const { namespace } = parseName(name);
+    const { namespace } = parseResolvableName(name);
     const claimed = await this.reverse(namespace, address);
     return claimed === name.toLowerCase();
   }
@@ -980,7 +1117,10 @@ export class Soran {
    * Registration date is not on chain — see {@link NameDetails}.
    */
   async details(name: string): Promise<NameDetails> {
-    const { label, namespace } = parseName(name);
+    const { label, namespace, childLabel } = parseResolvableName(name);
+    if (childLabel && this.resolutionMode !== "universal") {
+      throw new SoranError("subname details require Universal Lookup", "CONFIG");
+    }
     if (this.resolutionMode === "universal") {
       const [meta, ns, paymentRecord] = await Promise.all([this.nameMetadata(name), this.namespaceMetadata(namespace), this.paymentRecord(name)]);
       if (!meta || !ns || meta.generation !== paymentRecord.generation || meta.registrar !== paymentRecord.registrar ||
@@ -1087,7 +1227,7 @@ export class Soran {
   async profile(name: string): Promise<SoranProfile> {
     // One resolver_of read up front — the parallel text() calls below would
     // otherwise each fire their own before the cache is populated.
-    if (this.resolutionMode === "direct") await this.resolverOf(parseName(name).namespace);
+    if (this.resolutionMode === "direct") await this.resolverOf(parseResolvableName(name).namespace);
     const values = await Promise.all(PROFILE_KEYS.map((k) => this.text(name, k)));
     const out: SoranProfile = {};
     PROFILE_KEYS.forEach((k, i) => {
@@ -1153,14 +1293,14 @@ export class Soran {
       // several namespaces at one shared resolver instance.
       out.push({
         name: res.value,
-        namespace: parseName(res.value).namespace,
+        namespace: parseResolvableName(res.value).namespace,
         primary: res.value === primary,
       });
     });
     if (primary && !seen.has(primary)) {
       // The primary lives on a namespace outside the probe list — it is still
       // a contract-verified answer, so include it rather than hide it.
-      out.unshift({ name: primary, namespace: parseName(primary).namespace, primary: true });
+      out.unshift({ name: primary, namespace: parseResolvableName(primary).namespace, primary: true });
     }
     return out;
   }
@@ -1175,8 +1315,9 @@ export class Soran {
     if (!Number.isInteger(limit) || limit < 1 || limit > 100 || (options.cursor !== undefined && (typeof options.cursor !== "string" || options.cursor.length < 1 || options.cursor.length > 2048)))
       throw new SoranError("invalid page limit/cursor", "INVALID_INPUT");
     const query = `?limit=${limit}${options.cursor ? `&cursor=${encodeURIComponent(options.cursor)}` : ""}`;
-    const payload = await this.hintFetch(`/v1/names/by-holder/${address}${query}`, 131072);
-    if (!payload || typeof payload !== "object") throw new SoranError("holdings discovery unavailable", "RPC");
+    let reason = "unexpected response";
+    const payload = await this.hintFetch(`/v1/names/by-holder/${address}${query}`, 131072, r => { reason = r; });
+    if (!payload || typeof payload !== "object") throw new SoranError(`holdings discovery unavailable (${reason})`, "RPC");
     const raw = payload as Record<string, unknown>;
     if (raw.holder !== address || !Array.isArray(raw.names) || raw.names.length > limit || typeof raw.hasMore !== "boolean" ||
         !(raw.nextCursor === null || (typeof raw.nextCursor === "string" && raw.nextCursor.length > 0 && raw.nextCursor.length <= 2048)) || raw.hasMore !== (raw.nextCursor !== null))
@@ -1185,6 +1326,11 @@ export class Soran {
     const seen = new Set<string>();
     let excluded = 0, failed = 0;
     const names: NameSummary[] = [];
+    // Lookup's anchor is verified once for the whole page (lazily, so an empty
+    // page reads nothing) rather than once per candidate. A failed verification
+    // is dropped so the next candidate retries it; its concurrent siblings fail.
+    let verified: Promise<UniversalContext> | undefined;
+    const pageContext = () => verified ??= this.universalContext().catch(error => { verified = undefined; throw error; });
     // Eight workers bound RPC fan-out even when a page contains 100 candidates.
     let index = 0;
     const workers = Array.from({ length: Math.min(8, raw.names.length) }, async () => {
@@ -1193,13 +1339,13 @@ export class Soran {
         try {
           const input = (entry as { name?: unknown } | null)?.name;
           if (typeof input !== "string") throw new Error("invalid candidate");
-          const { label, namespace } = parseName(input);
+          const { label, namespace } = parseResolvableName(input);
           const name = `${label}.${namespace}`;
           if (seen.has(name)) { excluded++; continue; }
           seen.add(name);
           let expiresAt: bigint;
           if (this.resolutionMode === "universal") {
-            const meta = await this.nameMetadata(name);
+            const meta = await this.nameMetadataIn(name, pageContext);
             if (!meta || !meta.active || meta.holder !== address) { excluded++; continue; }
             expiresAt = meta.expiresAt;
           } else {
@@ -1252,19 +1398,21 @@ export class Soran {
    * throws RPC rather than pretending the name has no history.
    */
   async history(name: string): Promise<NameHistory> {
-    const { label, namespace } = parseName(name);
+    const { label, namespace } = parseResolvableName(name);
     if (!this.hintUrl) {
       throw new SoranError(
         "history needs an indexer source: set hintUrl",
         "CONFIG",
       );
     }
+    let reason = "no response";
     const payload = await this.hintFetch(
       `/v1/names/${namespace}/${label}/history`,
       HISTORY_MAX_BODY_BYTES,
+      r => { reason = r; },
     );
     if (payload === null) {
-      throw new SoranError("history unavailable from the hint service (outage, or name unknown to the indexer)", "RPC");
+      throw new SoranError(`history unavailable from the hint service (${reason === "HTTP 404" ? "HTTP 404: name unknown to the indexer" : reason})`, "RPC");
     }
     const raw = payload as {
       name?: unknown; issuedAt?: unknown; issuedLedger?: unknown; events?: unknown;
@@ -1286,8 +1434,8 @@ export class Soran {
       : [];
     return {
       name: `${label}.${namespace}`,
-      issuedAt: String(raw.issuedAt ?? ""),
-      issuedLedger: Number(raw.issuedLedger ?? 0),
+      issuedAt: typeof raw.issuedAt === "string" ? raw.issuedAt.slice(0, 40) : "",
+      issuedLedger: Number.isSafeInteger(Number(raw.issuedLedger ?? 0)) && Number(raw.issuedLedger ?? 0) >= 0 ? Number(raw.issuedLedger ?? 0) : 0,
       events,
     };
   }
@@ -1305,7 +1453,7 @@ export class Soran {
    * roughly twenty parallel simulations; cache briefly.
    */
   async identity(name: string): Promise<NameIdentity> {
-    const { namespace } = parseName(name);
+    const { namespace } = parseResolvableName(name);
     const details = await this.details(name); // also warms the pointer caches
     const [profile, holderPrimary, addressDisplayName, namespaceOwnerPrimary] =
       await Promise.all([
@@ -1389,9 +1537,10 @@ export class Soran {
    * null) or list junk labels (filtered below) — never produce a wrong name.
    * A hint outage likewise degrades the lookup to null, never to a misread.
    *
-   * Payload: the public API's existing `GET {hintUrl}/v1/showcase` endpoint,
-   * `{ namespaces: [{ label, displayName, policy, logo, names }] }` — no new
-   * API surface needed. Note it is capped (most-active 12) and eventually
+   * Payload: the public API's existing `GET {hintUrl}/v1/showcase?logos=0`
+   * endpoint, `{ namespaces: [{ label, displayName, policy, logo, names }] }`
+   * (logo null with logos=0) — no new API surface needed. Note it is capped
+   * (most-active 12) and eventually
    * consistent; acceptable for a liveness hint, and why explicit
    * `reverseNamespaces` remains the precise option.
    */
@@ -1399,17 +1548,29 @@ export class Soran {
    *  steer us to another origin), bound the wait, and cap the body BEFORE
    *  buffering so an oversized response can never be read into memory.
    *  Returns null on ANY failure — callers decide whether that degrades
-   *  (liveness-only hints) or throws (explicit indexed queries). */
-  private async hintFetch(path: string, maxBytes: number): Promise<unknown | null> {
+   *  (liveness-only hints) or throws (explicit indexed queries) — and reports
+   *  the reason through `why` so a throwing caller can say what went wrong
+   *  instead of blaming an outage. */
+  private async hintFetch(path: string, maxBytes: number, why?: (reason: string) => void): Promise<unknown | null> {
     if (!this.hintUrl) return null;
+    const fail = (reason: string): null => { why?.(reason); return null; };
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), HINT_TIMEOUT_MS);
     try {
-      const res = await fetch(`${this.hintUrl}${path}`, { signal: ctl.signal, redirect: "error" });
-      if (!res.ok) return null;
-      if (Number(res.headers.get("content-length") ?? 0) > maxBytes) return null;
+      // redirect "manual" + a status check instead of "error": workerd (the
+      // hosted MCP) does not implement "error" and throws before any request
+      // is sent. A redirect is a failure either way — never followed. In a
+      // browser a manual redirect arrives as an opaque status-0 response.
+      const res = await fetch(`${this.hintUrl}${path}`, { signal: ctl.signal, redirect: "manual" });
+      if (res.type === "opaqueredirect" || (res.status >= 300 && res.status < 400)) {
+        // Cleanup must not delay rejection if the stream never settles.
+        void res.body?.cancel().catch(() => undefined);
+        return fail("redirect refused");
+      }
+      if (!res.ok) return fail(`HTTP ${res.status}`);
+      if (Number(res.headers.get("content-length") ?? 0) > maxBytes) return fail("response too large");
       const reader = res.body?.getReader();
-      if (!reader) return null;
+      if (!reader) return fail("empty response");
       const chunks: Uint8Array[] = [];
       let total = 0;
       for (;;) {
@@ -1417,14 +1578,15 @@ export class Soran {
         if (done) break;
         total += value.byteLength;
         if (total > maxBytes) {
-          await reader.cancel();
-          return null;
+          void reader.cancel().catch(() => undefined);
+          return fail("response too large");
         }
         chunks.push(value);
       }
-      return JSON.parse(new TextDecoder().decode(concat(...chunks)));
-    } catch {
-      return null;
+      try { return JSON.parse(new TextDecoder().decode(concat(...chunks))); }
+      catch { return fail("invalid JSON"); }
+    } catch (e) {
+      return fail(ctl.signal.aborted ? "timed out" : redactUserinfo(`request failed: ${e instanceof Error ? e.message : String(e)}`, this.hintUrl).slice(0, 160));
     } finally {
       clearTimeout(timer);
     }
@@ -1432,7 +1594,10 @@ export class Soran {
 
   private async namespaceHint(): Promise<string[]> {
     // Hint outage → liveness degradation (empty candidates), never a wrong answer.
-    const payload = await this.hintFetch("/v1/showcase", HINT_MAX_BODY_BYTES);
+    // logos=0 asks the API to leave out the owner-uploaded logo data URIs (each
+    // can be hundreds of KB) that would otherwise blow the 4 KiB cap; an API
+    // that predates the parameter ignores it.
+    const payload = await this.hintFetch("/v1/showcase?logos=0", HINT_MAX_BODY_BYTES);
     if (payload === null) return [];
     // Untrusted input: keep only well-formed labels. A hostile hint injecting
     // junk must not abort the lookup (a throwing assertLabel here would be a
@@ -1560,7 +1725,8 @@ export class Soran {
     }
     if (!rpc.Api.isSimulationSuccess(sim)) {
       const detail = (sim as { error?: unknown }).error ?? "unknown";
-      const known = contractId === this.lookupId ? lookupError(String(detail)) : null;
+      const known = contractId === this.lookupId ? lookupError(String(detail)) :
+        (fn === "chain_address" || fn === "chain_policy") ? multichainResolverError(String(detail)) : fn.startsWith("subname_") ? subnameRegistrarError(String(detail)) : null;
       throw new SoranError(`simulate ${fn} on ${contractId} failed: ${String(detail)}`, "SIMULATION", known?.code ?? null, known?.name ?? null);
     }
     // An entry needing restore is ARCHIVED (rent lapsed), not absent — "null"
@@ -1638,7 +1804,8 @@ export const LOOKUP_ERRORS: Readonly<Record<number, string>> = Object.freeze({
   1: "InvalidRegistry", 2: "InvalidGovernance", 3: "NotInitialized", 4: "MalformedName", 5: "NamespaceNotFound",
   6: "RegistrarMissing", 7: "NameInactive", 8: "ContextMismatch", 9: "UnsupportedImplementation", 10: "DependencyUnavailable",
   11: "InvalidPayment", 12: "LegacyMemoUnknown", 13: "MemoRequired", 14: "UpgradePending", 15: "NoPendingUpgrade",
-  16: "UpgradeNotReady", 17: "UpgradeHashMismatch", 18: "TimestampOverflow", 19: "PrimaryNotConfigured", 20: "InvalidPrimary", 21: "ReadTooLarge", 22: "MuxedDestination", 23: "InvalidMuxedAccount", 24: "MuxedForwardMismatch", 25: "NotMuxedDisplayName", 26: "InvalidMuxedRecord", 27: "BatchTooLarge",
+  16: "UpgradeNotReady", 17: "UpgradeHashMismatch", 18: "TimestampOverflow", 19: "PrimaryNotConfigured", 20: "InvalidPrimary", 21: "ReadTooLarge", 22: "MuxedDestination", 23: "InvalidMuxedAccount", 24: "MuxedForwardMismatch", 25: "NotMuxedDisplayName", 26: "InvalidMuxedRecord", 27: "BatchTooLarge", 28: "MigrationMismatch",
+  29: "UnsupportedCoinType", 30: "ChainDisabled", 31: "InvalidChainAddress", 32: "InvalidChainPolicy",
 });
 function lookupError(detail: string): { code: number; name: string } | null {
   // Match only the RPC's leading contract failure, never an inner trace/log.
@@ -1661,4 +1828,21 @@ function decodeCoverage(raw: unknown): IndexCoverage | null {
   }
   return { source: "indexed", complete: c.complete && gaps.length === 0 && c.processedLedger !== null && c.headLedger !== null && c.processedLedger >= c.headLedger,
     processedLedger: c.processedLedger, headLedger: c.headLedger, gaps };
+}
+
+function multichainResolverError(detail: string): { code: number; name: string } | null {
+  const names: Record<number, string> = { 4: "NameInactive", 33: "UnsupportedCoinType", 34: "ChainDisabled", 35: "InvalidChainAddress", 36: "InvalidChainPolicy", 37: "ChainContextMismatch", 38: "ChainUnavailable" };
+  const match = /^(?:HostError: )?Error\(Contract, #(\d+)\)(?:\s|$)/.exec(detail);
+  const code = match ? Number(match[1]) : NaN;
+  return Number.isSafeInteger(code) && names[code] ? { code, name: names[code] } : null;
+}
+
+/** Resolve a root name or one child level; root lifecycle APIs still require parseName. */
+export function parseResolvableName(name: string) {
+  try { return parseResolutionParts(name); } catch (error) { throw new SoranError(String(error), "INVALID_INPUT"); }
+}
+
+function subnameRegistrarError(detail: string): { code: number; name: string } | null {
+  const match = /^(?:HostError: )?Error\(Contract, #(\d+)\)(?:\s|$)/.exec(detail), code = match ? Number(match[1]) : NaN;
+  return Number.isSafeInteger(code) && SUBNAME_REGISTRAR_ERRORS[code] ? { code, name: SUBNAME_REGISTRAR_ERRORS[code] } : null;
 }

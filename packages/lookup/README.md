@@ -29,6 +29,8 @@ checks their Registry, Registrar authority and payment API version. It has no
 old-address fallback. The universal-only `lookup`, `namespaceMetadata` and
 `nameMetadata` methods require universal mode.
 
+Do not use direct mode with a retired Registry. Lookup 0.6.0 to 0.9.0 default to the sealed 5 and 6 September 2026 testnet stacks: universal mode fails closed against today's Lookup, but direct mode reads that frozen state, which no longer follows the successor. Upgrade to 0.10.3 or later; see [Older versions and retired stacks](../../README.md#older-versions-and-retired-stacks).
+
 ## Name status and history reads
 
 Lookup 0.9 adds capability-checked methods for the corresponding on-chain read extension:
@@ -48,9 +50,9 @@ const scoped = await soran.reverseMany("nova", [walletA, muxedWallet]);
 can be reserved or restricted by policy, and active names can have unavailable
 payment instructions. The status is from the returned ledger and timestamp.
 
-The **unreleased 0.10.2 audit candidate** supports up to **32 identities in one
+Lookup **0.10.2 and later** support up to **32 identities in one
 namespace** with `reverseBatch`, and **16 across namespaces** with `primaryBatch`.
-The deployed capability 2 remains **16/8** until the candidate is audited and
+The deployed capability 2 remains **16/8** until the candidate contract is audited and
 upgraded. Each method checks the actual deployed capability and limit; getters
 `batchReadLimit()` and `primaryBatchReadLimit()` return those limits. Candidate
 capability 3 bundles anchors and record data, retaining current routing,
@@ -72,6 +74,31 @@ owned by an address. Contract input bounds apply before on-chain deduplication.
 G/C and full muxed identities remain distinct. A G address plus transaction memo
 does not identify a separate reverse-election identity. Disabling G/C Primary in
 client options rejects a mixed Primary batch; M-only Primary reads remain available.
+
+## Network address records (unreleased native extension)
+
+```ts
+const enabled = await soran.chainPolicy("solo"); // explicit network IDs
+const ethereum = await soran.chainAddress("fred.solo", "ethereum");
+const base = await soran.chainAddress("fred.solo", "base"); // independent record
+```
+
+`chainAddress` returns a canonical address or `null` for a missing current record.
+`CHAIN_DISABLED`, `MULTICHAIN_UNSUPPORTED`, `UNSUPPORTED_NETWORK`, malformed ABI,
+expiry, archival and transport failures remain errors. Every call checks the live
+namespace policy; errors never fall back to text, another network, or a Registrar
+address. Universal Lookup validates native route context; explicit direct mode
+checks Registry, Registrar authority/anchors and multichain version freshly.
+Stellar continues to use `resolvePayment` with its complete memo/muxed instruction.
+
+All methods require `multichain_version() == 1`; the existing published deployment
+presets are not upgraded by installing this SDK. The source change does not deploy
+contracts or publish packages. See [network formats and integration rules](../multichain/README.md)
+for all 14 supported mainnets, binary formats, and shared codec exports. XRP Ledger
+`xrp` preserves full mainnet X-addresses and their destination tags; `xrpl-evm` is a
+separate EVM network. Never strip an X-address tag. For Stellar use the dedicated
+payment API.
+
 
 ## Payment instructions
 
@@ -286,7 +313,7 @@ Read the [native claim APIs, security boundaries and complete signup flow](https
 
 ## Verified testnet deployment
 
-See the [deployment manifest](../../deploy/testnet/deployment.json) for confirmed code hashes, transaction receipts and verification scope. Network passphrase: `Test SDF Network ; September 2015`.
+See the [deployment manifest](../../deployments/testnet.json) for confirmed code hashes, transaction receipts and verification scope. Network passphrase: `Test SDF Network ; September 2015`.
 
 | Contract | Address |
 |---|---|
@@ -298,3 +325,39 @@ See the [deployment manifest](../../deploy/testnet/deployment.json) for confirme
 Mainnet has no deployment preset. Custom networks must supply their own verified
 addresses. Universal Lookup upgrades remain immediately executable; an address
 and ABI version do not pin the code that will execute after a governance upgrade.
+
+### One child level
+
+Resolution, node hashing, metadata, status, text, profile, network-address and
+identity reads accept `mail.fred.solo` as well as `fred.solo`. Names use two or
+three ASCII labels (1–63 characters each, at most 191 overall). Hash each label
+recursively from right to left. `parseName` remains the registration grammar;
+use `parseResolvableName` when accepting either name form.
+
+`subnamePolicy(namespace)`, `subnameRecord(name)` and
+`subnames(parent, { offset, limit })` read the Registry-selected Registrar with
+anchor and capability checks. Policy is `enabled`, `creation-disabled` or
+`suspended`; default `creation-disabled` allows no new children. Disabling
+creation leaves existing children usable; suspension blocks their resolution
+and record edits until re-enabled. The list contains historical labels and raw
+records, including tombstones. Its maximum page size is 16. Do not interpret a
+raw record's `active` flag as live ownership: parent generation, expiry and
+policy also apply. Use `nameMetadata`/`nameStatus` or payment resolution for the
+current answer. Status adds `suspended` for an otherwise-live suspended child.
+
+The parent holder controls a child even when its payment destination differs.
+`namespacePermanent` describes the namespace, not independent permanence of a
+child. Parent transfer/reissue invalidates children. Names returned by the
+index-backed `namesOfPage` remain discovery hints; enumerate a known parent's
+children explicitly rather than assuming the index includes them.
+
+These additions are source changes in this repository. Hosted/published MCP
+continues to use its pinned published SDK versions and accepts root names until
+a coordinated SDK and MCP publication updates those dependencies.
+
+### Subname metadata
+
+Use the default Universal Lookup mode for `details()` and `identity()` on a
+subname such as `mail.fred.solo`. These calls return a typed `CONFIG` error in
+direct mode, which cannot provide the complete child ownership metadata through
+the parent-only Registrar record interface.

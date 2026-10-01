@@ -2,8 +2,21 @@ name: CI
 on:
   push: { branches: [main] }
   pull_request:
+permissions:
+  contents: read
 jobs:
+  source-sync:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22.22.1"
+      - run: node scripts/verify-sync.mjs
+      - run: node --test scripts/verify-sync.test.mjs
   validate:
+    timeout-minutes: 20
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -13,36 +26,40 @@ jobs:
       run:
         working-directory: packages/${{ matrix.pkg }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
-          node-version: "22"
+          node-version: "22.22.1"
           cache: npm
           cache-dependency-path: packages/${{ matrix.pkg }}/package-lock.json
       - name: Install from lockfile
         run: npm ci
-      - name: Audit critical vulnerabilities
+      - name: Audit new core releases (high and critical)
+        if: matrix.pkg != 'mcp'
+        run: npm audit --audit-level=high
+      - name: Audit retained MCP baseline (critical)
+        if: matrix.pkg == 'mcp'
         run: npm audit --audit-level=critical
       - name: Build
         run: npm run build
       - name: Typecheck
         run: npm run typecheck
-      - name: Unit tests
+      - name: Portable package tests
         run: npm test
       - name: Browser compatibility
         if: matrix.pkg != 'mcp'
         run: npm run check:browser
-
   signup-example:
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: examples/native-signup
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
-          node-version: "22"
+          node-version: "22.22.1"
           cache: npm
           cache-dependency-path: examples/native-signup/package-lock.json
       - name: Install published dependencies

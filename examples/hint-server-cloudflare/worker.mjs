@@ -37,7 +37,9 @@
  *     KV value without bound.
  *   - A cursor that falls out of the RPC's retention window self-heals: the
  *     poller re-anchors at the current ledger, counts the gap in `gaps`
- *     (visible on /healthz), and keeps going — reseed if the gap matters.
+ *     (visible on /healthz), and keeps going — reseed if the gap matters. Any
+ *     other failure (network blip, HTTP 5xx, rate limit) keeps the cursor and
+ *     is retried by the next cron, so it never skips events.
  *
  * Vars (wrangler.toml): SORAN_NAMESPACE, SORAN_REGISTRAR_ID (both required),
  * SORAN_RPC_URL (default: testnet public RPC), SORAN_START_LEDGER (optional
@@ -57,15 +59,58 @@ const LABEL_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
 // mistyped seed entry costs a wasted probe, never a wrong answer.
 const ADDR_RE = /^[GC][A-Z2-7]{55}$/;
 const MAX_EVENTS_PER_NAME = 100;
-const MAX_NAMES_PER_HOLDER = 100;
 const MAX_PAGES_PER_RUN = 5; // stay well under the per-invocation subrequest cap
 // Hard bound on index size: KV values cap at 25 MiB and every request parses
 // the whole state, so refuse growth past this rather than wedging silently.
 // 50k quiet names ≈ a few MiB; /healthz reports `full: true` when hit.
 const MAX_NAMES = 50_000;
 const CACHE_TTL_SECS = 30;
+const MAX_PAGE_LIMIT = 100;
+const DEFAULT_PAGE_LIMIT = 40;
+const MAX_CURSOR_LEN = 2048;
+
+/** The page shape @sorandomains/lookup `namesOfPage` requires. Returns null on a bad limit/cursor. */
+export function byHolderPage(state, namespace, addr, limitParam, cursorParam) {
+  let limit = DEFAULT_PAGE_LIMIT;
+  if (limitParam !== null && limitParam !== undefined) {
+    if (!/^\d{1,3}$/.test(limitParam)) return null;
+    limit = Number(limitParam);
+    if (limit < 1 || limit > MAX_PAGE_LIMIT) return null;
+  }
+  let after = null;
+  if (cursorParam !== null && cursorParam !== undefined) {
+    if (cursorParam.length < 1 || cursorParam.length > MAX_CURSOR_LEN) return null;
+    after = cursorParam;
+  }
+  const all = Object.entries(state.holders)
+    .filter(([name, h]) => h === addr && (after === null || name > after))
+    .map(([name]) => name)
+    .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  const page = all.slice(0, limit);
+  const hasMore = all.length > limit;
+  return {
+    holder: addr,
+    names: page.map((name) => ({ name, namespace, holder: addr })),
+    hasMore,
+    nextCursor: hasMore ? page[page.length - 1] : null,
+    // Honest coverage: one namespace, bounded event window + optional seed.
+    coverage: {
+      source: "indexed",
+      complete: false,
+      processedLedger: Number.isSafeInteger(state.lastLedger) && state.lastLedger >= 0 ? state.lastLedger : null,
+      headLedger: null,
+      gaps: [],
+    },
+  };
+}
 
 const HOLDER_EVENTS = { issued: "issued", reclaimed: "reclaimed", transfer: "transferred" };
+
+/** What the RPC says when a cursor or start ledger has aged out of its event-retention window. */
+const RETENTION_RE = /ledger range:\s*(\d+)\s*[-–]\s*(\d+)/i;
+export function isRetentionError(error) {
+  return RETENTION_RE.test(String(error?.message ?? error));
+}
 
 function hexToUtf8(hex) {
   if (typeof hex !== "string" || hex.length % 2 !== 0 || /[^0-9a-fA-F]/.test(hex)) return null;
@@ -212,7 +257,9 @@ async function poll(env) {
     // window would otherwise fail every future run. Re-anchor at the current
     // ledger, count the gap (visible on /healthz), and let the next run
     // continue. Events inside the gap are missed — reseed if that matters.
-    if (state.cursor || state.anchorLedger) {
+    // ONLY that signature re-anchors: any other error (network blip, HTTP 5xx,
+    // rate limit) keeps the cursor so the next cron retries from the same place.
+    if ((state.cursor || state.anchorLedger) && isRetentionError(e)) {
       state.cursor = null;
       state.anchorLedger = 0;
       state.gaps = (state.gaps ?? 0) + 1;
@@ -252,8 +299,24 @@ export default {
 
   /** HTTP: serve the hint contract from the KV index, edge-cached. */
   async fetch(request, env, ctx) {
+    try {
+      return await handleFetch(request, env, ctx);
+    } catch {
+      // A malformed request or a KV hiccup must not surface as a runtime error.
+      return json({ error: "bad_request" }, 400);
+    }
+  },
+};
+
+async function handleFetch(request, env, ctx) {
+  {
     const namespace = (env.SORAN_NAMESPACE ?? "").toLowerCase();
-    const url = new URL(request.url);
+    let url;
+    try {
+      url = new URL(request.url);
+    } catch {
+      return json({ error: "bad_url" }, 400);
+    }
     const parts = url.pathname.split("/").filter(Boolean);
 
     // Routes that need no state answer before any KV read.
@@ -298,18 +361,8 @@ export default {
       });
     } else if (isByHolder) {
       const addr = parts[3];
-      const all = Object.entries(state.holders)
-        .filter(([, h]) => h === addr)
-        .map(([name]) => ({ name, namespace, holder: addr }));
-      res = json(
-        {
-          holder: addr,
-          names: all.slice(0, MAX_NAMES_PER_HOLDER),
-          truncated: all.length > MAX_NAMES_PER_HOLDER,
-        },
-        200,
-        true,
-      );
+      const page = byHolderPage(state, namespace, addr, url.searchParams.get("limit"), url.searchParams.get("cursor"));
+      res = page ? json(page, 200, true) : json({ error: "bad_page" }, 400);
     } else if (isReverse) {
       const found = Object.entries(state.holders).find(([, h]) => h === parts[2]);
       res = found ? json({ name: found[0] }, 200, true) : json({ error: "no_name" }, 404, true);
@@ -337,5 +390,5 @@ export default {
     }
     if (request.method === "GET") ctx.waitUntil(cache.put(request, res.clone()));
     return res;
-  },
-};
+  }
+}

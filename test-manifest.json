@@ -1,0 +1,77 @@
+{
+  "format": "soran-public-test-manifest-v1",
+  "sourceRevision": "cec2d29bd392c64ac3e7f8d1d20d626736c72ce5",
+  "portableSuites": {
+    "lookup": "packages/lookup/package.json scripts.test (all test/*.test.mts)",
+    "owner": "packages/owner/package.json scripts.test (explicit funding/native/multichain/subname suites, unchanged from source)",
+    "holder": "packages/holder/package.json scripts.test (explicit payment/funding/native/multichain/subname suites, unchanged from source)"
+  },
+  "adaptations": [
+    {
+      "file": "packages/lookup/test/helpers/contract-errors.mts",
+      "change": "Read generated public contract error names/numbers from fixtures/public-abi-errors.json; resolve sdk/ source map requests against packages/.",
+      "preserved": "Every SDK error-map entry is compared with the exact exported ABI snapshot; original Rust source digests and source commit are recorded.",
+      "monorepoGate": "Original helper reads contracts/*/src/lib.rs directly and must pass full source CI."
+    },
+    {
+      "file": "packages/lookup/test/package-metadata.test.mts",
+      "change": "Locate current mirror package directories under packages/ rather than sdk/.",
+      "preserved": "All four package names, repository directories, homepage and bug-report metadata must match."
+    },
+    {
+      "files": [
+        "packages/lookup/test/hint-server-compat.test.mts",
+        "packages/lookup/test/hint-server-poll.test.mts"
+      ],
+      "change": "Import unchanged public examples from ../../../examples/ rather than ../../examples/.",
+      "preserved": "All example parsing, malformed request, coverage and recovery checks run."
+    },
+    {
+      "file": "packages/owner/test/native-code-policy-copies.test.mts",
+      "change": "Compare Owner and Holder locally; do not read private API vendor source.",
+      "preserved": "Byte equality of public SDK copies.",
+      "monorepoGate": "Original Owner/Holder/API vendor parity and canonical vendor sync check must pass in source CI."
+    },
+    {
+      "file": "packages/owner/test/native-upgrades.test.mts",
+      "change": "Use fixtures/release-catalog.json containing exported catalog latest/superseded hashes and exact reviewed release artifact hashes.",
+      "preserved": "SDK latest, prior-lineage and artifact consistency checks still run.",
+      "monorepoGate": "Original test compares actual web catalog and candidate record in source CI."
+    }
+  ],
+  "monorepoOnly": [
+    {
+      "scope": "Contract ABI error source, web upgrade catalog and API vendor parity",
+      "required": true,
+      "sourceRevision": "cec2d29bd392c64ac3e7f8d1d20d626736c72ce5",
+      "status": "Full monorepo CI is required for the recorded source, or a merge with the identical Git tree, before publication.",
+      "claimedAsPublicCi": false
+    },
+    {
+      "scope": "sdk/mcp/test/api-recovery.test.mts",
+      "reason": "Imports private API implementation and dependencies. MCP is not changed in this first-stage mirror sync.",
+      "claimedAsPublicCi": false
+    }
+  ],
+  "unchangedExistingChecks": [
+    "packages/mcp retains existing mirror0.9.5 build/typecheck/tests and critical audit",
+    "examples/native-signup retains published dependency typecheck and recovery tests"
+  ],
+  "newMirrorChecks": [
+    "node scripts/verify-sync.mjs",
+    "node --test scripts/verify-sync.test.mjs",
+    "Core npm audit --audit-level=high",
+    "Core builds, typechecks, package suites and browser checks"
+  ],
+  "publicationScope": [
+    "lookup0.11.0",
+    "owner0.12.0",
+    "holder0.10.0"
+  ],
+  "notClaimed": [
+    "Private API integration executed in public mirror",
+    "Private Rust sources compiled in public mirror",
+    "MCP0.10.0 published",
+    "Provenance attestation for local npm publication"
+  ]
+}

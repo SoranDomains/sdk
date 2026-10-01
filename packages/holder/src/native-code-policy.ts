@@ -13,7 +13,8 @@ function ledger(value: unknown, minimum: number): number {
 }
 /** Select policy from an exact Registry instance proof. Failed RPC/method reads
  * never downgrade governed verification to the historical template rule. */
-export async function expectedRegistrarCode(context: Context, namespace: string, minimumLedger?: number): Promise<string> {
+export type ExpectedNativeCode = { governed: boolean; registrar: string; resolver: string };
+export async function expectedNativeCode(context: Context, namespace: string, minimumLedger?: number): Promise<ExpectedNativeCode> {
   const key = new Contract(context.registryId).getFootprint();
   const proof = await context.server.getLedgerEntries(key);
   const observed = ledger(proof?.latestLedger, minimumLedger ?? 1);
@@ -36,13 +37,17 @@ export async function expectedRegistrarCode(context: Context, namespace: string,
   if (authorities.length === 0) {
     const templates = await read('template_hashes');
     if (!Array.isArray(templates) || templates.length !== 2) fail('malformed historical templates');
-    return hex(bytes32(templates[0], 'Registry Registrar template'));
+    return { governed: false, registrar: hex(bytes32(templates[0], 'Registry Registrar template')), resolver: hex(bytes32(templates[1], 'Registry Resolver template')) };
   }
   if (authorities[0].val.type !== 'scvAddress') fail('malformed upgrade authority');
   address(scValToNative(authorities[0].val), 'identity', 'Registry upgrade authority');
   if (await read('upgrade_policy_version') !== 1) fail('unsupported governed policy');
   const code = exactObject(await read('native_code', [sc.bytes(unhex(namespace))]), ['registrar','resolver','registrar_updates','resolver_updates'], 'native code');
   u32(code.registrar_updates, 'Registrar upgrade count'); u32(code.resolver_updates, 'Resolver upgrade count');
-  bytes32(code.resolver, 'Registry Resolver code');
-  return hex(bytes32(code.registrar, 'Registry Registrar code'));
+  return { governed: true, registrar: hex(bytes32(code.registrar, 'Registry Registrar code')), resolver: hex(bytes32(code.resolver, 'Registry Resolver code')) };
+}
+
+/** Registrar-only consumers retain the same governed/legacy policy selection. */
+export async function expectedRegistrarCode(context: Context, namespace: string, minimumLedger?: number): Promise<string> {
+  return (await expectedNativeCode(context, namespace, minimumLedger)).registrar;
 }

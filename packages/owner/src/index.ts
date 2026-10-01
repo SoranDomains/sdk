@@ -1,3 +1,6 @@
+import { subnamePolicyFromNative, subnamePolicyToNative, type SubnamePolicy, type SubnameRecord } from "./names.js";
+export { type SubnamePolicy, type SubnameRecord } from "./names.js";
+import { createSubnameReader, subnameParent, subnameParts, subnameLabelArg, SUBNAME_REGISTRAR_ERRORS } from "./subnames-client.js";
 import { recoverFrozenClaim, historicalReadLedger, type HistoricalRead, type HistoricalRecoveryOptions } from "./native-history.js";
 import type { ClaimIntent } from "./native-types.js";
 export type { HistoricalRecoveryOptions } from "./native-history.js";
@@ -38,6 +41,9 @@ export type { HistoricalRecoveryOptions } from "./native-history.js";
  * that one only. The few reads here (policy, pending transfers, records) exist
  * to support write flows.
  */
+
+import { chainNetwork, chainPolicyFromNative, chainPolicyToNative, encodeChainAddress, decodeChainAddress, type ChainNetwork } from "./multichain.js";
+export { CHAIN_NETWORKS, ChainAddressError, chainNetwork, chainPolicyFromNative, chainPolicyToNative, encodeChainAddress, decodeChainAddress, type ChainNetwork, type ChainAddressErrorCode } from "./multichain.js";
 
 import {
   Account,
@@ -112,6 +118,8 @@ function decodeIssuedEvents(
 
 import { NativeClaimError, address as nativeAddress, bool as nativeBool, bytes32 as nativeBytes32, hex as nativeHex, sc as nativeSc, utf8 as nativeUtf8, namespaceNode as nativeNamespaceNode } from "./native-codec.js";
 import { requireNative, nativeCapability, sendNative, type NativeContext, type NativeWriteOptions, type NativeCapability } from "./native-transport.js";
+import { contractUpgradeStatus as readContractUpgradeStatus, contractUpgradeDirection, upgradeHash, type ContractUpgradeOptions, type ContractUpgradeRole, type ContractUpgradeStatus } from "./native-upgrades.js";
+export { CONTRACT_RELEASES, contractUpgradeDirection, type ContractUpgradeDirection, type ContractUpgradeOptions, type ContractUpgradeRole, type ContractUpgradeStatus } from "./native-upgrades.js";
 import { claimSettingsToScVal, claimConfigFromNative, claimLabelToScVal, claimUsageFromNative, approvalUsageFromNative, type ClaimSettings, type ClaimConfig, type ClaimUsage, type ApprovalUsage } from "./native-types.js";
 export * from "./native-types.js";
 export * from "./native-allowlist.js";
@@ -234,6 +242,16 @@ const REGISTRAR_ERRORS: Record<number, string> = {
   49: "MigrationUnavailable",
   50: "MigrationUnsupported",
   51: "PermanentLockDisabled",
+  52: "InvalidRenewalGrace",
+  53: "SubnameCreationDisabled", 54: "SubnamesSuspended",
+  55: "SubnameGenerationMismatch", 56: "SubnameIndexUnavailable",
+};
+
+/** Error names shared by native multichain Resolver reads and writes. */
+const CHAIN_RESOLVER_ERRORS: Record<number, string> = {
+  2: "NotInitialized", 7: "InvalidAuthority", 33: "UnsupportedCoinType",
+  34: "ChainDisabled", 35: "InvalidChainAddress", 36: "InvalidChainPolicy",
+  37: "ChainContextMismatch", 38: "ChainUnavailable",
 };
 
 /** Registry contract error codes, by number. */
@@ -279,7 +297,25 @@ const REGISTRY_ERRORS: Record<number, string> = {
   39: "UpgradePolicyMismatch",
   40: "UpgradeNotApproved",
   41: "PermanentLockDisabled",
+  42: "BatchTooLarge",
 };
+
+/** Errors for a submit the network REJECTED as a stale sequence: nothing was included, so one retry with a fresh sequence is safe. */
+const BAD_SEQ_REJECTED = new WeakSet<object>();
+function isBadSeqResult(result: unknown): boolean {
+  try {
+    const field = (result as { result?: unknown } | undefined)?.result;
+    const inner = (typeof field === "function" ? field.call(result) : field) as { type?: unknown } | undefined;
+    if (inner && typeof inner === "object" && "type" in inner) return inner.type === "txBadSeq";
+    throw new Error("unrecognised result");
+  } catch {
+    try {
+      return /txBadSeq|bad_seq/i.test(String((result as { toXDR?: () => unknown } | undefined)?.toXDR?.() ?? ""));
+    } catch {
+      return false;
+    }
+  }
+}
 
 /**
  * A failed owner operation. When the contract itself rejected the call,
@@ -563,6 +599,51 @@ export class SoranOwner {
       if (cap.owner !== source) throw new NativeClaimError("the current namespace owner must authorize this change", "authorization");
       return sendNative(context, { source, contract: cap.registrar, method, args, sourceInvocation: { contract: cap.registrar, method, args }, maxFeeStroops: context.maxFeeStroops }, options);
     });
+  }
+  /** Current implementation after validating the Registry's native binding. */
+  async registrarCodeHash(namespace: string): Promise<string> {
+    const cap = await requireNative(this.nativeContext(), normalizeLabel(namespace));
+    const instance = await this.server.getContractInstance(cap.registrar);
+    if (instance.executable.type !== "contractExecutableWasm") throw new NativeClaimError("Registrar is not a Wasm contract", "unavailable");
+    return nativeHex(instance.executable.wasmHash.value);
+  }
+  /** Verify both children and the selected implementation without signing or reading claim settings. */
+  contractUpgradeStatus(namespace: string, role: ContractUpgradeRole, wasmHash: string): Promise<ContractUpgradeStatus> {
+    return readContractUpgradeStatus(this.nativeContext(), normalizeLabel(namespace), role, wasmHash);
+  }
+  private upgradeContract(namespace: string, role: ContractUpgradeRole, wasmHash: string, options: ContractUpgradeOptions): Promise<Submitted> {
+    return this.serialize(async () => {
+      const args = [upgradeHash(wasmHash)];
+      const context = this.nativeContext();
+      const status = await readContractUpgradeStatus(context, normalizeLabel(namespace), role, wasmHash);
+      const source = nativeAddress(await this.signer.publicKey(), "account", "owner transaction source");
+      if (source !== status.owner) throw new NativeClaimError("the current namespace owner must authorize this change", "authorization");
+      if (!status.governed || !status.approved) throw new NativeClaimError("This contract upgrade is not approved by the Registry", "authorization");
+      const direction = contractUpgradeDirection(role, status.currentHash, wasmHash);
+      if (direction === "same") throw new NativeClaimError("This contract implementation is already installed");
+      // Registry approval says a hash may be installed, not that the move is safe:
+      // older releases stay approved, and a downgrade drops their fixes.
+      if (options.allowDowngrade !== true) {
+        if (direction === "backward")
+          throw new NativeClaimError("Refusing to install a superseded implementation (a downgrade that drops later fixes). Install the latest reviewed release, or pass allowDowngrade: true only after reviewing the older release for this namespace.", "authorization");
+        if (direction === "unrecognized-current")
+          throw new NativeClaimError("This namespace runs an implementation this SDK does not recognise, so installing the latest known release may be a downgrade. Update the SDK, or pass allowDowngrade: true after verifying the installed release is older.", "authorization");
+      }
+      const result = await sendNative(context, {
+        source, contract: status.contractId, method: "upgrade", args,
+        sourceInvocation: { contract: status.contractId, method: "upgrade", args },
+        maxFeeStroops: context.maxFeeStroops,
+      }, options);
+      return { hash: result.hash, ledger: result.ledger };
+    });
+  }
+  /** Current-owner, Registry-approved update; never uses the legacy tainting path. */
+  upgradeRegistrar(namespace: string, wasmHash: string, options: ContractUpgradeOptions = {}): Promise<Submitted> {
+    return this.upgradeContract(namespace, "registrar", wasmHash, options);
+  }
+  /** Current-owner, Registry-approved Resolver update with exact native authorization. */
+  upgradeResolver(namespace: string, wasmHash: string, options: ContractUpgradeOptions = {}): Promise<Submitted> {
+    return this.upgradeContract(namespace, "resolver", wasmHash, options);
   }
   async configureClaims(namespace: string, settings: ClaimSettings, options: NativeWriteOptions = {}): Promise<Submitted & { config: ClaimConfig }> {
     const encoded = claimSettingsToScVal(settings);
@@ -891,6 +972,46 @@ export class SoranOwner {
     return { hash: r.hash, ledger: r.ledger };
   }
 
+  /** Networks currently enabled for all holders, including names already claimed. */
+  async chainPolicy(namespace: string): Promise<ChainNetwork[]> {
+    namespace = normalizeLabel(namespace);
+    const resolver = await this.multichainResolverOf(namespace);
+    return chainPolicyFromNative(await this.read(resolver, "chain_policy", []));
+  }
+
+  /** Set the namespace-wide network allowlist. Empty disables all multichain records.
+   * Disabled destinations remain stored and become visible if re-enabled. */
+  async setChainPolicy(namespace: string, networks: readonly ChainNetwork[]): Promise<Submitted> {
+    namespace = normalizeLabel(namespace);
+    const coins = chainPolicyToNative(networks);
+    const resolver = await this.multichainResolverOf(namespace);
+    await this.assertOwner(namespace);
+    const result = await this.invoke(resolver, "set_chain_policy", [
+      xdr.ScVal.scvVec(coins.map(coin => nativeToScVal(coin, { type: "u32" }))),
+    ], CHAIN_RESOLVER_ERRORS);
+    return { hash: result.hash, ledger: result.ledger };
+  }
+
+  private async multichainResolverOf(namespace: string): Promise<string> {
+    const nsNode = namehash(namespace);
+    const args = [nodeArg(nsNode)];
+    const [resolver, registrar] = await Promise.all([
+      this.read(this.registryId, "resolver_of", args), this.read(this.registryId, "registrar_of", args),
+    ]);
+    if (typeof resolver !== "string" || !StrKey.isValidContract(resolver) || typeof registrar !== "string" || !StrKey.isValidContract(registrar))
+      throw new OwnerError("namespace has no native multichain route", this.registryId, "resolver_of", null, "UnsupportedImplementation");
+    const [anchor, authority, version, anchors] = await Promise.all([
+      this.read(resolver, "registry", []), this.read(resolver, "authority", []),
+      this.read(resolver, "multichain_version", []), this.read(registrar, "anchors", []),
+    ]);
+    if (anchor !== this.registryId || authority !== registrar || !Array.isArray(anchors) || anchors.length !== 2 ||
+        anchors[0] !== this.registryId || !(anchors[1] instanceof Uint8Array) || anchors[1].length !== 32 ||
+        !nsNode.every((byte, index) => byte === anchors[1][index]))
+      throw new OwnerError("multichain Resolver route does not match this Registry and namespace", resolver, "registry", 37, "ChainContextMismatch");
+    if (version !== 1) throw new OwnerError("unsupported multichain Resolver version", resolver, "multichain_version", null, "UnsupportedImplementation");
+    return resolver;
+  }
+
   // ---- reads that support write flows --------------------------------------
 
   /** The namespace's immutable issuance policy. */
@@ -932,6 +1053,22 @@ export class SoranOwner {
   }
 
   // ---- internals -----------------------------------------------------------
+
+  private subnameReader() { return createSubnameReader({ registryId: this.registryId, error: message => new OwnerError(message), read: (id, fn, args) => this.read(id, fn, args) }); }
+  /** Live namespace policy. Creation-disabled keeps existing children usable; suspended hides them. */
+  async subnamePolicy(namespace: string): Promise<SubnamePolicy> { return this.subnameReader().policy(namespace); }
+  /** Raw child state, including tombstones and stale parent generations; this is not payment resolution. */
+  async subnameRecord(name: string): Promise<SubnameRecord | null> { return this.subnameReader().record(name); }
+  /** Bounded on-chain historical labels, including removed children. Re-read metadata before treating a child as active. */
+  async subnames(parent: string, options: { offset?: number; limit?: number } = {}) { return this.subnameReader().list(parent, options); }
+
+  async setSubnamePolicy(namespace: string, policy: SubnamePolicy): Promise<Submitted> {
+    const native = subnamePolicyToNative(policy);
+    const ctx = await this.subnameReader().context(namespace);
+    await this.assertOwner(ctx.namespace);
+    const result = await this.invoke(ctx.registrar, "set_subname_policy", [xdr.ScVal.scvVec([nativeToScVal(native[0], { type: "symbol" })])], { ...REGISTRAR_ERRORS, ...SUBNAME_REGISTRAR_ERRORS });
+    return { hash: result.hash, ledger: result.ledger };
+  }
 
   private async readRecord(registrarId: string, label: string): Promise<NameState | null> {
     const rec = (await this.read(registrarId, "record_of", [labelArg(label)])) as {
@@ -976,7 +1113,8 @@ export class SoranOwner {
       .build();
     const sim = await this.server.simulateTransaction(tx);
     if (rpc.Api.isSimulationError(sim)) {
-      throw typedError(contractId, fn, sim.error, {});
+      const errors = fn.startsWith("subname_") ? SUBNAME_REGISTRAR_ERRORS : ["chain_policy", "chain_address", "multichain_version"].includes(fn) ? CHAIN_RESOLVER_ERRORS : {};
+      throw typedError(contractId, fn, sim.error, errors);
     }
     // An archived entry is NOT absence: reads cannot restore (no signer),
     // so surface the state honestly instead of reporting "does not exist".
@@ -1039,7 +1177,7 @@ export class SoranOwner {
       } catch (e) {
         // A stale sequence (another process moved the account) is safe to
         // retry once with a fresh sequence — nothing was included.
-        if (!(e instanceof OwnerError && e.txHash) && /txBadSeq|bad_seq/i.test(String(e))) {
+        if ((BAD_SEQ_REJECTED.has(e as object) || (!(e instanceof OwnerError && e.txHash) && /txBadSeq|bad_seq/i.test(String(e))))) {
           return await this.attempt(contractId, fn, args, errNames);
         }
         throw e;
@@ -1077,6 +1215,25 @@ export class SoranOwner {
         fn,
       );
     }
+  }
+
+  /** Authorize exactly the selected policy with no additional child operations. */
+  private assertChainPolicyIntent(prepared: { source: string; operations: unknown[] }, pub: string, contractId: string, fn: string, args: xdr.ScVal[]): void {
+    if (!["set_chain_policy", "set_subname_policy"].includes(fn)) return;
+    if (prepared.source !== pub || prepared.operations.length !== 1) throw new OwnerError("unexpected chain policy transaction", contractId, fn);
+    const op = prepared.operations[0] as { type: string; source?: string; func: xdr.HostFunction; auth?: xdr.SorobanAuthorizationEntry[] };
+    if (op.type !== "invokeHostFunction" || (op.source !== undefined && op.source !== pub) || op.func.type !== "hostFunctionTypeInvokeContract")
+      throw new OwnerError("unexpected chain policy operation", contractId, fn);
+    const call = op.func.invokeContract;
+    if (Address.fromScAddress(call.contractAddress).toString() !== contractId || call.functionName.toString() !== fn ||
+        call.args.length !== args.length || call.args.some((value, i) => value.toXDR("base64") !== args[i].toXDR("base64")))
+      throw new OwnerError("chain policy operation differs from selected intent", contractId, fn);
+    if (!op.auth || op.auth.length !== 1 || op.auth[0].credentials.type !== "sorobanCredentialsSourceAccount")
+      throw new OwnerError("chain policy requires exactly the source owner authorization", contractId, fn);
+    const root = op.auth[0].rootInvocation;
+    if (root.function.type !== "sorobanAuthorizedFunctionTypeContractFn" || root.subInvocations.length ||
+        root.function.contractFn.toXDR("base64") !== call.toXDR("base64"))
+      throw new OwnerError("chain policy authorization differs from selected intent", contractId, fn);
   }
 
   private async attempt(
@@ -1120,6 +1277,7 @@ export class SoranOwner {
     const prepared = rpc.assembleTransaction(tx, sim).build();
     this.assertNetworkFee(prepared.fee, fn);
     this.assertSatisfiableAuth(prepared, pub, contractId, fn);
+    this.assertChainPolicyIntent(prepared, pub, contractId, fn, args);
     // The hash is fixed before signatures — compute it now so every failure
     // past this point can carry it (the "re-check before retrying" contract).
     const txHash = toHex(prepared.hash()); // (SDK17) hash() is Uint8Array
@@ -1140,7 +1298,7 @@ export class SoranOwner {
       );
     }
     if (sent.status === "ERROR") {
-      throw new OwnerError(
+      const rejected = new OwnerError(
         `${fn}: submit rejected: ${JSON.stringify(sent.errorResult ?? sent.status)}`,
         contractId,
         fn,
@@ -1148,6 +1306,8 @@ export class SoranOwner {
         null,
         txHash,
       );
+      if (isBadSeqResult(sent.errorResult)) BAD_SEQ_REJECTED.add(rejected);
+      throw rejected;
     }
     if (sent.status === "TRY_AGAIN_LATER") {
       throw new OwnerError(
@@ -1328,3 +1488,5 @@ export { SoranSponsorship, sponsorPlan, validateSponsorTransaction, type Sponsor
 export { FundingServiceClient } from "./funding-service.js";
 
 export { TestnetSponsorHistory, type SponsorHistory, type FundingReceipt } from "./funding-history.js";
+
+export type { ContractWallet } from "./contract-wallet.js";
