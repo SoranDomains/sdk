@@ -71,13 +71,13 @@
     "MCP build/typecheck and every portable test; native-signup typecheck and recovery tests"
   ],
   "publicationScope": [
-    "mcp0.10.0 candidate"
+    "mcp0.10.0 published 2026-10-01"
   ],
   "notClaimed": [
     "Private API integration executed in public mirror",
     "Private Rust sources compiled in public mirror",
-    "MCP0.10.0 published",
-    "Provenance attestation for local npm publication"
+    "Provenance attestation for local npm publication",
+    "Hosted service version attested by npm publication"
   ],
   "sourceRevisions": {
     "core": "cec2d29bd392c64ac3e7f8d1d20d626736c72ce5",
@@ -85,7 +85,7 @@
   },
   "publicationState": {
     "core": "lookup0.11.0, owner0.12.0, holder0.10.0 published 2026-10-01",
-    "mcp": "0.10.0 candidate; publication pending"
+    "mcp": "0.10.0 published 2026-10-01T12:15:28.309Z; registry archive matches reviewed bytes"
   },
   "retainedPublicTests": [
     {

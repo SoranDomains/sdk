@@ -7,12 +7,12 @@ preparation use the API, with locally pinned transaction and fee validation
 before signing. Hosted API and MCP responses are service-mediated; integrators
 can call Universal Lookup directly for their own on-chain reads.
 
-| Package | Published / candidate version | Audience and surface |
+| Package | Published version | Audience and surface |
 | --- | --- | --- |
 | [`@sorandomains/lookup`](packages/lookup/) | 0.11.0 | Wallets and apps: Universal Lookup, nested names, network addresses, complete payment instructions and verified holdings pages |
 | [`@sorandomains/owner`](packages/owner/) | 0.12.0 | Namespace operators: issuance, lifecycle, subname and network-address policies |
 | [`@sorandomains/holder`](packages/holder/) | 0.10.0 | Name holders: subnames, network addresses, payment memos and lifecycle |
-| [`@sorandomains/mcp`](packages/mcp/) | 0.10.0 candidate | AI agents: hosted read tools and locally signed management tools |
+| [`@sorandomains/mcp`](packages/mcp/) | 0.10.0 | AI agents: hosted read tools and locally signed management tools |
 
 All four releases require Node.js 22.12.0 or newer.
 All four packages target `@stellar/stellar-sdk >=17 <18`, tested with 17.0.1.
@@ -43,6 +43,6 @@ The governed testnet stacks of 5 and 6 September 2026 were sealed by migration. 
 
 ## October 1 publication
 
-Lookup **0.11.0**, Owner **0.12.0** and Holder **0.10.0** were published to npm on **1 October 2026**. MCP **0.10.0** is the next release candidate in this source; its publication remains pending and npm currently serves MCP **0.9.6**. Existing namespace owners must opt in to their contract upgrades before new capabilities become available.
+Lookup **0.11.0**, Owner **0.12.0**, Holder **0.10.0** and MCP **0.10.0** were published to npm on **1 October 2026**. The downloaded MCP archive matches the reviewed release bytes; its publication time and integrity are recorded in the [release notes](RELEASE-2026-10-01.md). Existing namespace owners must opt in to their contract upgrades before new capabilities become available.
 
 See [release notes](RELEASE-2026-10-01.md), [source provenance](SYNC.md) and the [test manifest](test-manifest.json). Hosted MCP deployment is separate from this package release.

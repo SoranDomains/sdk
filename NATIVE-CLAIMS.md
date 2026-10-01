@@ -2,7 +2,7 @@
 
 SDK versions in this source: Holder `0.10.0`, Owner `0.12.0`, MCP `0.10.0`, Lookup `0.11.0`. The release uses the native-claim successor Registry/Resolver/Registrar; its exact verified deployment is recorded in the package preset and [release manifest](https://github.com/SoranDomains/sdk/blob/main/deployments/testnet.json). Public package and service availability is recorded separately in the [release status](https://docs.soran.domains/reference/release-status).
 
-Lookup 0.11.0, Owner 0.12.0 and Holder 0.10.0 were published on 1 October 2026. MCP 0.10.0 is a candidate with publication pending; see the [October 1 release notes](RELEASE-2026-10-01.md).
+Lookup 0.11.0, Owner 0.12.0, Holder 0.10.0 and MCP 0.10.0 were published on 1 October 2026; see the [October 1 release notes](RELEASE-2026-10-01.md). Hosted service deployment is tracked separately from npm publication.
 
 ## Application-owned signup
 
