@@ -1217,23 +1217,29 @@ export class SoranOwner {
     }
   }
 
-  /** Authorize exactly the selected policy with no additional child operations. */
-  private assertChainPolicyIntent(prepared: { source: string; operations: unknown[] }, pub: string, contractId: string, fn: string, args: xdr.ScVal[]): void {
-    if (!["set_chain_policy", "set_subname_policy"].includes(fn)) return;
-    if (prepared.source !== pub || prepared.operations.length !== 1) throw new OwnerError("unexpected chain policy transaction", contractId, fn);
+  /**
+   * (SR-01 / SW-05) Default-deny for every legacy write: this source account, one invoke-contract operation on the
+   * intended contract, function and arguments, and exactly one source-account authorization whose root is that same
+   * call with NO sub-invocations. Every owner writer is a single call (issue, issue_batch, reclaim, renew,
+   * set_treasury, make_permanent, namespace transfers, set_resolver, set_chain_policy, set_subname_policy). The
+   * Registrar an owner talks to can be upgraded by whoever owned the namespace before them, so the callee is not a
+   * safe assumption: a recorded `token.transfer(owner -> attacker)` child call must never be signed.
+   */
+  private assertExactIntent(prepared: { source: string; operations: unknown[] }, pub: string, contractId: string, fn: string, args: xdr.ScVal[]): void {
+    if (prepared.source !== pub || prepared.operations.length !== 1) throw new OwnerError(`${fn}: unexpected transaction source or operation count`, contractId, fn);
     const op = prepared.operations[0] as { type: string; source?: string; func: xdr.HostFunction; auth?: xdr.SorobanAuthorizationEntry[] };
     if (op.type !== "invokeHostFunction" || (op.source !== undefined && op.source !== pub) || op.func.type !== "hostFunctionTypeInvokeContract")
-      throw new OwnerError("unexpected chain policy operation", contractId, fn);
+      throw new OwnerError(`${fn}: unexpected operation`, contractId, fn);
     const call = op.func.invokeContract;
     if (Address.fromScAddress(call.contractAddress).toString() !== contractId || call.functionName.toString() !== fn ||
         call.args.length !== args.length || call.args.some((value, i) => value.toXDR("base64") !== args[i].toXDR("base64")))
-      throw new OwnerError("chain policy operation differs from selected intent", contractId, fn);
+      throw new OwnerError(`${fn}: operation differs from selected intent`, contractId, fn);
     if (!op.auth || op.auth.length !== 1 || op.auth[0].credentials.type !== "sorobanCredentialsSourceAccount")
-      throw new OwnerError("chain policy requires exactly the source owner authorization", contractId, fn);
+      throw new OwnerError(`${fn}: requires exactly the source owner authorization`, contractId, fn);
     const root = op.auth[0].rootInvocation;
     if (root.function.type !== "sorobanAuthorizedFunctionTypeContractFn" || root.subInvocations.length ||
         root.function.contractFn.toXDR("base64") !== call.toXDR("base64"))
-      throw new OwnerError("chain policy authorization differs from selected intent", contractId, fn);
+      throw new OwnerError(`${fn}: authorization differs from selected intent (unexpected nested authorization)`, contractId, fn);
   }
 
   private async attempt(
@@ -1277,7 +1283,7 @@ export class SoranOwner {
     const prepared = rpc.assembleTransaction(tx, sim).build();
     this.assertNetworkFee(prepared.fee, fn);
     this.assertSatisfiableAuth(prepared, pub, contractId, fn);
-    this.assertChainPolicyIntent(prepared, pub, contractId, fn, args);
+    this.assertExactIntent(prepared, pub, contractId, fn, args);
     // The hash is fixed before signatures — compute it now so every failure
     // past this point can carry it (the "re-check before retrying" contract).
     const txHash = toHex(prepared.hash()); // (SDK17) hash() is Uint8Array

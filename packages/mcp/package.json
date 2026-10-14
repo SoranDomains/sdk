@@ -46,7 +46,7 @@
     "ai-agents"
   ],
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "@sorandomains/holder": "0.10.0",
     "@sorandomains/lookup": "0.11.0",
     "@sorandomains/owner": "0.12.0",

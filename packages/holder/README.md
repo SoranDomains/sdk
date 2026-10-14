@@ -5,12 +5,14 @@
 > [release status](https://docs.soran.domains/reference/release-status) for package and service availability.
 
 
-Version 0.10.0 targets Stellar SDK17 (`>=17 <18`). ASCII names
+Version 0.10.1 targets Stellar SDK17 (`>=17 <18`). ASCII names
 and labels are validated before lowercase normalization; Unicode lookalikes are
 rejected. Payment and ownership writes target the owning Registry/Registrar/Resolver.
 Complete-M display-name writes target Universal Lookup; Lookup 0.10.0 or later provides
 the corresponding read interface. Check the release status before enabling the
 new capability on a deployment.
+
+Version 0.10.1 rejects simulated transactions whose source, operation, contract, method, arguments or authorization differ from the requested legacy account-signed write. Unexpected authorizers and nested calls are rejected before signing; permissionless upkeep must carry no authorization. Network-address writes now use the configured contract-wallet holder identity.
 
 Releases older than 0.9.1 (and any built against Lookup 0.6.0 to 0.9.0) default to the retired 5 and 6 September 2026 testnet stacks; upgrade rather than pinning a retired Registry. See [Older versions and retired stacks](../../README.md#older-versions-and-retired-stacks).
 

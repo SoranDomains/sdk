@@ -254,6 +254,9 @@ const PRIMARY_ERRORS: Record<number, string> = {
 
 /** Errors for a submit the network REJECTED as a stale sequence: nothing was included, so one retry with a fresh sequence is safe. */
 const BAD_SEQ_REJECTED = new WeakSet<object>();
+/** Writes whose contract entrypoint takes no authorization at all (permissionless storage upkeep).
+ * assertExactIntent requires these simulations to carry zero authorization entries. */
+const NO_AUTH_WRITES = new Set(["touch_subname", "touch_subname_page"]);
 function isBadSeqResult(result: unknown): boolean {
   try {
     const field = (result as { result?: unknown } | undefined)?.result;
@@ -572,7 +575,7 @@ export class SoranHolder {
     const policy = chainPolicyFromNative(await this.read(resolver, "chain_policy", []));
     if (!policy.includes(network)) throw new HolderError(`${metadata.name} addresses are disabled by the namespace`, resolver, "chain_policy", 34, "ChainDisabled");
     const result = await this.invoke(resolver, "set_chain_address", [
-      nativeToScVal(`${label}.${namespace}`, { type: "string" }), addrArg(await this.signer.publicKey()),
+      nativeToScVal(`${label}.${namespace}`, { type: "string" }), addrArg(await this.holderAddress()),
       nativeToScVal(metadata.coinType, { type: "u32" }), bytesArg(encoded),
     ], RESOLVER_ERRORS);
     return { hash: result.hash, ledger: result.ledger };
@@ -585,7 +588,7 @@ export class SoranHolder {
     const resolver = await this.multichainResolverOf(namespace);
     await this.requireSubnameSupport(name, resolver);
     const result = await this.invoke(resolver, "clear_chain_address", [
-      nativeToScVal(`${label}.${namespace}`, { type: "string" }), addrArg(await this.signer.publicKey()),
+      nativeToScVal(`${label}.${namespace}`, { type: "string" }), addrArg(await this.holderAddress()),
       nativeToScVal(metadata.coinType, { type: "u32" }),
     ], RESOLVER_ERRORS);
     return { hash: result.hash, ledger: result.ledger };
@@ -1129,29 +1132,39 @@ export class SoranHolder {
     }
   }
 
-  /** Record and upkeep writes must match the selected operation and authorization. */
-  private assertPaymentIntent(prepared: { source: string; operations: unknown[] }, pub: string, contractId: string, fn: string, args: xdr.ScVal[]): void {
-    if (!["set_payment", "set_muxed", "set_chain_address", "clear_chain_address", "create_subname", "remove_subname", "touch_subname_page"].includes(fn)) return;
-    if (prepared.source !== pub || prepared.operations.length !== 1) throw new HolderError("unexpected payment transaction source or operation count", contractId, fn);
+  /**
+   * (SR-01) Default-deny for every G-account write. The simulated transaction must be exactly the
+   * call the holder asked for: this source account, one invoke-contract operation on the intended
+   * contract, function and arguments, and either no authorization (permissionless upkeep) or exactly
+   * one source-account entry whose root is that same call with NO sub-invocations.
+   *
+   * Without the sub-invocation rule, a resolver the namespace owner pointed at hostile code (the
+   * Registry accepts any address) can call `holder.require_auth()` plus `token.transfer(holder, ...)`
+   * under a text, record, reverse or primary write; the honest simulation records that child call in
+   * the holder's own tree and the SDK would sign it. Callers only ever ask for single-call trees, so
+   * a method that genuinely needs a child call must be added to this check explicitly.
+   */
+  private assertExactIntent(prepared: { source: string; operations: unknown[] }, pub: string, contractId: string, fn: string, args: xdr.ScVal[]): void {
+    if (prepared.source !== pub || prepared.operations.length !== 1) throw new HolderError(`${fn}: unexpected transaction source or operation count`, contractId, fn);
     const op = prepared.operations[0] as {
       type: string; source?: string; func: xdr.HostFunction; auth?: xdr.SorobanAuthorizationEntry[];
     };
     if (op.type !== "invokeHostFunction" || (op.source !== undefined && op.source !== pub) || op.func.type !== "hostFunctionTypeInvokeContract")
-      throw new HolderError("unexpected payment operation", contractId, fn);
+      throw new HolderError(`${fn}: unexpected operation`, contractId, fn);
     const call = op.func.invokeContract;
     if (Address.fromScAddress(call.contractAddress).toString() !== contractId || call.functionName.toString() !== fn ||
         call.args.length !== args.length || call.args.some((value, i) => value.toXDR("base64") !== args[i].toXDR("base64")))
-      throw new HolderError("payment operation differs from selected intent", contractId, fn);
-    if (fn === "touch_subname_page") {
-      if (op.auth?.length) throw new HolderError("subname page upkeep must not require authorization", contractId, fn);
+      throw new HolderError(`${fn}: operation differs from selected intent`, contractId, fn);
+    if (NO_AUTH_WRITES.has(fn)) {
+      if (op.auth?.length) throw new HolderError(`${fn}: permissionless upkeep must not require authorization`, contractId, fn);
       return;
     }
     if (!op.auth || op.auth.length !== 1 || op.auth[0].credentials.type !== "sorobanCredentialsSourceAccount")
-      throw new HolderError("payment requires exactly the source holder authorization", contractId, fn);
+      throw new HolderError(`${fn}: requires exactly the source holder authorization`, contractId, fn);
     const root = op.auth[0].rootInvocation;
     if (root.function.type !== "sorobanAuthorizedFunctionTypeContractFn" || root.subInvocations.length ||
         root.function.contractFn.toXDR("base64") !== call.toXDR("base64"))
-      throw new HolderError("payment authorization differs from selected intent", contractId, fn);
+      throw new HolderError(`${fn}: authorization differs from selected intent (unexpected nested authorization)`, contractId, fn);
   }
 
   private invoke(
@@ -1182,7 +1195,7 @@ export class SoranHolder {
     args: xdr.ScVal[],
     errNames: Record<number, string>,
   ): Promise<Invoked> {
-    if (this.contractWallet && fn !== "touch_subname_page") {
+    if (this.contractWallet && !NO_AUTH_WRITES.has(fn)) {
       if (this.isMuxedIdentityWrite(fn)) throw new HolderError("muxed identity elections require the underlying G account");
       const context = this.nativeContext();
       const result = await sendNative(context, { ...await nativeWalletPlan(context), contract: contractId, method: fn, args,
@@ -1221,7 +1234,8 @@ export class SoranHolder {
     const prepared = rpc.assembleTransaction(tx, sim).build();
     this.assertNetworkFee(prepared.fee, fn);
     this.assertSatisfiableAuth(prepared, pub, contractId, fn);
-    this.assertPaymentIntent(prepared, pub, contractId, fn, args);
+    // Muxed identity elections get the stricter native validator below (exact tree, no memo, fee bound).
+    if (!this.isMuxedIdentityWrite(fn)) this.assertExactIntent(prepared, pub, contractId, fn, args);
     if (this.isMuxedIdentityWrite(fn)) {
       const account = scValToNative(args[fn === "clear_reverse_muxed" ? 1 : 0]);
       if (account !== pub || contractId !== this.lookupId) throw new HolderError("muxed identity signer or Lookup changed", contractId, fn);

@@ -29,3 +29,7 @@ test('shared documentation cannot silently relabel core provenance', () => jsonP
 test('portable test mapping cannot omit a test', () => jsonProbe('mcp-sync-manifest.json', m => m.portableTests.pop()));
 
 test('retained public regression tests remain covered', () => jsonProbe('mcp-sync-manifest.json', m => m.retainedPublicTests.pop()));
+
+test('core-stage dependency refresh cannot widen into MCP runtime exports', () => {
+  for (const change of [m => m.pendingDependencyRefresh.files.push('packages/mcp/src/tools.ts'), m => m.pendingDependencyRefresh.mcpRuntimeUnchanged = false, m => m.pendingDependencyRefresh.sourceRevision = m.sourceRevision]) jsonProbe('mcp-sync-manifest.json', change);
+});

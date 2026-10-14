@@ -71,16 +71,20 @@
     {
       "source": "sdk/mcp/package-lock.json",
       "destination": "packages/mcp/package-lock.json",
-      "sourceSha256": "11974d55517a0a5233d740865277dab4defb3c8c764f10e65abf530ddfa73a7a",
-      "destinationSha256": "11974d55517a0a5233d740865277dab4defb3c8c764f10e65abf530ddfa73a7a",
-      "exact": true
+      "sourceSha256": "279fab749d974f44b64573c1b7bb784c7a2c04ab4bb6e4a380c7e68fc000a6cd",
+      "destinationSha256": "6a50ff33a1717c16a4a853d8376b516c9c3de75532f2890aae16b3b50e7ffa2d",
+      "exact": false,
+      "sourceRevision": "e5788127c38f360f6bf97d91217f897441cf9bd1",
+      "adaptation": "Carry only the protocol SDK and proxy-addr security dependency refresh while retaining the existing published core pins, Zod 3 and TypeScript 5 for this core-only stage."
     },
     {
       "source": "sdk/mcp/package.json",
       "destination": "packages/mcp/package.json",
-      "sourceSha256": "e398162dfc38f10ea473361ba9234287a222f8a763a3dcc288295f9826994a82",
-      "destinationSha256": "e398162dfc38f10ea473361ba9234287a222f8a763a3dcc288295f9826994a82",
-      "exact": true
+      "sourceSha256": "c47984bc7e6c695789357547b33039b9c6c3b315a640ca99150e8e5521391f29",
+      "destinationSha256": "97c51acbb6b4061edc7e654c6303396e254b2e601aea799a769b6253177d343b",
+      "exact": false,
+      "sourceRevision": "e5788127c38f360f6bf97d91217f897441cf9bd1",
+      "adaptation": "Carry only the protocol SDK and proxy-addr security dependency refresh while retaining the existing published core pins, Zod 3 and TypeScript 5 for this core-only stage."
     },
     {
       "source": "sdk/mcp/roles-test.mts",
@@ -517,5 +521,15 @@
     "sourceChecksPassed": 18,
     "publicPullRequest": "https://github.com/SoranDomains/sdk/pull/20",
     "publicChecksPassed": 6
+  },
+  "pendingDependencyRefresh": {
+    "sourceRevision": "e5788127c38f360f6bf97d91217f897441cf9bd1",
+    "files": [
+      "packages/mcp/package.json",
+      "packages/mcp/package-lock.json"
+    ],
+    "publicationPerformed": false,
+    "mcpRuntimeUnchanged": true,
+    "note": "This checkout changes dependency metadata after the recorded October 1 publication. Its historical publication receipt applies only to the recorded release commit, not this pending package build."
   }
 }

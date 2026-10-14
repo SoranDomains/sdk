@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SOURCE_REVISION, MCP_REVISION, verifySync } from './verify-sync.mjs';
+import { SOURCE_REVISION, MCP_REVISION, SIGNING_REVISION, verifySync } from './verify-sync.mjs';
 const sha256 = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 const safe = value => typeof value === 'string' && /^(?:[A-Za-z0-9_.-]+\/)*[A-Za-z0-9_.-]+$/.test(value) && !value.split('/').some(x => x === '.' || x === '..');
 function bytes(root, relative) {
@@ -32,6 +32,10 @@ export function verifyMcpSync(root) {
   assert.equal(manifest.testScriptUnchanged, true);
   assert.equal(manifest.publishFileListUnchanged, true);
   assert.equal(manifest.files.length, 43);
+  const refresh = manifest.pendingDependencyRefresh;
+  assert.equal(refresh.sourceRevision, SIGNING_REVISION);
+  assert.equal(refresh.mcpRuntimeUnchanged, true);
+  assert.deepEqual(refresh.files, ['packages/mcp/package.json', 'packages/mcp/package-lock.json']);
   const seen = new Set();
   for (const row of manifest.files) {
     assert(safe(row.source) && safe(row.destination), 'Unsafe mapping path');
@@ -41,7 +45,11 @@ export function verifyMcpSync(root) {
     assert.equal(row.source, row.destination.startsWith('packages/mcp/') ? row.destination.replace('packages/mcp/', 'sdk/mcp/') : 'sdk/' + row.destination);
     assert(/^[a-f0-9]{64}$/.test(row.sourceSha256) && /^[a-f0-9]{64}$/.test(row.destinationSha256));
     assert.equal(sha256(bytes(root, row.destination)), row.destinationSha256, `Export drift: ${row.destination}`);
-    if (row.destination !== 'packages/mcp/README.md') {
+    if (refresh.files.includes(row.destination)) {
+      assert.equal(row.sourceRevision, SIGNING_REVISION);
+      assert.equal(row.exact, false);
+      assert.equal(typeof row.adaptation, 'string');
+    } else if (row.destination !== 'packages/mcp/README.md') {
       assert.equal(row.exact, true, `Transformed source: ${row.destination}`);
       assert.equal(row.sourceSha256, row.destinationSha256);
     } else assert.equal(row.exact, false);
@@ -91,6 +99,11 @@ export function verifyMcpSync(root) {
   const metadata = JSON.parse(bytes(root, 'packages/mcp/package.json'));
   const lock = JSON.parse(bytes(root, 'packages/mcp/package-lock.json'));
   assert.equal(metadata.version, '0.10.0');
+  assert.equal(metadata.dependencies['@modelcontextprotocol/sdk'], '^1.32.1');
+  assert.equal(metadata.dependencies.zod, '^3.25.0');
+  assert.equal(metadata.devDependencies.typescript, '^5.7.3');
+  assert.equal(lock.packages['node_modules/@modelcontextprotocol/sdk'].version, '1.32.1');
+  assert.equal(lock.packages['node_modules/proxy-addr'].version, '2.0.8');
   assert.equal(metadata.engines.node, '>=22.12.0');
   assert.equal(metadata.scripts.test, 'node --import tsx --test test/*.test.mts');
   assert.deepEqual(metadata.files, ['dist']);

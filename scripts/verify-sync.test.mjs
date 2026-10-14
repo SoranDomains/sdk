@@ -17,9 +17,13 @@ function modified(file, transform, run) {
   };
   try { run(); } finally { fs.readFileSync = original; }
 }
-test('reviewed export and public fixtures are complete and unchanged', () => assert.equal(verifySync(root).mappedFiles, 143));
+test('reviewed export and public fixtures are complete and unchanged', () => assert.equal(verifySync(root).mappedFiles, 145));
 test('production byte drift is rejected', () => modified('packages/lookup/src/index.ts', x => x + '\n', () => assert.throws(() => verifySync(root), /Export drift/)));
 test('ABI fixture drift is rejected', () => modified('fixtures/public-abi-errors.json', x => x.replace('"53"', '"999"'), () => assert.throws(() => verifySync(root), /Fixture drift/)));
 test('path traversal and source revision changes are rejected', () => {
   for (const transform of [r => r.files[0].destination = '../outside', r => r.sourceRevision = '0'.repeat(40)]) modified('sync-manifest.json', x => { const r = JSON.parse(x); transform(r); return JSON.stringify(r); }, () => assert.throws(() => verifySync(root)));
+});
+
+test('signing release cannot relabel old source or omit its source-CI gate', () => {
+  for (const change of [m => m.signingRelease.sourceRevision = m.sourceRevision, m => m.signingRelease.requiredMonorepoCi = false, m => m.signingRelease.files.pop()]) modified('sync-manifest.json', x => { const m = JSON.parse(x); change(m); return JSON.stringify(m); }, () => assert.throws(() => verifySync(root)));
 });
