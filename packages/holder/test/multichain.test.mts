@@ -22,6 +22,15 @@ test("set and clear encode one native invocation, with holder authorization and 
  assert.deepEqual(writes[0].args.slice(0,3),["fred.solo",G,2147492101]);assert.deepEqual(new Uint8Array(writes[0].args[3]),encodeChainAddress("base",address));assert.equal(writes[0].errors[34],"ChainDisabled");
  await s.clearChainAddress("FRED.SOLO","base");assert.equal(writes[1].fn,"clear_chain_address");assert.deepEqual(writes[1].args,["fred.solo",G,2147492101]);
 });
+test("a contract-wallet holder publishes and clears as the WALLET, not as the fee payer",async()=>{
+ const WALLET=StrKey.encodeContract(new Uint8Array(32).fill(9));
+ const {s,writes}=client();
+ Object.assign(s,{contractWallet:{address:WALLET,signAuthorization:async()=>{throw Error("not signed in this unit test");}}});
+ await s.setChainAddress("fred.solo","base",address);await s.clearChainAddress("fred.solo","base");
+ assert.equal(writes[0].fn,"set_chain_address");assert.equal(writes[0].args[1],WALLET,"the on-chain NotHolder check compares this with the name's holder");
+ assert.equal(writes[1].fn,"clear_chain_address");assert.equal(writes[1].args[1],WALLET);
+ assert.notEqual(writes[0].args[1],G);
+});
 test("disabled stops publishing but permits clearing; version and route errors fail before writes",async()=>{
  const disabled=client({chain_policy:[]});await assert.rejects(disabled.s.setChainAddress("fred.solo","ethereum",address),(e:unknown)=>e instanceof HolderError&&e.codeName==="ChainDisabled");
  assert.equal(disabled.writes.length,0);await disabled.s.clearChainAddress("fred.solo","ethereum");assert.equal(disabled.writes.length,1);

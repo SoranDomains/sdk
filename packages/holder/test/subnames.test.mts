@@ -49,6 +49,21 @@ for(const tamper of ["none","unexpected-auth","signer-body"] as const)test(`list
  if(tamper==="none"){assert.equal((await s.touchSubnamePage("fred.solo",3)).ledger,2);assert.equal(signed,1);assert.equal(sent,1);}
  else{await assert.rejects(s.touchSubnamePage("fred.solo",3),/must not require authorization|signer changed/);assert.equal(signed,tamper==="signer-body"?1:0);assert.equal(sent,0);}
 });
+test("a contract-wallet holder can run permissionless touch_subname through the fee payer, with no wallet authorization",async()=>{
+ const {s}=client();let signed=0,sent=0;
+ Object.assign(s,{invoke:(SoranHolder.prototype as any).invoke,
+  contractWallet:{address:RESOLVER,signAuthorization:async()=>{throw Error("permissionless upkeep must not request wallet authorization");}},
+  signer:{publicKey:()=>G,signTransaction:async(raw:string,{networkPassphrase}:{networkPassphrase:string})=>{
+   signed++;const tx=TransactionBuilder.fromXDR(raw,networkPassphrase);tx.sign(kp);return tx.toXDR();
+  }},server:{getAccount:async()=>new Account(G,"0"),simulateTransaction:async(tx:any)=>{
+   const call=tx.operations[0].func.invokeContract;
+   assert.equal(Address.fromScAddress(call.contractAddress).toString(),REGISTRAR);
+   assert.equal(call.functionName.toString(),"touch_subname");
+   assert.deepEqual(call.args.map(scValToNative),[new TextEncoder().encode("fred"),new TextEncoder().encode("mail")]);
+   return {_parsed:true,transactionData:new SorobanDataBuilder(),minResourceFee:"0",result:{auth:[],retval:xdr.ScVal.scvVoid()},events:[],latestLedger:1};
+  },sendTransaction:async(tx:any)=>{sent++;assert(kp.verify(tx.hash(),tx.signatures[0].signature));return {status:"PENDING"};}},confirm:async()=>({ledger:2,returnValue:null,events:[]})});
+ assert.equal((await s.touchSubname("mail.fred.solo")).ledger,2);assert.equal(signed,1);assert.equal(sent,1);
+});
 for(const action of ["create", "remove"])for(const tamper of ["none","auth-args","auth-nested","signer-body"] as const)test(`subname ${action} signing validates exact intent: ${tamper}`,async()=>{
  const {s}=client();let signed=0,sent=0;
  Object.assign(s,{invoke:(SoranHolder.prototype as any).invoke,signer:{publicKey:()=>G,signTransaction:async(raw:string,{networkPassphrase}:{networkPassphrase:string})=>{

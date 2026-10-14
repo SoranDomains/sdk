@@ -97,3 +97,28 @@ npm archive remain unchanged from public release merge
 `2874fe4c5cb7a4253a0f685da95339e96314bc0f`. The MCP manifest retains the prior
 shared-document hashes for that release. Hosted rollout verification is separate
 and is not implied by npm publication.
+
+## October 14 signing release
+
+Holder **0.10.1** and Owner **0.12.1** are prepared from reviewed source
+`e5788127c38f360f6bf97d91217f897441cf9bd1`. Their production source is byte-identical
+to that source; their manifests, build configuration and portable signing tests
+are copied from the same commit. The two README files retain the existing public
+link adaptations. `sync-manifest.json` records all 16 updated paths with explicit
+per-file source revisions, preserving the prior Lookup, ABI fixture and catalog
+provenance. The default core revision above still applies to untouched rows.
+
+The package suites now explicitly include hostile nested-authorization regressions.
+Existing public ABI, catalog and API-vendor test adaptations remain unchanged;
+full private source CI is still a required publication gate. The updated verifier
+also rejects a missing signing-source CI gate or an expanded export inventory.
+
+The existing MCP checkout receives only a protocol SDK / proxy-addr security
+metadata refresh so its CI audit continues to pass. Its runtime, older published
+core dependencies, Zod 3 and TypeScript 5 remain unchanged for this first stage.
+The October 1 archive receipt is historical and does not attest a build from this
+changed checkout. MCP 0.10.1 and the native-signup dependency update follow after
+the two core versions are available and verified in npm.
+
+See [October 14 release notes](RELEASE-2026-10-14.md). Publication remains pending;
+this source preparation makes no claim of registry availability or CI provenance.

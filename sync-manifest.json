@@ -17,6 +17,29 @@
   ],
   "files": [
     {
+      "source": "sdk/NATIVE-CLAIMS.md",
+      "destination": "NATIVE-CLAIMS.md",
+      "sourceSha256": "164dd191b903577c0f089ddaa211a72a415e703d4e6725f304f3cd076d9220de",
+      "destinationSha256": "be3aee8196f2ee6ba854cf0756dc16b5a0c7d9304b29d7e7a5887c05884eb67f",
+      "exact": false,
+      "sourceRevision": "9cc027804f2e7363f1cabcd99eb25839355e3f0b"
+    },
+    {
+      "source": "sdk/README.md",
+      "destination": "README.md",
+      "sourceSha256": "62fa96c611f0d624153460b62856748948be9ce5c11711dc38880c7ea81bf095",
+      "destinationSha256": "0b8ebe0b11a42b9cae3298f3547a33cfe2837d391c997429d95e821e04964d43",
+      "exact": false,
+      "sourceRevision": "9cc027804f2e7363f1cabcd99eb25839355e3f0b"
+    },
+    {
+      "source": "deploy/testnet/deployment.json",
+      "destination": "deployments/testnet.json",
+      "sourceSha256": "bfba01c38aeb205db45d3deeeb55e8f67c156542c9607fd1c5fc603ac6d59a2c",
+      "destinationSha256": "bfba01c38aeb205db45d3deeeb55e8f67c156542c9607fd1c5fc603ac6d59a2c",
+      "exact": true
+    },
+    {
       "source": "sdk/examples/hint-server-cloudflare/README.md",
       "destination": "examples/hint-server-cloudflare/README.md",
       "sourceSha256": "ee8a41c76d16bae728e0ecb3747ece0b3266be20ffac4384a1e1c4cdb0c0450d",
@@ -96,9 +119,11 @@
     {
       "source": "sdk/holder/README.md",
       "destination": "packages/holder/README.md",
-      "sourceSha256": "15c76db41ede259caf99d4a17ae569213cdf17c0914742b866ccacc34469a00a",
-      "destinationSha256": "4822abee6ccf328cf98b6b3006b85a8278ebc57f4a1a0a3b8d63fa9fdf4b9620",
-      "exact": false
+      "sourceSha256": "0c50920d30c9416e87e3a1510164e5455fc0e31d36159d8bd83db90c5e535312",
+      "destinationSha256": "8570fd1b962a462a8a5d76ec2490b8f560ccc8da89e67715ea9a7dda58c9a6a7",
+      "exact": false,
+      "sourceRevision": "e5788127c38f360f6bf97d91217f897441cf9bd1",
+      "adaptation": "Adjust only README and deployment-manifest links to the existing public mirror layout."
     },
     {
       "source": "sdk/holder/e2e.ts",
@@ -110,16 +135,18 @@
     {
       "source": "sdk/holder/package-lock.json",
       "destination": "packages/holder/package-lock.json",
-      "sourceSha256": "159e08ac4b1a418f88948e0a24d3eb50c4e5cbe2657be9dabad06a4150e07c94",
-      "destinationSha256": "159e08ac4b1a418f88948e0a24d3eb50c4e5cbe2657be9dabad06a4150e07c94",
-      "exact": true
+      "sourceSha256": "6f3ea6fe7e565beffffd2701335d9493f48fe464d6a9cac27df3fde6c14c0bf1",
+      "destinationSha256": "6f3ea6fe7e565beffffd2701335d9493f48fe464d6a9cac27df3fde6c14c0bf1",
+      "exact": true,
+      "sourceRevision": "e5788127c38f360f6bf97d91217f897441cf9bd1"
     },
     {
       "source": "sdk/holder/package.json",
       "destination": "packages/holder/package.json",
-      "sourceSha256": "40dc1ed24c600efffa82802285816027c7e4e8efb486c0bcdd27f09799ec112c",
-      "destinationSha256": "40dc1ed24c600efffa82802285816027c7e4e8efb486c0bcdd27f09799ec112c",
-      "exact": true
+      "sourceSha256": "eda6847bd64cc150ec1ffc9b4f8ca21c6e2075511d5d7199db951fbb6861078e",
+      "destinationSha256": "eda6847bd64cc150ec1ffc9b4f8ca21c6e2075511d5d7199db951fbb6861078e",
+      "exact": true,
+      "sourceRevision": "e5788127c38f360f6bf97d91217f897441cf9bd1"
     },
     {
       "source": "sdk/holder/src/contract-wallet.ts",
@@ -173,9 +200,10 @@
     {
       "source": "sdk/holder/src/index.ts",
       "destination": "packages/holder/src/index.ts",
-      "sourceSha256": "1d8a99756f7bb035717756ff0e77f76ea3416e15dda591cdfb2ed76fe6ff9718",
-      "destinationSha256": "1d8a99756f7bb035717756ff0e77f76ea3416e15dda591cdfb2ed76fe6ff9718",
-      "exact": true
+      "sourceSha256": "67650f25f98263a9c023f6f03e49d3059ace0430a38f00e0c0dd69fabbcddfbe",
+      "destinationSha256": "67650f25f98263a9c023f6f03e49d3059ace0430a38f00e0c0dd69fabbcddfbe",
+      "exact": true,
+      "sourceRevision": "e5788127c38f360f6bf97d91217f897441cf9bd1"
     },
     {
       "source": "sdk/holder/src/multichain.ts",
@@ -348,9 +376,10 @@
     {
       "source": "sdk/holder/test/multichain.test.mts",
       "destination": "packages/holder/test/multichain.test.mts",
-      "sourceSha256": "c6bec311fb6de324608b68d08aa40b72a35fb072d49e803493ff210b246c7ed7",
-      "destinationSha256": "c6bec311fb6de324608b68d08aa40b72a35fb072d49e803493ff210b246c7ed7",
-      "exact": true
+      "sourceSha256": "18ddad2c87ea41c5f37412f7527424da3367400a834d0af50c0fa12051f8494c",
+      "destinationSha256": "18ddad2c87ea41c5f37412f7527424da3367400a834d0af50c0fa12051f8494c",
+      "exact": true,
+      "sourceRevision": "e5788127c38f360f6bf97d91217f897441cf9bd1"
     },
     {
       "source": "sdk/holder/test/muxed-identity.test.mts",
@@ -397,9 +426,10 @@
     {
       "source": "sdk/holder/test/native-fee-limits.test.mts",
       "destination": "packages/holder/test/native-fee-limits.test.mts",
-      "sourceSha256": "8f32cb4d2964eec967c2c1d10cae18c166938dd9b3cfebb43c3a759eb3020e25",
-      "destinationSha256": "8f32cb4d2964eec967c2c1d10cae18c166938dd9b3cfebb43c3a759eb3020e25",
-      "exact": true
+      "sourceSha256": "fe6624ac5d7ed2f3a8ab67e7dc3435c6bd3bc4e301f464cfbc36d8c14728df71",
+      "destinationSha256": "fe6624ac5d7ed2f3a8ab67e7dc3435c6bd3bc4e301f464cfbc36d8c14728df71",
+      "exact": true,
+      "sourceRevision": "e5788127c38f360f6bf97d91217f897441cf9bd1"
     },
     {
       "source": "sdk/holder/test/native-history.test.mts",
@@ -437,6 +467,14 @@
       "exact": true
     },
     {
+      "source": "sdk/holder/test/nested-authorization.test.mts",
+      "destination": "packages/holder/test/nested-authorization.test.mts",
+      "sourceSha256": "a587901968e90280473dbeee608b7e1ad2a08a8901d1c9218ca757f5bb91a731",
+      "destinationSha256": "a587901968e90280473dbeee608b7e1ad2a08a8901d1c9218ca757f5bb91a731",
+      "exact": true,
+      "sourceRevision": "e5788127c38f360f6bf97d91217f897441cf9bd1"
+    },
+    {
       "source": "sdk/holder/test/payment.test.mts",
       "destination": "packages/holder/test/payment.test.mts",
       "sourceSha256": "410020ef43e3e568ca3020f72563f3882ac10555737caa19dbe75118ccfecf46",
@@ -446,16 +484,18 @@
     {
       "source": "sdk/holder/test/subnames.test.mts",
       "destination": "packages/holder/test/subnames.test.mts",
-      "sourceSha256": "c019ceff13c3fdcb1fbb1fca9c5dc5cc5ea593bcfe6824161659a2e4e46f9166",
-      "destinationSha256": "c019ceff13c3fdcb1fbb1fca9c5dc5cc5ea593bcfe6824161659a2e4e46f9166",
-      "exact": true
+      "sourceSha256": "ae4ceece5f54ea1f83843a3184de555341473917b090a0ec78d42da2b4c93b65",
+      "destinationSha256": "ae4ceece5f54ea1f83843a3184de555341473917b090a0ec78d42da2b4c93b65",
+      "exact": true,
+      "sourceRevision": "e5788127c38f360f6bf97d91217f897441cf9bd1"
     },
     {
       "source": "sdk/holder/tsconfig.json",
       "destination": "packages/holder/tsconfig.json",
-      "sourceSha256": "e60a81c464c73c2ce104158d28ea61b7d2580b7f95b3e60e6e84fd2bd46015f2",
-      "destinationSha256": "e60a81c464c73c2ce104158d28ea61b7d2580b7f95b3e60e6e84fd2bd46015f2",
-      "exact": true
+      "sourceSha256": "91666f2e17e56f7d4f392e051f1d2c14ee16d89ed793253269ee13a681fc92d7",
+      "destinationSha256": "91666f2e17e56f7d4f392e051f1d2c14ee16d89ed793253269ee13a681fc92d7",
+      "exact": true,
+      "sourceRevision": "e5788127c38f360f6bf97d91217f897441cf9bd1"
     },
     {
       "source": "sdk/lookup/LICENSE",
@@ -689,6 +729,13 @@
       "exact": true
     },
     {
+      "source": "sdk/multichain/README.md",
+      "destination": "packages/multichain/README.md",
+      "sourceSha256": "27535112699dc8900593c1063dc71264d0e8ae0ac23d977e30a9089d42471e9a",
+      "destinationSha256": "27535112699dc8900593c1063dc71264d0e8ae0ac23d977e30a9089d42471e9a",
+      "exact": true
+    },
+    {
       "source": "sdk/owner/LICENSE",
       "destination": "packages/owner/LICENSE",
       "sourceSha256": "2bf49b4cb561f5c33d2e2b52abf0cc04e13947f26c1699d65e5e6f3af9857fe0",
@@ -698,9 +745,11 @@
     {
       "source": "sdk/owner/README.md",
       "destination": "packages/owner/README.md",
-      "sourceSha256": "848b7891d04938302644014d200b4dd0c1f8cb8f979dcd49d78ebe6278bcf5f1",
-      "destinationSha256": "e3036aa3ae8d394d41a558434dc5e77c22fe560bdcb5e13bb758466759c06e72",
-      "exact": false
+      "sourceSha256": "468cf800162cff5ddf8a046d2777f713d8613f48ca91cf63b6f5258153bf48a9",
+      "destinationSha256": "2ab4b800ea4a44701787bd2b4a6573783e3b4365cc442c05a4453b8deee8941c",
+      "exact": false,
+      "sourceRevision": "e5788127c38f360f6bf97d91217f897441cf9bd1",
+      "adaptation": "Adjust only README and deployment-manifest links to the existing public mirror layout."
     },
     {
       "source": "sdk/owner/e2e.ts",
@@ -712,16 +761,18 @@
     {
       "source": "sdk/owner/package-lock.json",
       "destination": "packages/owner/package-lock.json",
-      "sourceSha256": "27c77b697cdebb3d925d0091c5534023a05096a45879ab1016c8827b8590a8ec",
-      "destinationSha256": "27c77b697cdebb3d925d0091c5534023a05096a45879ab1016c8827b8590a8ec",
-      "exact": true
+      "sourceSha256": "622b9e8f812a721939852f1ce00136c190c8412e2d61d622815af32395c498ee",
+      "destinationSha256": "622b9e8f812a721939852f1ce00136c190c8412e2d61d622815af32395c498ee",
+      "exact": true,
+      "sourceRevision": "e5788127c38f360f6bf97d91217f897441cf9bd1"
     },
     {
       "source": "sdk/owner/package.json",
       "destination": "packages/owner/package.json",
-      "sourceSha256": "7a214019f05cd4f09ff18333efd61c94686960078ed3060cb11e3e64d0f294b8",
-      "destinationSha256": "7a214019f05cd4f09ff18333efd61c94686960078ed3060cb11e3e64d0f294b8",
-      "exact": true
+      "sourceSha256": "2a5cf2b4a4cccb9d3c73d0547231d864db7a4718e2d42f8af38998b6889ff1bc",
+      "destinationSha256": "2a5cf2b4a4cccb9d3c73d0547231d864db7a4718e2d42f8af38998b6889ff1bc",
+      "exact": true,
+      "sourceRevision": "e5788127c38f360f6bf97d91217f897441cf9bd1"
     },
     {
       "source": "sdk/owner/src/contract-wallet.ts",
@@ -775,9 +826,10 @@
     {
       "source": "sdk/owner/src/index.ts",
       "destination": "packages/owner/src/index.ts",
-      "sourceSha256": "1375ca583a5683709967916897fa28f1043ebbf9ec56f538b61843028098af21",
-      "destinationSha256": "1375ca583a5683709967916897fa28f1043ebbf9ec56f538b61843028098af21",
-      "exact": true
+      "sourceSha256": "9c746e4fc07db5856a0815a9bf52b7eb44d314a02c41d9ea4e8fa203100ff72b",
+      "destinationSha256": "9c746e4fc07db5856a0815a9bf52b7eb44d314a02c41d9ea4e8fa203100ff72b",
+      "exact": true,
+      "sourceRevision": "e5788127c38f360f6bf97d91217f897441cf9bd1"
     },
     {
       "source": "sdk/owner/src/multichain.ts",
@@ -957,9 +1009,10 @@
     {
       "source": "sdk/owner/test/native-fee-limits.test.mts",
       "destination": "packages/owner/test/native-fee-limits.test.mts",
-      "sourceSha256": "21e09d284ef5ab0e5bcaa96c15053306f5b81129421c1c29dc8df6c36a0d736c",
-      "destinationSha256": "21e09d284ef5ab0e5bcaa96c15053306f5b81129421c1c29dc8df6c36a0d736c",
-      "exact": true
+      "sourceSha256": "1ec17e3820ee57705a6a503c651dfacdf1b5afd0a8b980e62a5c4fd4b0c4f2ed",
+      "destinationSha256": "1ec17e3820ee57705a6a503c651dfacdf1b5afd0a8b980e62a5c4fd4b0c4f2ed",
+      "exact": true,
+      "sourceRevision": "e5788127c38f360f6bf97d91217f897441cf9bd1"
     },
     {
       "source": "sdk/owner/test/native-history.test.mts",
@@ -976,6 +1029,14 @@
       "exact": false
     },
     {
+      "source": "sdk/owner/test/nested-authorization.test.mts",
+      "destination": "packages/owner/test/nested-authorization.test.mts",
+      "sourceSha256": "fdf2dea47076da1b68b9fe6a11e47e56c2d91d845cfd9c4e681ed037e5d60589",
+      "destinationSha256": "fdf2dea47076da1b68b9fe6a11e47e56c2d91d845cfd9c4e681ed037e5d60589",
+      "exact": true,
+      "sourceRevision": "e5788127c38f360f6bf97d91217f897441cf9bd1"
+    },
+    {
       "source": "sdk/owner/test/subnames.test.mts",
       "destination": "packages/owner/test/subnames.test.mts",
       "sourceSha256": "96b817bd93486c06cbfc2e3541daacb84e5a997c8a4fb1d701aa16761b3a6d83",
@@ -985,39 +1046,10 @@
     {
       "source": "sdk/owner/tsconfig.json",
       "destination": "packages/owner/tsconfig.json",
-      "sourceSha256": "e60a81c464c73c2ce104158d28ea61b7d2580b7f95b3e60e6e84fd2bd46015f2",
-      "destinationSha256": "e60a81c464c73c2ce104158d28ea61b7d2580b7f95b3e60e6e84fd2bd46015f2",
-      "exact": true
-    },
-    {
-      "source": "sdk/README.md",
-      "destination": "README.md",
-      "sourceSha256": "62fa96c611f0d624153460b62856748948be9ce5c11711dc38880c7ea81bf095",
-      "destinationSha256": "0b8ebe0b11a42b9cae3298f3547a33cfe2837d391c997429d95e821e04964d43",
-      "exact": false,
-      "sourceRevision": "9cc027804f2e7363f1cabcd99eb25839355e3f0b"
-    },
-    {
-      "source": "sdk/NATIVE-CLAIMS.md",
-      "destination": "NATIVE-CLAIMS.md",
-      "sourceSha256": "164dd191b903577c0f089ddaa211a72a415e703d4e6725f304f3cd076d9220de",
-      "destinationSha256": "be3aee8196f2ee6ba854cf0756dc16b5a0c7d9304b29d7e7a5887c05884eb67f",
-      "exact": false,
-      "sourceRevision": "9cc027804f2e7363f1cabcd99eb25839355e3f0b"
-    },
-    {
-      "source": "sdk/multichain/README.md",
-      "destination": "packages/multichain/README.md",
-      "sourceSha256": "27535112699dc8900593c1063dc71264d0e8ae0ac23d977e30a9089d42471e9a",
-      "destinationSha256": "27535112699dc8900593c1063dc71264d0e8ae0ac23d977e30a9089d42471e9a",
-      "exact": true
-    },
-    {
-      "source": "deploy/testnet/deployment.json",
-      "destination": "deployments/testnet.json",
-      "sourceSha256": "bfba01c38aeb205db45d3deeeb55e8f67c156542c9607fd1c5fc603ac6d59a2c",
-      "destinationSha256": "bfba01c38aeb205db45d3deeeb55e8f67c156542c9607fd1c5fc603ac6d59a2c",
-      "exact": true
+      "sourceSha256": "91666f2e17e56f7d4f392e051f1d2c14ee16d89ed793253269ee13a681fc92d7",
+      "destinationSha256": "91666f2e17e56f7d4f392e051f1d2c14ee16d89ed793253269ee13a681fc92d7",
+      "exact": true,
+      "sourceRevision": "e5788127c38f360f6bf97d91217f897441cf9bd1"
     }
   ],
   "generatedFixtures": [
@@ -1035,5 +1067,33 @@
     "core": "cec2d29bd392c64ac3e7f8d1d20d626736c72ce5",
     "mcp": "9cc027804f2e7363f1cabcd99eb25839355e3f0b"
   },
-  "additionalSyncManifest": "mcp-sync-manifest.json"
+  "additionalSyncManifest": "mcp-sync-manifest.json",
+  "signingRelease": {
+    "sourceRevision": "e5788127c38f360f6bf97d91217f897441cf9bd1",
+    "versions": {
+      "holder": "0.10.1",
+      "owner": "0.12.1"
+    },
+    "files": [
+      "packages/holder/README.md",
+      "packages/holder/package-lock.json",
+      "packages/holder/package.json",
+      "packages/holder/src/index.ts",
+      "packages/holder/test/multichain.test.mts",
+      "packages/holder/test/native-fee-limits.test.mts",
+      "packages/holder/test/nested-authorization.test.mts",
+      "packages/holder/test/subnames.test.mts",
+      "packages/holder/tsconfig.json",
+      "packages/owner/README.md",
+      "packages/owner/package-lock.json",
+      "packages/owner/package.json",
+      "packages/owner/src/index.ts",
+      "packages/owner/test/native-fee-limits.test.mts",
+      "packages/owner/test/nested-authorization.test.mts",
+      "packages/owner/tsconfig.json"
+    ],
+    "requiredMonorepoCi": true,
+    "publicationPerformed": false,
+    "productionSourcesByteIdentical": true
+  }
 }

@@ -18,8 +18,16 @@ function fixture(options: { resourceFee?: string; restoreFee?: string; maxNetwor
   });
   Object.assign(client, { registrarOf: async () => contract, resolverOf: async () => contract, server: {
     getAccount: async () => new Account(account, String(sends)),
-    simulateTransaction: async () => {
-      const result = { _parsed: true, transactionData: new SorobanDataBuilder().setResourceFee(options.resourceFee ?? "0"), minResourceFee: options.resourceFee ?? "0", result: { auth: [], retval: nativeToScVal(2000n, { type: "u64" }) }, events: [], latestLedger: 100 };
+    simulateTransaction: async (tx: any) => {
+      // A real simulation records the owner's source-account authorization for the call itself.
+      const call = tx.operations[0].func.invokeContract;
+      const auth = [new xdr.SorobanAuthorizationEntry({
+        credentials: xdr.SorobanCredentials.sorobanCredentialsSourceAccount(),
+        rootInvocation: new xdr.SorobanAuthorizedInvocation({
+          function: xdr.SorobanAuthorizedFunction.sorobanAuthorizedFunctionTypeContractFn(call), subInvocations: [],
+        }),
+      })];
+      const result = { _parsed: true, transactionData: new SorobanDataBuilder().setResourceFee(options.resourceFee ?? "0"), minResourceFee: options.resourceFee ?? "0", result: { auth, retval: nativeToScVal(2000n, { type: "u64" }) }, events: [], latestLedger: 100 };
       if (++simulations === 1 && options.restoreFee !== undefined) return { ...result, restorePreamble: { minResourceFee: options.restoreFee, transactionData: new SorobanDataBuilder().setResourceFee(options.restoreFee) } };
       return result;
     },

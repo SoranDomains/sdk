@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const MCP_REVISION = '9cc027804f2e7363f1cabcd99eb25839355e3f0b';
+export const SIGNING_REVISION = 'e5788127c38f360f6bf97d91217f897441cf9bd1';
 export const SOURCE_REVISION = 'cec2d29bd392c64ac3e7f8d1d20d626736c72ce5';
 const sha256 = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 const safe = value => typeof value === 'string' && /^(?:[A-Za-z0-9_.-]+\/)*[A-Za-z0-9_.-]+$/.test(value) && !value.split('/').some(x => x === '.' || x === '..');
@@ -22,10 +23,26 @@ export function verifySync(root) {
   assert.equal(manifest.format, 'soran-public-sdk-sync-v1');
   assert.equal(manifest.sourceRevision, SOURCE_REVISION);
   assert.equal(manifest.productionSourcesUnchanged, true);
+  const signing = manifest.signingRelease;
+  assert.equal(signing.sourceRevision, SIGNING_REVISION);
+  assert.equal(signing.requiredMonorepoCi, true);
+  assert.equal(signing.productionSourcesByteIdentical, true);
+  assert.deepEqual(signing.versions, { holder: '0.10.1', owner: '0.12.1' });
+  const signingFiles = new Set(signing.files);
+  assert.deepEqual([...signingFiles].sort(), ["packages/holder/README.md", "packages/holder/package-lock.json", "packages/holder/package.json", "packages/holder/src/index.ts", "packages/holder/test/multichain.test.mts", "packages/holder/test/native-fee-limits.test.mts", "packages/holder/test/nested-authorization.test.mts", "packages/holder/test/subnames.test.mts", "packages/holder/tsconfig.json", "packages/owner/README.md", "packages/owner/package-lock.json", "packages/owner/package.json", "packages/owner/src/index.ts", "packages/owner/test/native-fee-limits.test.mts", "packages/owner/test/nested-authorization.test.mts", "packages/owner/tsconfig.json"]);
   const seen = new Set();
   for (const row of manifest.files) {
     assert(safe(row.source) && safe(row.destination), 'Unsafe mapping path');
-    if (['README.md', 'NATIVE-CLAIMS.md'].includes(row.destination)) {
+    if (signingFiles.has(row.destination)) {
+      assert.equal(row.sourceRevision, SIGNING_REVISION, 'Signing source revision changed');
+      if (row.destination.endsWith('/README.md')) {
+        assert.equal(row.exact, false);
+        assert.equal(typeof row.adaptation, 'string');
+      } else {
+        assert.equal(row.exact, true, 'Signing export must preserve reviewed bytes');
+        assert.equal(row.sourceSha256, row.destinationSha256);
+      }
+    } else if (['README.md', 'NATIVE-CLAIMS.md'].includes(row.destination)) {
       assert.equal(row.sourceRevision, MCP_REVISION, 'Shared document source override must be explicit');
     } else {
       assert.equal(row.sourceRevision ?? SOURCE_REVISION, SOURCE_REVISION, 'Core source revision changed');
@@ -55,7 +72,7 @@ export function verifySync(root) {
     assert(Object.keys(row.errors).length > 0);
     for (const [code, variant] of Object.entries(row.errors)) assert(/^[1-9][0-9]*$/.test(code) && /^[A-Za-z][A-Za-z0-9]*$/.test(variant));
   }
-  const versions = { lookup: '0.11.0', owner: '0.12.0', holder: '0.10.0' };
+  const versions = { lookup: '0.11.0', owner: '0.12.1', holder: '0.10.1' };
   for (const [pkg, version] of Object.entries(versions)) {
     const metadata = JSON.parse(fs.readFileSync(path.join(root, 'packages', pkg, 'package.json')));
     const lock = JSON.parse(fs.readFileSync(path.join(root, 'packages', pkg, 'package-lock.json')));
@@ -64,6 +81,6 @@ export function verifySync(root) {
     assert.equal(lock.packages[''].version, version);
     assert.deepEqual(metadata.repository, { type: 'git', url: 'git+https://github.com/SoranDomains/sdk.git', directory: `packages/${pkg}` });
   }
-  return { sourceRevision: SOURCE_REVISION, mappedFiles: seen.size, generatedFixtures: manifest.generatedFixtures.length, productionSourcesUnchanged: true };
+  return { sourceRevision: SOURCE_REVISION, signingSourceRevision: SIGNING_REVISION, mappedFiles: seen.size, generatedFixtures: manifest.generatedFixtures.length, productionSourcesUnchanged: true };
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) console.log(JSON.stringify(verifySync(path.resolve(fileURLToPath(new URL('../', import.meta.url)))), null, 2));

@@ -5,10 +5,12 @@
 > [release status](https://docs.soran.domains/reference/release-status) for package and service availability.
 
 
-Version 0.12.0 targets Stellar SDK17 (`>=17 <18`). ASCII names
+Version 0.12.1 targets Stellar SDK17 (`>=17 <18`). ASCII names
 and labels are validated before lowercase normalization; Unicode lookalikes are
 rejected. Writes continue to target the owning Registry/Registrar/Resolver. Universal
 Lookup is the read entry point in `@sorandomains/lookup` 0.10.0 or later.
+
+Version 0.12.1 rejects simulated transactions whose source, operation, contract, method, arguments or authorization differ from the requested legacy account-signed write. Unexpected authorizers and nested calls are rejected before signing.
 
 Releases older than 0.11.0 (and any built against Lookup 0.6.0 to 0.9.0) default to the retired 5 and 6 September 2026 testnet stacks; upgrade rather than pinning a retired Registry. See [Older versions and retired stacks](../../README.md#older-versions-and-retired-stacks).
 

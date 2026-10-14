@@ -3,8 +3,8 @@
   "sourceRevision": "cec2d29bd392c64ac3e7f8d1d20d626736c72ce5",
   "portableSuites": {
     "lookup": "packages/lookup/package.json scripts.test (all test/*.test.mts)",
-    "owner": "packages/owner/package.json scripts.test (explicit funding/native/multichain/subname suites, unchanged from source)",
-    "holder": "packages/holder/package.json scripts.test (explicit payment/funding/native/multichain/subname suites, unchanged from source)",
+    "owner": "packages/owner/package.json scripts.test (including nested-authorization tests; unchanged from the signing source)",
+    "holder": "packages/holder/package.json scripts.test (including nested-authorization tests; unchanged from the signing source)",
     "mcp": "packages/mcp/package.json scripts.test (16 source tests plus two preserved mirror-only regression files; unchanged discovery)",
     "nativeSignup": "examples/native-signup/package.json scripts.test (unchanged source flow.test.mts against published core versions)"
   },
@@ -58,6 +58,13 @@
       "sourceRevision": "9cc027804f2e7363f1cabcd99eb25839355e3f0b",
       "claimedAsPublicCi": false,
       "status": "Full monorepo CI required for the recorded source or an identical Git tree before MCP publication."
+    },
+    {
+      "scope": "Holder/Owner signing release and preserved private ABI/catalog/API-vendor integration gates",
+      "sourceRevision": "e5788127c38f360f6bf97d91217f897441cf9bd1",
+      "required": true,
+      "claimedAsPublicCi": false,
+      "status": "Full monorepo CI must pass for this exact source or an identical Git tree before core publication."
     }
   ],
   "newMirrorChecks": [
@@ -71,7 +78,7 @@
     "MCP build/typecheck and every portable test; native-signup typecheck and recovery tests"
   ],
   "publicationScope": [
-    "mcp0.10.0 published 2026-10-01"
+    "holder0.10.1 and owner0.12.1 candidates; MCP follows after their registry verification"
   ],
   "notClaimed": [
     "Private API integration executed in public mirror",
@@ -81,11 +88,13 @@
   ],
   "sourceRevisions": {
     "core": "cec2d29bd392c64ac3e7f8d1d20d626736c72ce5",
-    "mcp": "9cc027804f2e7363f1cabcd99eb25839355e3f0b"
+    "mcp": "9cc027804f2e7363f1cabcd99eb25839355e3f0b",
+    "signingCore": "e5788127c38f360f6bf97d91217f897441cf9bd1"
   },
   "publicationState": {
     "core": "lookup0.11.0, owner0.12.0, holder0.10.0 published 2026-10-01",
-    "mcp": "0.10.0 published 2026-10-01T12:15:28.309Z; registry archive matches reviewed bytes"
+    "mcp": "0.10.0 published 2026-10-01T12:15:28.309Z; registry archive matches reviewed bytes",
+    "signingCore": "holder0.10.1 and owner0.12.1 prepared; npm publication pending"
   },
   "retainedPublicTests": [
     {
