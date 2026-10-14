@@ -16,7 +16,7 @@ function modified(file, transform, run) {
   try { run(); } finally { fs.readFileSync = original; }
 }
 const jsonProbe = (file, mutation) => modified(file, text => { const value = JSON.parse(text); mutation(value); return JSON.stringify(value); }, () => assert.throws(() => verifyMcpSync(root)));
-test('MCP and native-signup projection preserves all portable source files', () => assert.equal(verifyMcpSync(root).mappedFiles, 45));
+test('MCP and native-signup projection preserves all portable source files', () => assert.equal(verifyMcpSync(root).mappedFiles, 48));
 test('runtime byte drift is rejected', () => modified('packages/mcp/src/tools.ts', x => x + '\n', () => assert.throws(() => verifyMcpSync(root), /Export drift/)));
 test('missing mapping, wrong revision and traversal are rejected', () => {
   for (const mutation of [m => m.files.pop(), m => m.sourceRevision = '0'.repeat(40), m => m.files[0].destination = '../outside']) jsonProbe('mcp-sync-manifest.json', mutation);
@@ -30,6 +30,7 @@ test('portable test mapping cannot omit a test', () => jsonProbe('mcp-sync-manif
 
 test('retained public regression tests remain covered', () => jsonProbe('mcp-sync-manifest.json', m => m.retainedPublicTests.pop()));
 
-test('core-stage dependency refresh cannot widen into MCP runtime exports', () => {
-  for (const change of [m => m.pendingDependencyRefresh.files.push('packages/mcp/src/tools.ts'), m => m.pendingDependencyRefresh.mcpRuntimeUnchanged = false, m => m.pendingDependencyRefresh.sourceRevision = m.sourceRevision]) jsonProbe('mcp-sync-manifest.json', change);
+
+test('MCP publication requires verified fixed-core dependency archives', () => {
+  for (const change of [m => m.corePublication.verified = false, m => m.corePublication.packages[0].registryArchiveMatchesReviewed = false, m => m.corePublication.packages[0].integrity = 'sha512-wrong', m => m.signingCoreSourceRevision = m.coreSourceRevision]) jsonProbe('mcp-sync-manifest.json', change);
 });

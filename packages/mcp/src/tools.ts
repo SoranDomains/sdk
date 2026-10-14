@@ -30,11 +30,12 @@ import { predictRegistrar, predictResolver } from "./deployment.js";
 import { namespaceResolverState, ResolverReadUnavailable } from "./resolver.js";
 import { normalizeRegistrarPolicy, sameRegistrarPolicy, registrarPolicyFromNative } from "./registrar-policy.js";
 import { networkFeeLimit, assertFeeLimit, feeBoundSigner } from "./fee-policy.js";
+import { legacyBoundSigner } from "./legacy-signing.js";
 import { recoverHistoricalSavedClaim } from "./historical.js";
 import { ApiHttpError, boundedJson, isLocalHttp, isSecureApiUrl } from "./http.js";
 import { submitWithRecovery } from "./submission.js";
 import { createConfirmationGate, type ConfirmationGate } from "./confirm.js";
-export const MCP_VERSION = "0.10.0";
+export const MCP_VERSION = "0.10.1";
 
 /** The only server capability used by this package. Keep the callback limited
  * to parsed arguments: importing MCP's full callback type also imports its
@@ -464,6 +465,22 @@ function confirmationGated(server: ToolRegistrar, gate: ConfirmationGate): ToolR
   };
 }
 
+/** All clients share one transaction payer. Keep its sequence work ordered even
+ * when native and legacy SDK instances have independent internal queues. */
+function serializedWrites(server: ToolRegistrar): ToolRegistrar {
+  let queue: Promise<unknown> = Promise.resolve();
+  return {
+    tool: (name, description, schema, callback) => {
+      if (READ_ONLY_TOOLS.has(name)) return server.tool(name, description, schema, callback);
+      return server.tool(name, description, schema, (args) => {
+        const run = queue.then(() => callback(args), () => callback(args));
+        queue = run.then(() => undefined, () => undefined);
+        return run;
+      });
+    },
+  };
+}
+
 /**
  * Wallet + write tools for the LOCAL (stdio) server. `create_wallet` is
  * always available (that's how an agent gets a key in the first place); the
@@ -520,11 +537,18 @@ export async function registerWriteTools(rawServer: ToolRegistrar, opts: WriteTo
   }
   const me = kp.publicKey();
   if (opts.requireConfirmation !== false) server = confirmationGated(server, createConfirmationGate({ wallet: me, network: opts.passphrase ?? Networks.TESTNET }));
+  // Confirmation runs outside the queue; rejected requests never delay writes.
+  server = serializedWrites(server);
   const maximumFee = networkFeeLimit(opts);
   const nativeLimit = opts.maxNativeFeeStroops ?? maximumFee;
   const rpc = { rpcUrl: opts.rpcUrl, allowHttp: rpcServerOptions(opts.rpcUrl ?? "").allowHttp, passphrase: opts.passphrase, registryId: opts.registryId, maxNetworkFeeStroops: maximumFee, maxNativeFeeStroops: nativeLimit < maximumFee ? nativeLimit : maximumFee };
-  const holder = new SoranHolder({ signer: feeBoundSigner(keypairSigner(secret), maximumFee), ...rpc, primaryId: opts.primaryId, lookupId: opts.lookupId });
-  const owner = new SoranOwner({ signer: feeBoundSigner(ownerSigner(secret), maximumFee), ...rpc });
+  const holder = new SoranHolder({ signer: feeBoundSigner(legacyBoundSigner(keypairSigner(secret)), maximumFee), ...rpc, primaryId: opts.primaryId, lookupId: opts.lookupId });
+  const owner = new SoranOwner({ signer: feeBoundSigner(legacyBoundSigner(ownerSigner(secret)), maximumFee), ...rpc });
+  // Native operations already validate exact intent-derived trees, including the
+  // selected fee transfer and destination initializer. Keep them off the legacy
+  // signer, which intentionally permits no child authorizations.
+  const nativeClaimant = new SoranHolder({ signer: feeBoundSigner(keypairSigner(secret), maximumFee), ...rpc, primaryId: opts.primaryId, lookupId: opts.lookupId });
+  const nativeOwner = new SoranOwner({ signer: feeBoundSigner(ownerSigner(secret), maximumFee), ...rpc });
   // Local successor methods are capability-gated; deployed legacy presets remain unchanged.
   const nativeHolder = await import("@sorandomains/holder");
   const nativeInteger = z.string().regex(/^(0|[1-9][0-9]*)$/).max(39);
@@ -539,14 +563,14 @@ export async function registerWriteTools(rawServer: ToolRegistrar, opts: WriteTo
   server.tool("native_claim_receipt","Read a receipt from the current clean namespace Registrar. For a saved claim from a migrated source, use recover_historical_claim with its complete original intent. Does not prove current ownership or create a claim.",{namespace:labelSchema,claimant:z.string(),requestId:z.string().regex(/^[0-9a-f]{64}$/)},async({namespace,claimant,requestId})=>{try{return text(await holder.claimReceipt(namespace,claimant,requestId));}catch(e){return errText(e);}});
   const nativeIntentSchema=z.string().max(16384).describe("Exact lossless SDK stringifyNativeIntent JSON; bigint values use {$u64:decimal}. Reuse the original request ID for recovery.");
   server.tool("prepare_native_claim","Build and inspect the exact user claim without signing or broadcasting. Returns a scoped eligibility entry only when configured. Persist the immutable intent before requesting approval.",{intentJson:nativeIntentSchema,proof:z.array(z.string().regex(/^[0-9a-f]{64}$/)).max(32).optional()},async({intentJson,proof})=>{try{const intent=nativeHolder.parseNativeClaimIntent(intentJson);const built=await holder.buildClaim(intent,{proof});return text({intentJson:nativeHolder.stringifyNativeIntent(intent),transactionXdr:built.transactionXdr,hash:built.hash,feeStroops:built.feeStroops,eligibilityEntryXdr:built.eligibilityEntryXdr,networkPassphrase:built.networkPassphrase,submitted:false});}catch(e){return errText(e);}});
-  server.tool("claim_username","Sign one exact native username claim with the local claimant wallet. Checks fees, full G/M/C destination, current rules and any separate scoped app approval. Unknown results retain a hash; recover original request before replacement.",{intentJson:nativeIntentSchema,proof:z.array(z.string().regex(/^[0-9a-f]{64}$/)).max(32).optional(),eligibilityAuthorization:z.string().max(32768).optional()},async({intentJson,proof,eligibilityAuthorization})=>{try{return text(await holder.claim(nativeHolder.parseNativeClaimIntent(intentJson),{proof,eligibilityAuthorization}));}catch(e){return errText(e);}});
-  server.tool("configure_native_claims","Owner-sign native username mode/admission/fee/quota/budget settings. Amount is in XLM stroops. Approval allowance is a cumulative ceiling; this never grants an app the namespace owner key.",{namespace:labelSchema,settings:settingsSchema},async({namespace,settings})=>{try{return text(await owner.configureClaims(namespace,{...settings,feeAmount:BigInt(settings.feeAmount),walletLimit:BigInt(settings.walletLimit),approvalAllowance:BigInt(settings.approvalAllowance),approvalRateLimit:BigInt(settings.approvalRateLimit),approvalWindowSecs:BigInt(settings.approvalWindowSecs),approvalTtlSecs:BigInt(settings.approvalTtlSecs)}));}catch(e){return errText(e);}});
-  server.tool("set_native_claims_enabled","Owner-sign enable/pause; cannot silently adopt stale owner settings and does not disable existing holder rights.",{namespace:labelSchema,enabled:z.boolean()},async({namespace,enabled})=>{try{return text(await owner.setClaimsEnabled(namespace,enabled));}catch(e){return errText(e);}});
-  server.tool("reserve_usernames","Owner-sign a bounded atomic reservation batch. Reserving issues no holder. Releasing never revokes an existing holder.",{namespace:labelSchema,labels:z.array(labelSchema).min(1).max(23),reserved:z.boolean()},async({namespace,labels,reserved})=>{try{return text(await(reserved?owner.reserveNames(namespace,labels):owner.releaseReservations(namespace,labels)));}catch(e){return errText(e);}});
-  server.tool("assign_reserved_username","Owner-sign an already reserved username to the selected holder with its default route. Reservation remains. Custom receiving details are not set by this tool.",{namespace:labelSchema,label:labelSchema,holder:z.string()},async({namespace,label,holder:recipient})=>{try{return text(await owner.assignReserved(namespace,label,recipient));}catch(e){return errText(e);}});
+  server.tool("claim_username","Sign one exact native username claim with the local claimant wallet. Checks fees, full G/M/C destination, current rules and any separate scoped app approval. Unknown results retain a hash; recover original request before replacement.",{intentJson:nativeIntentSchema,proof:z.array(z.string().regex(/^[0-9a-f]{64}$/)).max(32).optional(),eligibilityAuthorization:z.string().max(32768).optional()},async({intentJson,proof,eligibilityAuthorization})=>{try{return text(await nativeClaimant.claim(nativeHolder.parseNativeClaimIntent(intentJson),{proof,eligibilityAuthorization}));}catch(e){return errText(e);}});
+  server.tool("configure_native_claims","Owner-sign native username mode/admission/fee/quota/budget settings. Amount is in XLM stroops. Approval allowance is a cumulative ceiling; this never grants an app the namespace owner key.",{namespace:labelSchema,settings:settingsSchema},async({namespace,settings})=>{try{return text(await nativeOwner.configureClaims(namespace,{...settings,feeAmount:BigInt(settings.feeAmount),walletLimit:BigInt(settings.walletLimit),approvalAllowance:BigInt(settings.approvalAllowance),approvalRateLimit:BigInt(settings.approvalRateLimit),approvalWindowSecs:BigInt(settings.approvalWindowSecs),approvalTtlSecs:BigInt(settings.approvalTtlSecs)}));}catch(e){return errText(e);}});
+  server.tool("set_native_claims_enabled","Owner-sign enable/pause; cannot silently adopt stale owner settings and does not disable existing holder rights.",{namespace:labelSchema,enabled:z.boolean()},async({namespace,enabled})=>{try{return text(await nativeOwner.setClaimsEnabled(namespace,enabled));}catch(e){return errText(e);}});
+  server.tool("reserve_usernames","Owner-sign a bounded atomic reservation batch. Reserving issues no holder. Releasing never revokes an existing holder.",{namespace:labelSchema,labels:z.array(labelSchema).min(1).max(23),reserved:z.boolean()},async({namespace,labels,reserved})=>{try{return text(await(reserved?nativeOwner.reserveNames(namespace,labels):nativeOwner.releaseReservations(namespace,labels)));}catch(e){return errText(e);}});
+  server.tool("assign_reserved_username","Owner-sign an already reserved username to the selected holder with its default route. Reservation remains. Custom receiving details are not set by this tool.",{namespace:labelSchema,label:labelSchema,holder:z.string()},async({namespace,label,holder:recipient})=>{try{return text(await nativeOwner.assignReserved(namespace,label,recipient));}catch(e){return errText(e);}});
   server.tool("native_renewal_preview","Preview exact generation payment instructions, including inactive records, without making an expired name resolve for live payments.",{name:nameSchema},async({name})=>{try{return text(await holder.renewalPreview(name));}catch(e){return errText(e);}});
-  server.tool("accept_name_transfer_with_destination","Recipient-sign exact pending transfer and complete destination atomically. Requires a canonical TransferIntent; preserves expiry and does not charge a username claim fee.",{intentJson:nativeIntentSchema},async({intentJson})=>{try{return text(await holder.acceptNameTransferWithDestination(nativeHolder.parseNativeTransferIntent(intentJson)));}catch(e){return errText(e);}});
-  server.tool("renew_held_name","Holder-sign independent bounded renewal. No separate renewal fee; network/storage costs apply. Current native contract checks term, early window, generation and lease bounds.",{intentJson:nativeIntentSchema},async({intentJson})=>{try{return text(await holder.renewName(nativeHolder.parseNativeRenewIntent(intentJson)));}catch(e){return errText(e);}});
+  server.tool("accept_name_transfer_with_destination","Recipient-sign exact pending transfer and complete destination atomically. Requires a canonical TransferIntent; preserves expiry and does not charge a username claim fee.",{intentJson:nativeIntentSchema},async({intentJson})=>{try{return text(await nativeClaimant.acceptNameTransferWithDestination(nativeHolder.parseNativeTransferIntent(intentJson)));}catch(e){return errText(e);}});
+  server.tool("renew_held_name","Holder-sign independent bounded renewal. No separate renewal fee; network/storage costs apply. Current native contract checks term, early window, generation and lease bounds.",{intentJson:nativeIntentSchema},async({intentJson})=>{try{return text(await nativeClaimant.renewName(nativeHolder.parseNativeRenewIntent(intentJson)));}catch(e){return errText(e);}});
   const soran = new Soran({ hintUrl, ...rpc, lookupId: opts.lookupId, primaryId: opts.primaryId, resolutionMode: opts.resolutionMode });
   const stellar = await import("@stellar/stellar-sdk");
   const { TransactionBuilder, Address, scValToNative } = stellar;

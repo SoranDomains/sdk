@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const MCP_REVISION = '9cc027804f2e7363f1cabcd99eb25839355e3f0b';
+export const MCP_REVISION = '60325a41ea2e7820272c8e8d3a9c827122ab5d62';
 export const SIGNING_REVISION = 'e5788127c38f360f6bf97d91217f897441cf9bd1';
 export const SOURCE_REVISION = 'cec2d29bd392c64ac3e7f8d1d20d626736c72ce5';
 const sha256 = bytes => crypto.createHash('sha256').update(bytes).digest('hex');

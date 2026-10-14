@@ -20,20 +20,28 @@ Two transports, one tool set:
   read tools — what hosted agents (claude.ai connectors and friends) reach
   with no install.
 
-Version 0.10.0 targets the native-claim **Stellar testnet** successor deployment.
+Version 0.10.1 targets the native-claim **Stellar testnet** successor deployment.
 The default Registry, Lookup, Primary and Allocator pins belong to that deployment.
 
-Earlier releases are retired: 0.8.x and older read the retired 5 and 6 September 2026 stacks (universal mode fails closed against today's Lookup, but direct mode can still read frozen state), and 0.9.5 and older lack the 0.9.6 hardening (confirmation literals on five owner tools, response caps, tool annotations). Pin 0.10.0 or later. See [Older versions and retired stacks](../../README.md#older-versions-and-retired-stacks).
+Version 0.10.1 pins Holder 0.10.1 and Owner 0.12.1 and independently checks
+legacy authorization at the local signer. It refuses changed operations,
+nested calls and extra authorizations before a signature is produced;
+permissionless upkeep must carry no authorization. Native claims and transfers
+retain their separate exact-intent validation for the reviewed payment and
+destination initializer. Write tools share one payer queue to prevent competing
+account sequence numbers. Upgrade from 0.10.0 to receive these signing guards.
+
+Earlier releases are retired: 0.8.x and older read the retired 5 and 6 September 2026 stacks (universal mode fails closed against today's Lookup, but direct mode can still read frozen state), and 0.9.5 and older lack the 0.9.6 hardening (confirmation literals on five owner tools, response caps, tool annotations). Pin 0.10.1 or later. See [Older versions and retired stacks](../../README.md#older-versions-and-retired-stacks).
 
 ## Install
 
 ### Claude Code / any shell agent (full surface)
 
 ```bash
-claude mcp add soran -- npx -y @sorandomains/mcp@0.10.0
+claude mcp add soran -- npx -y @sorandomains/mcp@0.10.1
 ```
 
-Any MCP client: command `npx`, args `["-y", "@sorandomains/mcp@0.10.0"]`. Set env
+Any MCP client: command `npx`, args `["-y", "@sorandomains/mcp@0.10.1"]`. Set env
 `SORAN_SECRET` (the agent's Stellar secret, `S…`) to unlock the write tools.
 
 Restart the MCP process after updating its configured version. If an older client
@@ -211,8 +219,8 @@ import { registerReadTools, registerWriteTools } from "@sorandomains/mcp";
 Source: <https://github.com/SoranDomains/sdk> · Docs: <https://github.com/SoranDomains/docs> · License: MIT
 
 
-Version 0.10.0 requires Node.js 22.12.0 or newer and uses Stellar SDK17 with
-Lookup 0.11.0, Holder 0.10.0 and Owner 0.12.0. Holder receipt recovery requires sufficiently fresh clean Registrar provenance after each receipt read or transaction inclusion. Both transports pass the same universal
+Version 0.10.1 requires Node.js 22.12.0 or newer and uses Stellar SDK17 with
+Lookup 0.11.0, Holder 0.10.1 and Owner 0.12.1. Holder receipt recovery requires sufficiently fresh clean Registrar provenance after each receipt read or transaction inclusion. Both transports pass the same universal
 configuration and export the same MCP version. The successor deployment retains Lookup V2; custom Registry or passphrase
 settings require their own Allocator pin and do not inherit testnet fee routing.
 

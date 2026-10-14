@@ -1,8 +1,6 @@
 # Native username claims
 
-SDK versions in this source: Holder `0.10.0`, Owner `0.12.0`, MCP `0.10.0`, Lookup `0.11.0`. The release uses the native-claim successor Registry/Resolver/Registrar; its exact verified deployment is recorded in the package preset and [release manifest](https://github.com/SoranDomains/sdk/blob/main/deployments/testnet.json). Public package and service availability is recorded separately in the [release status](https://docs.soran.domains/reference/release-status).
-
-Lookup 0.11.0, Owner 0.12.0, Holder 0.10.0 and MCP 0.10.0 were published on 1 October 2026; see the [October 1 release notes](RELEASE-2026-10-01.md). Hosted service deployment is tracked separately from npm publication.
+SDK versions in this source: Holder `0.10.1`, Owner `0.12.1`, MCP `0.10.1`, Lookup `0.11.0`. The release uses the native-claim successor Registry/Resolver/Registrar; its exact verified deployment is recorded in the package preset and [release manifest](https://github.com/SoranDomains/sdk/blob/main/deployments/testnet.json). Public package and service availability is recorded separately in the [release status](https://docs.soran.domains/reference/release-status).
 
 ## Application-owned signup
 
@@ -75,3 +73,5 @@ Pass the same `ContractWallet` adapter to `SoranSponsorship.authorize` for spons
 This adapter supports applications integrating their own contract wallet. Soran's namespace-owner console login still uses its existing G-wallet challenge; this change does not reinterpret a C address as a valid classic login signature.
 
 Namespace owners can review the approved update under **Contract updates** (`/app/updates`) in the Soran console; the Username registration page only links there. The page reuses the signed-in owner wallet and covers both the Registrar and the Resolver. SDK integrations can call `owner.upgradeRegistrar(namespace, reviewedWasmHash)` (and `upgradeResolver` for the Resolver); it checks governed upgrade mode, Registry approval, the current implementation and live ownership before signing. Upgrading an existing namespace does not happen automatically when Soran updates its default template.
+
+Holder 0.10.1 and Owner 0.12.1 are published. MCP 0.10.1 is prepared with these fixed dependencies; its npm publication remains pending. See the [October 14 release notes](RELEASE-2026-10-14.md).

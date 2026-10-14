@@ -19,18 +19,18 @@
     {
       "source": "sdk/NATIVE-CLAIMS.md",
       "destination": "NATIVE-CLAIMS.md",
-      "sourceSha256": "164dd191b903577c0f089ddaa211a72a415e703d4e6725f304f3cd076d9220de",
-      "destinationSha256": "be3aee8196f2ee6ba854cf0756dc16b5a0c7d9304b29d7e7a5887c05884eb67f",
-      "exact": false,
-      "sourceRevision": "9cc027804f2e7363f1cabcd99eb25839355e3f0b"
+      "sourceRevision": "60325a41ea2e7820272c8e8d3a9c827122ab5d62",
+      "sourceSha256": "716cb67d44b1724cd7de5c41a8e75f6126029d31a673cd79c423b44d6b4658d0",
+      "destinationSha256": "0c79b7914683511ba16aa89f72bb6cceba225a14b8de8a106b78a271e93c7911",
+      "exact": false
     },
     {
       "source": "sdk/README.md",
       "destination": "README.md",
-      "sourceSha256": "62fa96c611f0d624153460b62856748948be9ce5c11711dc38880c7ea81bf095",
-      "destinationSha256": "0b8ebe0b11a42b9cae3298f3547a33cfe2837d391c997429d95e821e04964d43",
-      "exact": false,
-      "sourceRevision": "9cc027804f2e7363f1cabcd99eb25839355e3f0b"
+      "sourceRevision": "60325a41ea2e7820272c8e8d3a9c827122ab5d62",
+      "sourceSha256": "88bc155d4f0a52929c899523e2fd61979caf50d9286c61dedba559fc3ebdae65",
+      "destinationSha256": "32bf82d0292704473d49a0d3401866ce6d965c2de2a92358cde1e24b31d41e60",
+      "exact": false
     },
     {
       "source": "deploy/testnet/deployment.json",
@@ -1065,7 +1065,8 @@
   "productionSourcesUnchanged": true,
   "sourceRevisions": {
     "core": "cec2d29bd392c64ac3e7f8d1d20d626736c72ce5",
-    "mcp": "9cc027804f2e7363f1cabcd99eb25839355e3f0b"
+    "mcp": "60325a41ea2e7820272c8e8d3a9c827122ab5d62",
+    "signingCore": "e5788127c38f360f6bf97d91217f897441cf9bd1"
   },
   "additionalSyncManifest": "mcp-sync-manifest.json",
   "signingRelease": {
@@ -1093,7 +1094,28 @@
       "packages/owner/tsconfig.json"
     ],
     "requiredMonorepoCi": true,
-    "publicationPerformed": false,
-    "productionSourcesByteIdentical": true
+    "publicationPerformed": true,
+    "productionSourcesByteIdentical": true,
+    "publicReleaseRevision": "d3d2c1b2bbe39bec48e93d036b29d831672df487",
+    "publishedPackages": [
+      {
+        "name": "@sorandomains/holder",
+        "version": "0.10.1",
+        "publishedAt": "2026-10-14T16:57:15.252Z",
+        "integrity": "sha512-OVEVAd1l5ob3SD/5jIcgGOsWle/0cbPJ0GvvDz5apy6pX3agTx1Ubz9BLJjU0xvZlmQHVc3DppL+Gs5QlchdAg==",
+        "shasum": "0ee97cad978cae811acf6b1c36694ea7f8343188",
+        "tarballSha256": "5430d0ef394997a010ee668ad54280b9da7e222bfadbae0c350f3cce81b1b258",
+        "registryArchiveMatchesReviewed": true
+      },
+      {
+        "name": "@sorandomains/owner",
+        "version": "0.12.1",
+        "publishedAt": "2026-10-14T17:00:21.311Z",
+        "integrity": "sha512-ZN05Lsb7BCo8bVwkgQL1nYTTw5MU9KYkTCsTiAv6I/gygYqQkW7/fB+9xOStDPYxCAhxgCXkgftVecEC+wZI0g==",
+        "shasum": "9c78ba9dac945e03ef792718c1dfbcf454cbc946",
+        "tarballSha256": "66c7e3443b3571c539de40928dbdd33f4eb7d84a3acd1128594026f634cc4357",
+        "registryArchiveMatchesReviewed": true
+      }
+    ]
   }
 }

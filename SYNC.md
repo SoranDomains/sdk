@@ -100,25 +100,30 @@ and is not implied by npm publication.
 
 ## October 14 signing release
 
-Holder **0.10.1** and Owner **0.12.1** are prepared from reviewed source
-`e5788127c38f360f6bf97d91217f897441cf9bd1`. Their production source is byte-identical
-to that source; their manifests, build configuration and portable signing tests
-are copied from the same commit. The two README files retain the existing public
-link adaptations. `sync-manifest.json` records all 16 updated paths with explicit
-per-file source revisions, preserving the prior Lookup, ABI fixture and catalog
-provenance. The default core revision above still applies to untouched rows.
+Holder **0.10.1** and Owner **0.12.1** were published from public merge
+`d3d2c1b2bbe39bec48e93d036b29d831672df487` on 14 October 2026. Their npm archives
+match the reviewed byte inventories. Their production source matches private
+source `e5788127c38f360f6bf97d91217f897441cf9bd1`; its 16 changed paths
+retain explicit per-file source revisions and only existing README link
+adaptations. Lookup 0.11.0, its source, ABI metadata and catalog remain unchanged.
 
-The package suites now explicitly include hostile nested-authorization regressions.
-Existing public ABI, catalog and API-vendor test adaptations remain unchanged;
-full private source CI is still a required publication gate. The updated verifier
-also rejects a missing signing-source CI gate or an expanded export inventory.
+MCP **0.10.1** is prepared from `60325a41ea2e7820272c8e8d3a9c827122ab5d62` with exact published
+Holder 0.10.1, Owner 0.12.1 and Lookup 0.11.0 dependencies. The native-signup example
+uses the published Holder package again. npm publication remains pending.
 
-The existing MCP checkout receives only a protocol SDK / proxy-addr security
-metadata refresh so its CI audit continues to pass. Its runtime, older published
-core dependencies, Zod 3 and TypeScript 5 remain unchanged for this first stage.
-The October 1 archive receipt is historical and does not attest a build from this
-changed checkout. MCP 0.10.1 and the native-signup dependency update follow after
-the two core versions are available and verified in npm.
+`mcp-sync-manifest.json` records all 46 MCP/example source mappings,18 portable
+source tests plus two retained public regressions,13 runtime source files, the
+shared Holder fixture and verified core dependency integrities. Runtime and test
+bytes are unchanged; only the MCP README link uses the public layout. The one
+private API integration test remains an explicit required source-CI gate with its
+exact hash. No private API or Rust source is exported. The package test command
+continues to discover every public test.
 
-See [October 14 release notes](RELEASE-2026-10-14.md). Publication remains pending;
-this source preparation makes no claim of registry availability or CI provenance.
+Shared README/NATIVE-CLAIMS mappings use the final MCP source revision and record
+previous mappings. They do not relabel untouched core or fixture provenance.
+Existing October 1 receipts remain historical records of their original archives.
+
+Before MCP publication require full private source CI, all six public CI checks,
+a clean merged checkout, compiled-file parity and installed-package hostile
+authorization tests. Local npm publication does not claim GitHub CI provenance;
+hosted MCP rollout remains separate. See [release notes](RELEASE-2026-10-14.md).
