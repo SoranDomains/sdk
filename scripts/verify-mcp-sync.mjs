@@ -26,16 +26,15 @@ export function verifyMcpSync(root) {
   assert.equal(manifest.format, 'soran-public-mcp-sync-v1');
   assert.equal(manifest.sourceRevision, MCP_REVISION);
   assert.equal(manifest.coreSourceRevision, SOURCE_REVISION);
-  assert.equal(manifest.mirrorBase, '891330d5451ff3b9f3b4285c5811298a1d972846');
-  assert.equal(manifest.coreSyncManifestSha256, 'ae6180af3d7e2cf31eb8675590301e880acea17a011731af5319cefec1693233');
+  assert.equal(manifest.mirrorBase, 'd3d2c1b2bbe39bec48e93d036b29d831672df487');
+  assert.equal(manifest.coreSyncManifestSha256, 'dcdf33437eadd0c1f7a9d4010af5899c71802a5a33259455a1f1f1e89bac6ad2');
+  assert.equal(manifest.signingCoreSourceRevision, SIGNING_REVISION);
+  assert.equal(manifest.corePublication.verified, true);
+  assert.equal(manifest.corePublication.publicReleaseRevision, manifest.mirrorBase);
   assert.equal(manifest.productionSourceByteIdentical, true);
   assert.equal(manifest.testScriptUnchanged, true);
   assert.equal(manifest.publishFileListUnchanged, true);
-  assert.equal(manifest.files.length, 43);
-  const refresh = manifest.pendingDependencyRefresh;
-  assert.equal(refresh.sourceRevision, SIGNING_REVISION);
-  assert.equal(refresh.mcpRuntimeUnchanged, true);
-  assert.deepEqual(refresh.files, ['packages/mcp/package.json', 'packages/mcp/package-lock.json']);
+  assert.equal(manifest.files.length, 46);
   const seen = new Set();
   for (const row of manifest.files) {
     assert(safe(row.source) && safe(row.destination), 'Unsafe mapping path');
@@ -45,11 +44,7 @@ export function verifyMcpSync(root) {
     assert.equal(row.source, row.destination.startsWith('packages/mcp/') ? row.destination.replace('packages/mcp/', 'sdk/mcp/') : 'sdk/' + row.destination);
     assert(/^[a-f0-9]{64}$/.test(row.sourceSha256) && /^[a-f0-9]{64}$/.test(row.destinationSha256));
     assert.equal(sha256(bytes(root, row.destination)), row.destinationSha256, `Export drift: ${row.destination}`);
-    if (refresh.files.includes(row.destination)) {
-      assert.equal(row.sourceRevision, SIGNING_REVISION);
-      assert.equal(row.exact, false);
-      assert.equal(typeof row.adaptation, 'string');
-    } else if (row.destination !== 'packages/mcp/README.md') {
+    if (row.destination !== 'packages/mcp/README.md') {
       assert.equal(row.exact, true, `Transformed source: ${row.destination}`);
       assert.equal(row.sourceSha256, row.destinationSha256);
     } else assert.equal(row.exact, false);
@@ -57,7 +52,7 @@ export function verifyMcpSync(root) {
   assert.deepEqual(manifest.retainedPublicTests.map(x => x.destination).sort(), ['packages/mcp/test/session-scope.test.mts', 'packages/mcp/test/submission.test.mts']);
   for (const row of manifest.retainedPublicTests) {
     assert.equal(row.sourceRepository, 'SoranDomains/sdk');
-    assert.equal(row.sourceRevision, manifest.mirrorBase);
+    assert.equal(row.sourceRevision, '891330d5451ff3b9f3b4285c5811298a1d972846');
     assert.equal(row.source, row.destination);
     assert(/^[a-f0-9]{64}$/.test(row.sourceSha256));
     assert(!seen.has(row.destination));
@@ -68,10 +63,10 @@ export function verifyMcpSync(root) {
   const allFiles = ['packages/mcp/', 'examples/native-signup/'].flatMap(prefix => listedFiles(root, prefix));
   assert.deepEqual(allFiles.sort(), [...seen].sort(), 'Managed file inventory changed');
   assert.equal(allFiles.filter(x => x.startsWith('examples/native-signup/')).length, 6);
-  assert.equal(allFiles.filter(x => /^packages\/mcp\/src\/.*\.ts$/.test(x)).length, 12);
+  assert.equal(allFiles.filter(x => /^packages\/mcp\/src\/.*\.ts$/.test(x)).length, 13);
   const testFiles = allFiles.filter(x => /^packages\/mcp\/test\/[^/]+\.test\.mts$/.test(x)).sort();
-  assert.equal(testFiles.length, 18);
-  assert.equal(manifest.portableTests.length, 16);
+  assert.equal(testFiles.length, 20);
+  assert.equal(manifest.portableTests.length, 18);
   assert.deepEqual([...manifest.portableTests.map(x => x.file), ...manifest.retainedPublicTests.map(x => x.destination)].sort(), testFiles);
   for (const row of manifest.portableTests) assert.equal(sha256(bytes(root, row.file)), row.sha256);
   assert.equal(manifest.omitted.length, 1);
@@ -95,13 +90,13 @@ export function verifyMcpSync(root) {
     assert.equal(override.previous.destination, row.destination);
     assert.equal(override.previous.source, row.source);
   }
-  const versions = { lookup: '0.11.0', owner: '0.12.0', holder: '0.10.0' };
+  const versions = { lookup: '0.11.0', owner: '0.12.1', holder: '0.10.1' };
   const metadata = JSON.parse(bytes(root, 'packages/mcp/package.json'));
   const lock = JSON.parse(bytes(root, 'packages/mcp/package-lock.json'));
-  assert.equal(metadata.version, '0.10.0');
+  assert.equal(metadata.version, '0.10.1');
   assert.equal(metadata.dependencies['@modelcontextprotocol/sdk'], '^1.32.1');
-  assert.equal(metadata.dependencies.zod, '^3.25.0');
-  assert.equal(metadata.devDependencies.typescript, '^5.7.3');
+  assert.equal(metadata.dependencies.zod, '^4.6.5');
+  assert.equal(metadata.devDependencies.typescript, '^7.0.2');
   assert.equal(lock.packages['node_modules/@modelcontextprotocol/sdk'].version, '1.32.1');
   assert.equal(lock.packages['node_modules/proxy-addr'].version, '2.0.8');
   assert.equal(metadata.engines.node, '>=22.12.0');
@@ -120,6 +115,10 @@ export function verifyMcpSync(root) {
     assert.equal(entry.version, version);
     assert.equal(entry.resolved, `https://registry.npmjs.org/${name}/-/${pkg}-${version}.tgz`);
     assert.deepEqual(manifest.coreDependencies[key], { version, integrity: entry.integrity });
+    const published = manifest.corePublication.packages.find(p => p.name === name);
+    assert(published && published.registryArchiveMatchesReviewed === true);
+    assert.equal(published.version, version);
+    assert.equal(published.integrity, entry.integrity);
     if (pkg !== 'owner') {
       assert.equal(native.dependencies[name], version);
       assert.equal(nativeLock.packages[''].dependencies[name], version);

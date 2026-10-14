@@ -7,12 +7,14 @@ preparation use the API, with locally pinned transaction and fee validation
 before signing. Hosted API and MCP responses are service-mediated; integrators
 can call Universal Lookup directly for their own on-chain reads.
 
-| Package | Published version | Audience and surface |
+| Package | Source version | Audience and surface |
 | --- | --- | --- |
 | [`@sorandomains/lookup`](packages/lookup/) | 0.11.0 | Wallets and apps: Universal Lookup, nested names, network addresses, complete payment instructions and verified holdings pages |
-| [`@sorandomains/owner`](packages/owner/) | 0.12.0 | Namespace operators: issuance, lifecycle, subname and network-address policies |
-| [`@sorandomains/holder`](packages/holder/) | 0.10.0 | Name holders: subnames, network addresses, payment memos and lifecycle |
-| [`@sorandomains/mcp`](packages/mcp/) | 0.10.0 | AI agents: hosted read tools and locally signed management tools |
+| [`@sorandomains/owner`](packages/owner/) | 0.12.1 | Namespace operators: issuance, lifecycle, subname and network-address policies |
+| [`@sorandomains/holder`](packages/holder/) | 0.10.1 | Name holders: subnames, network addresses, payment memos and lifecycle |
+| [`@sorandomains/mcp`](packages/mcp/) | 0.10.1 candidate | AI agents: hosted read tools and locally signed management tools |
+
+Holder 0.10.1 and Owner 0.12.1 harden every legacy account-signed write: the simulated transaction and authorization must match the requested contract, method and arguments, with no extra authorizers or nested calls. Holder permissionless upkeep requires no authorization, and network-address writes use the configured contract-wallet holder identity. MCP 0.10.1 pins both fixed signing packages and independently checks legacy authorization at its local signer.
 
 All four releases require Node.js 22.12.0 or newer.
 All four packages target `@stellar/stellar-sdk >=17 <18`, tested with 17.0.1.
@@ -41,8 +43,8 @@ See the [current deployment manifest](deployments/testnet.json). Run `npm ci`, `
 
 The governed testnet stacks of 5 and 6 September 2026 were sealed by migration. Lookup 0.6.0 to 0.9.0, and the Holder, Owner and MCP releases built against them, default to those retired Registries. Against today's shared Lookup their default (universal) mode fails closed with `CONFIG` ("Lookup has an invalid or different Registry anchor"). `resolutionMode: "direct"`, `lookupId: null` or a hard-coded retired Registry bypasses that check, and the 6 September stack can still answer reads from frozen state that no longer follows the successor. **Upgrade to the current versions in the table above and never use direct mode with a retired Registry.** Deprecating the superseded npm releases is a maintainer action (`npm deprecate`); until it is done, treat any version older than the table as retired.
 
-## October 1 publication
+## October 14 publication
 
-Lookup **0.11.0**, Owner **0.12.0**, Holder **0.10.0** and MCP **0.10.0** were published to npm on **1 October 2026**. The downloaded MCP archive matches the reviewed release bytes; its publication time and integrity are recorded in the [release notes](RELEASE-2026-10-01.md). Existing namespace owners must opt in to their contract upgrades before new capabilities become available.
+Holder **0.10.1** and Owner **0.12.1** were published on **14 October 2026**, and their downloaded npm archives match the reviewed releases. Lookup remains **0.11.0**. MCP **0.10.1** is the next candidate; npm publication is pending.
 
-See [release notes](RELEASE-2026-10-01.md), [source provenance](SYNC.md) and the [test manifest](test-manifest.json). Hosted MCP deployment is separate from this package release.
+See the [release notes](RELEASE-2026-10-14.md), [source mapping](SYNC.md) and [test manifest](test-manifest.json). Hosted MCP deployment is separate.
