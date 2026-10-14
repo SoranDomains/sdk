@@ -7,12 +7,12 @@ preparation use the API, with locally pinned transaction and fee validation
 before signing. Hosted API and MCP responses are service-mediated; integrators
 can call Universal Lookup directly for their own on-chain reads.
 
-| Package | Source version | Audience and surface |
+| Package | Published version | Audience and surface |
 | --- | --- | --- |
 | [`@sorandomains/lookup`](packages/lookup/) | 0.11.0 | Wallets and apps: Universal Lookup, nested names, network addresses, complete payment instructions and verified holdings pages |
 | [`@sorandomains/owner`](packages/owner/) | 0.12.1 | Namespace operators: issuance, lifecycle, subname and network-address policies |
 | [`@sorandomains/holder`](packages/holder/) | 0.10.1 | Name holders: subnames, network addresses, payment memos and lifecycle |
-| [`@sorandomains/mcp`](packages/mcp/) | 0.10.1 candidate | AI agents: hosted read tools and locally signed management tools |
+| [`@sorandomains/mcp`](packages/mcp/) | 0.10.1 | AI agents: hosted read tools and locally signed management tools |
 
 Holder 0.10.1 and Owner 0.12.1 harden every legacy account-signed write: the simulated transaction and authorization must match the requested contract, method and arguments, with no extra authorizers or nested calls. Holder permissionless upkeep requires no authorization, and network-address writes use the configured contract-wallet holder identity. MCP 0.10.1 pins both fixed signing packages and independently checks legacy authorization at its local signer.
 
@@ -45,6 +45,6 @@ The governed testnet stacks of 5 and 6 September 2026 were sealed by migration. 
 
 ## October 14 publication
 
-Holder **0.10.1** and Owner **0.12.1** were published on **14 October 2026**, and their downloaded npm archives match the reviewed releases. Lookup remains **0.11.0**. MCP **0.10.1** is the next candidate; npm publication is pending.
+Holder **0.10.1** and Owner **0.12.1** were published on **14 October 2026**, and their downloaded npm archives match the reviewed releases. Lookup remains **0.11.0**. MCP **0.10.1** is also published, and its downloaded archive matches the reviewed release.
 
 See the [release notes](RELEASE-2026-10-14.md), [source mapping](SYNC.md) and [test manifest](test-manifest.json). Hosted MCP deployment is separate.

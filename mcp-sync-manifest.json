@@ -471,10 +471,19 @@
         "destination": "README.md",
         "sourceRevision": "60325a41ea2e7820272c8e8d3a9c827122ab5d62",
         "sourceSha256": "88bc155d4f0a52929c899523e2fd61979caf50d9286c61dedba559fc3ebdae65",
+        "destinationSha256": "351f2e3d0df15be60ce79d5f7606f20787e00001821f31bcd4a3cc294920fbdd",
+        "exact": false
+      },
+      "adaptation": "Public mirror links and explicit fixed-core publication / MCP candidate availability.",
+      "releaseCurrent": {
+        "source": "sdk/README.md",
+        "destination": "README.md",
+        "sourceRevision": "60325a41ea2e7820272c8e8d3a9c827122ab5d62",
+        "sourceSha256": "88bc155d4f0a52929c899523e2fd61979caf50d9286c61dedba559fc3ebdae65",
         "destinationSha256": "32bf82d0292704473d49a0d3401866ce6d965c2de2a92358cde1e24b31d41e60",
         "exact": false
       },
-      "adaptation": "Public mirror links and explicit fixed-core publication / MCP candidate availability."
+      "publicationDocumentationAdaptation": "Verified npm publication status only; published package files and source mappings unchanged."
     },
     {
       "previous": {
@@ -490,10 +499,19 @@
         "destination": "NATIVE-CLAIMS.md",
         "sourceRevision": "60325a41ea2e7820272c8e8d3a9c827122ab5d62",
         "sourceSha256": "716cb67d44b1724cd7de5c41a8e75f6126029d31a673cd79c423b44d6b4658d0",
+        "destinationSha256": "49083214582c668cfcafb14b3d82bba2991665d7b71b94287b9867059394a40f",
+        "exact": false
+      },
+      "adaptation": "Public mirror links and explicit fixed-core publication / MCP candidate availability.",
+      "releaseCurrent": {
+        "source": "sdk/NATIVE-CLAIMS.md",
+        "destination": "NATIVE-CLAIMS.md",
+        "sourceRevision": "60325a41ea2e7820272c8e8d3a9c827122ab5d62",
+        "sourceSha256": "716cb67d44b1724cd7de5c41a8e75f6126029d31a673cd79c423b44d6b4658d0",
         "destinationSha256": "0c79b7914683511ba16aa89f72bb6cceba225a14b8de8a106b78a271e93c7911",
         "exact": false
       },
-      "adaptation": "Public mirror links and explicit fixed-core publication / MCP candidate availability."
+      "publicationDocumentationAdaptation": "Verified npm publication status only; published package files and source mappings unchanged."
     }
   ],
   "corePublication": {
@@ -531,8 +549,19 @@
   "mcpPublication": {
     "name": "@sorandomains/mcp",
     "version": "0.10.1",
-    "status": "candidate-publication-pending",
-    "previousNpmVersion": "0.10.0"
+    "status": "published",
+    "publishedAt": "2026-10-14T17:16:28.686Z",
+    "verifiedAt": "2026-10-14T17:16:30.497Z",
+    "latestTagVerified": true,
+    "integrity": "sha512-foVj7s0r1uYuTAHNfTOGgoRNuAc9+iDPoZikMYynH3yfZaGtadWIIXSeJKXNHvWe8WcZ366Ky9gIab4I3o8ImQ==",
+    "shasum": "55e969eda2dbfaf83201ced4f40e59e88aff7a75",
+    "tarballSha256": "bb4aa6c9b26670d3eb3131c74de01975fafc1c66a22789ad98e9ebd40c579d18",
+    "registryArchiveMatchesReviewed": true,
+    "sourceRevision": "60325a41ea2e7820272c8e8d3a9c827122ab5d62",
+    "publicReleaseRevision": "aa347f616fa31732ca174fded82415915d81f5ef",
+    "registryVerificationReceiptSha256": "a02c0d4dc69bbde6f6421ce4eaec345ff27516731b1191dbbd219adfbb40b07e",
+    "provenanceAttestationClaimed": false,
+    "hostedDeploymentAttestedByThisRecord": false
   },
   "monorepoCiGate": {
     "sourceRevision": "60325a41ea2e7820272c8e8d3a9c827122ab5d62",
@@ -559,5 +588,11 @@
       "provenanceAttestationClaimed": false,
       "hostedDeploymentAttestedByThisRecord": false
     }
-  ]
+  ],
+  "releaseCi": {
+    "sourcePullRequest": "https://github.com/SoranDomains/soran/pull/147",
+    "sourceChecksPassed": 18,
+    "publicPullRequest": "https://github.com/SoranDomains/sdk/pull/23",
+    "publicChecksPassed": 6
+  }
 }

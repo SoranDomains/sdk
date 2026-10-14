@@ -74,4 +74,4 @@ This adapter supports applications integrating their own contract wallet. Soran'
 
 Namespace owners can review the approved update under **Contract updates** (`/app/updates`) in the Soran console; the Username registration page only links there. The page reuses the signed-in owner wallet and covers both the Registrar and the Resolver. SDK integrations can call `owner.upgradeRegistrar(namespace, reviewedWasmHash)` (and `upgradeResolver` for the Resolver); it checks governed upgrade mode, Registry approval, the current implementation and live ownership before signing. Upgrading an existing namespace does not happen automatically when Soran updates its default template.
 
-Holder 0.10.1 and Owner 0.12.1 are published. MCP 0.10.1 is prepared with these fixed dependencies; its npm publication remains pending. See the [October 14 release notes](RELEASE-2026-10-14.md).
+Holder 0.10.1 and Owner 0.12.1 are published. MCP 0.10.1 is published with these fixed dependencies, and its downloaded archive matches the reviewed release. See the [October 14 release notes](RELEASE-2026-10-14.md).
