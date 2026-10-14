@@ -107,12 +107,12 @@ source `e5788127c38f360f6bf97d91217f897441cf9bd1`; its 16 changed paths
 retain explicit per-file source revisions and only existing README link
 adaptations. Lookup 0.11.0, its source, ABI metadata and catalog remain unchanged.
 
-MCP **0.10.1** is prepared from `60325a41ea2e7820272c8e8d3a9c827122ab5d62` with exact published
+MCP **0.10.1** was published from `60325a41ea2e7820272c8e8d3a9c827122ab5d62` with exact published
 Holder 0.10.1, Owner 0.12.1 and Lookup 0.11.0 dependencies. The native-signup example
-uses the published Holder package again. npm publication remains pending.
+uses the published Holder package again. The downloaded MCP archive matches the reviewed release.
 
-`mcp-sync-manifest.json` records all 46 MCP/example source mappings,18 portable
-source tests plus two retained public regressions,13 runtime source files, the
+`mcp-sync-manifest.json` records all 46 MCP/example source mappings, 18 portable
+source tests plus two retained public regressions, 13 runtime source files, the
 shared Holder fixture and verified core dependency integrities. Runtime and test
 bytes are unchanged; only the MCP README link uses the public layout. The one
 private API integration test remains an explicit required source-CI gate with its
@@ -127,3 +127,7 @@ Before MCP publication require full private source CI, all six public CI checks,
 a clean merged checkout, compiled-file parity and installed-package hostile
 authorization tests. Local npm publication does not claim GitHub CI provenance;
 hosted MCP rollout remains separate. See [release notes](RELEASE-2026-10-14.md).
+
+The verified MCP 0.10.1 archive was built from public merge `aa347f616fa31732ca174fded82415915d81f5ef`.
+Publication time, integrity and exact archive hash are recorded in
+`mcp-sync-manifest.json`. This documentation update changes no package files.

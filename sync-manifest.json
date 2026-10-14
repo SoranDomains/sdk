@@ -21,7 +21,7 @@
       "destination": "NATIVE-CLAIMS.md",
       "sourceRevision": "60325a41ea2e7820272c8e8d3a9c827122ab5d62",
       "sourceSha256": "716cb67d44b1724cd7de5c41a8e75f6126029d31a673cd79c423b44d6b4658d0",
-      "destinationSha256": "0c79b7914683511ba16aa89f72bb6cceba225a14b8de8a106b78a271e93c7911",
+      "destinationSha256": "49083214582c668cfcafb14b3d82bba2991665d7b71b94287b9867059394a40f",
       "exact": false
     },
     {
@@ -29,7 +29,7 @@
       "destination": "README.md",
       "sourceRevision": "60325a41ea2e7820272c8e8d3a9c827122ab5d62",
       "sourceSha256": "88bc155d4f0a52929c899523e2fd61979caf50d9286c61dedba559fc3ebdae65",
-      "destinationSha256": "32bf82d0292704473d49a0d3401866ce6d965c2de2a92358cde1e24b31d41e60",
+      "destinationSha256": "351f2e3d0df15be60ce79d5f7606f20787e00001821f31bcd4a3cc294920fbdd",
       "exact": false
     },
     {

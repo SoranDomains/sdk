@@ -79,7 +79,7 @@
     "MCP build/typecheck and every portable test; native-signup typecheck and recovery tests"
   ],
   "publicationScope": [
-    "mcp0.10.1 candidate; publication pending"
+    "MCP 0.10.1 published 2026-10-14"
   ],
   "notClaimed": [
     "Private API integration executed in public mirror",
@@ -94,7 +94,7 @@
   },
   "publicationState": {
     "core": "lookup0.11.0, owner0.12.0, holder0.10.0 published 2026-10-01",
-    "mcp": "0.10.1 candidate; publication pending",
+    "mcp": "0.10.1 published 2026-10-14T17:16:28.686Z; registry archive matches reviewed bytes",
     "signingCore": "holder0.10.1 and owner0.12.1 published 2026-10-14; downloaded registry archives match reviewed bytes"
   },
   "retainedPublicTests": [
