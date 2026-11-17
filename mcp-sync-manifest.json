@@ -471,7 +471,7 @@
         "destination": "README.md",
         "sourceRevision": "60325a41ea2e7820272c8e8d3a9c827122ab5d62",
         "sourceSha256": "88bc155d4f0a52929c899523e2fd61979caf50d9286c61dedba559fc3ebdae65",
-        "destinationSha256": "351f2e3d0df15be60ce79d5f7606f20787e00001821f31bcd4a3cc294920fbdd",
+        "destinationSha256": "83dfc20fc8f89acdad3b19d1aed3b57052c158ed3a2c764df72b14698c6855e5",
         "exact": false
       },
       "adaptation": "Public mirror links and explicit fixed-core publication / MCP candidate availability.",
@@ -483,7 +483,11 @@
         "destinationSha256": "32bf82d0292704473d49a0d3401866ce6d965c2de2a92358cde1e24b31d41e60",
         "exact": false
       },
-      "publicationDocumentationAdaptation": "Verified npm publication status only; published package files and source mappings unchanged."
+      "publicationDocumentationAdaptation": "Verified npm publication status only; published package files and source mappings unchanged.",
+      "marketplaceDocumentationAdaptation": {
+        "previousDestinationSha256": "351f2e3d0df15be60ce79d5f7606f20787e00001821f31bcd4a3cc294920fbdd",
+        "change": "Update the public version table, Stellar SDK requirements and navigation for the Holder and Owner marketplace release."
+      }
     },
     {
       "previous": {

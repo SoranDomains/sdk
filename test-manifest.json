@@ -95,7 +95,7 @@
     "MCP build/typecheck and every portable test; native-signup typecheck and recovery tests"
   ],
   "publicationScope": [
-    "Holder 0.12.0 and Owner 0.13.1 prepared for public npm release"
+    "Holder 0.12.0 and Owner 0.13.1 published to npm"
   ],
   "notClaimed": [
     "Private API integration executed in public mirror",
@@ -112,7 +112,8 @@
   "publicationState": {
     "core": "lookup0.11.0, owner0.12.0, holder0.10.0 published 2026-10-01",
     "mcp": "0.10.1 published 2026-10-14T17:16:28.686Z; registry archive matches reviewed bytes",
-    "signingCore": "holder0.10.1 and owner0.12.1 published 2026-10-14; downloaded registry archives match reviewed bytes"
+    "signingCore": "holder0.10.1 and owner0.12.1 published 2026-10-14; downloaded registry archives match reviewed bytes",
+    "marketplaceCore": "Holder 0.12.0 and Owner 0.13.1 downloaded from npm and verified byte for byte against the reviewed public builds."
   },
   "retainedPublicTests": [
     {
