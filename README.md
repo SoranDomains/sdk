@@ -7,17 +7,17 @@ preparation use the API, with locally pinned transaction and fee validation
 before signing. Hosted API and MCP responses are service-mediated; integrators
 can call Universal Lookup directly for their own on-chain reads.
 
-| Package | Published version | Audience and surface |
+| Package | Version in this repository | Audience and surface |
 | --- | --- | --- |
 | [`@sorandomains/lookup`](packages/lookup/) | 0.11.0 | Wallets and apps: Universal Lookup, nested names, network addresses, complete payment instructions and verified holdings pages |
-| [`@sorandomains/owner`](packages/owner/) | 0.12.1 | Namespace operators: issuance, lifecycle, subname and network-address policies |
-| [`@sorandomains/holder`](packages/holder/) | 0.10.1 | Name holders: subnames, network addresses, payment memos and lifecycle |
+| [`@sorandomains/owner`](packages/owner/) | 0.13.1 | Namespace operators manage issuance, policies and governed Registrar upgrades |
+| [`@sorandomains/holder`](packages/holder/) | 0.12.0 | Name holders manage subnames, payment destinations and fixed-price name sales in XLM |
 | [`@sorandomains/mcp`](packages/mcp/) | 0.10.1 | AI agents: hosted read tools and locally signed management tools |
 
 Holder 0.10.1 and Owner 0.12.1 harden every legacy account-signed write: the simulated transaction and authorization must match the requested contract, method and arguments, with no extra authorizers or nested calls. Holder permissionless upkeep requires no authorization, and network-address writes use the configured contract-wallet holder identity. MCP 0.10.1 pins both fixed signing packages and independently checks legacy authorization at its local signer.
 
 All four releases require Node.js 22.12.0 or newer.
-All four packages target `@stellar/stellar-sdk >=17 <18`, tested with 17.0.1.
+Holder 0.12.0 and Owner 0.13.1 require `@stellar/stellar-sdk >=17.4.0 <18`. Lookup 0.11.0 and MCP 0.10.1 accept `>=17 <18`.
 The governed testnet migration was sealed at ledger **4604192** on **10 September 2026**. Universal Lookup and Allocator retain their addresses; Registry, Primary and Nova's Registrar/Resolver use the successor addresses in the [current deployment manifest](deployments/testnet.json). All six active contracts support authorized code upgrades. The migration preserved 37 existing names, 34 original claim receipts and the original namespace claim windows and escrow. The [release status](https://docs.soran.domains/reference/release-status) records matching packages and hosted services. Mainnet has no preset.
 
 Universal Lookup is the default read route. Consume `resolvePayment` results as
@@ -41,7 +41,11 @@ See the [current deployment manifest](deployments/testnet.json). Run `npm ci`, `
 
 ## Older versions and retired stacks
 
-The governed testnet stacks of 5 and 6 September 2026 were sealed by migration. Lookup 0.6.0 to 0.9.0, and the Holder, Owner and MCP releases built against them, default to those retired Registries. Against today's shared Lookup their default (universal) mode fails closed with `CONFIG` ("Lookup has an invalid or different Registry anchor"). `resolutionMode: "direct"`, `lookupId: null` or a hard-coded retired Registry bypasses that check, and the 6 September stack can still answer reads from frozen state that no longer follows the successor. **Upgrade to the current versions in the table above and never use direct mode with a retired Registry.** Deprecating the superseded npm releases is a maintainer action (`npm deprecate`); until it is done, treat any version older than the table as retired.
+The governed testnet stacks of 5 and 6 September 2026 were sealed by migration. Lookup 0.6.0 to 0.9.0, and the Holder, Owner and MCP releases built against them, default to those retired Registries. Against today's shared Lookup their default (universal) mode fails closed with `CONFIG` ("Lookup has an invalid or different Registry anchor"). `resolutionMode: "direct"`, `lookupId: null` or a hard-coded retired Registry bypasses that check, and the 6 September stack can still answer reads from frozen state that no longer follows the successor. **Use releases configured for the active deployment and avoid direct mode with a retired Registry.** Check the deployment and package versions against the [release status](https://docs.soran.domains/reference/release-status).
+
+## November 17 marketplace release
+
+Holder **0.12.0** lets users quote, list, cancel and buy eligible individual names in XLM. Owner **0.13.1** recognizes the marketplace Registrar for governed upgrades. Install either version from npm. [Release notes and archive verification](RELEASE-2026-11-17.md)
 
 ## October 14 publication
 
