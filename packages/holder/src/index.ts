@@ -2,6 +2,8 @@ import { createSubnameReader, subnameParent, subnameParts, subnameLabelArg, SUBN
 import { parseResolvableName as parseResolutionParts, resolvableNameNode, subnamePolicyFromNative, subnamePolicyToNative, subnameRecordFromNative, subnameLabelsFromNative, subnamePageInput, exactGeneration, type SubnamePolicy, type SubnameRecord } from "./names.js";
 export { type SubnamePolicy, type SubnameRecord } from "./names.js";
 import { recoverFrozenClaim, type HistoricalRecoveryOptions } from "./native-history.js";
+import { NameSales, type NameSaleListing, type NameSaleQuoteRequest } from "./name-sales.js";
+export type { NameSaleListing, NameSaleQuoteRequest, NameSaleState } from "./name-sales.js";
 export type { HistoricalRecoveryOptions } from "./native-history.js";
 /**
  * @sorandomains/holder — the write-side SDK for people who HOLD a Soran name.
@@ -58,8 +60,8 @@ import {
   xdr,
 } from "@stellar/stellar-sdk";
 
-import { decodeMuxedAddress, destinationFromNative, paymentFromNative, paymentMemoToScVal, validatePaymentDestination, type PaymentDestination } from "./payment.js";
-export { encodeMuxedAddress, decodeMuxedAddress, PAYMENT_RECORD_KEY, encodePaymentRecord, parsePaymentRecord, validatePaymentDestination, type PaymentMemo, type PaymentDestination } from "./payment.js";
+import { isMuxedPaymentAddress, decodeMuxedAddress, destinationFromNative, paymentFromNative, paymentMemoToScVal, validatePaymentDestination, type PaymentDestination } from "./payment.js";
+export { isMuxedPaymentAddress, encodeMuxedAddress, decodeMuxedAddress, PAYMENT_RECORD_KEY, encodePaymentRecord, parsePaymentRecord, validatePaymentDestination, type PaymentMemo, type PaymentDestination } from "./payment.js";
 
 import { validateNativeTransaction, assertSignedBodyUnchanged } from "./native-auth.js";
 import { NativeHolderClient, type ClaimSubmitOptions } from "./native-holder.js";
@@ -189,6 +191,8 @@ const REGISTRAR_ERRORS: Record<number, string> = {
   52: "InvalidRenewalGrace",
   53: "SubnameCreationDisabled", 54: "SubnamesSuspended",
   55: "SubnameGenerationMismatch", 56: "SubnameIndexUnavailable",
+  57: "NameNotSaleable", 58: "InvalidSaleTerms", 59: "SaleTermsChanged",
+  60: "ListingUnavailable", 61: "SaleFeesUnavailable",
 };
 
 const RESOLVER_ERRORS: Record<number, string> = {
@@ -547,6 +551,23 @@ export class SoranHolder {
       read: (id, method, args) => this.read(id, method, args),
       readWithLedger: (id, method, args) => this.readWithLedger(id, method, args), serialize: work => this.serialize(work) };
   }
+  /** Read sale eligibility and the current listing directly from the namespace Registrar. */
+  nameSaleState(name: string) { return new NameSales(this.nativeContext()).state(name); }
+  /** Read the holder's stored offer, including an expired or retired revision they can cancel. */
+  async nameListingForHolder(name: string, holder?: string) {
+    return new NameSales(this.nativeContext()).forHolder(name, holder ?? await this.holderAddress());
+  }
+  quoteNameSale(name: string, request: NameSaleQuoteRequest) { return new NameSales(this.nativeContext()).quote(name, request); }
+  listNameForSale(listing: NameSaleListing, options: NativeWriteOptions = {}) {
+    return new NameSales(this.nativeContext()).write("list_name", listing, null, options);
+  }
+  cancelNameListing(listing: NameSaleListing, options: NativeWriteOptions = {}) {
+    return new NameSales(this.nativeContext()).write("cancel_name_listing", listing, null, options);
+  }
+  /** Settle the exact listing in XLM. Omitting destination routes the newly acquired name to the buyer. */
+  buyName(listing: NameSaleListing, destination: PaymentDestination | null = null, options: NativeWriteOptions = {}) {
+    return new NameSales(this.nativeContext()).write("buy_name", listing, destination, options);
+  }
   private nativeClient(): NativeHolderClient { return new NativeHolderClient(this.nativeContext()); }
   private async holderAddress(): Promise<string> { return this.contractWallet?.address ?? await this.signer.publicKey(); }
   nativeClaimCapability(namespace: string) { return this.nativeClient().nativeClaimCapability(namespace); }
@@ -628,9 +649,11 @@ export class SoranHolder {
     const { resolver, version } = await this.paymentResolverOf(namespace);
     await this.requireSubnameSupport(name, resolver);
     const holder = await this.holderAddress();
-    if (StrKey.isValidMed25519PublicKey(payment.address)) {
+    if (isMuxedPaymentAddress(payment.address)) {
       if (version !== 2) throw new HolderError("muxed destinations require native Resolver v2", resolver, "payment_version");
       const muxed = decodeMuxedAddress(payment.address);
+      if (StrKey.isValidContract(muxed.account) && await this.read(resolver, "muxed_contract_version", []) !== 1)
+        throw new HolderError("this Resolver needs the muxed contract destination update", resolver, "muxed_contract_version");
       const r = await this.invoke(resolver, "set_muxed", [
         nativeToScVal(`${label}.${namespace}`, { type: "string" }), addrArg(holder),
         addrArg(muxed.account), nativeToScVal(BigInt(muxed.id), { type: "u64" }),
@@ -876,9 +899,9 @@ export class SoranHolder {
   }
   private async muxedIdentityWrite(fn: string, address: string, prefix: xdr.ScVal[] = [], suffix: xdr.ScVal[] = []): Promise<Submitted> {
     let muxed: { account: string; id: string };
-    try { muxed = decodeMuxedAddress(address); } catch { throw new HolderError("a canonical full M destination is required"); }
+    try { muxed = decodeMuxedAddress(address); } catch { throw new HolderError("a canonical full M or W destination is required"); }
     const pub = await this.holderAddress();
-    if (pub !== muxed.account) throw new HolderError("the muxed destination's underlying G account must sign");
+    if (pub !== muxed.account) throw new HolderError("the muxed destination's underlying G account or C contract must authorize");
     if (!this.lookupId) throw new HolderError("muxed identity requires a configured Universal Lookup contract");
     if (await this.read(this.lookupId, "registry", []) !== this.registryId) throw new HolderError("Lookup is anchored to a different Registry");
     const [version, destination, identity] = await Promise.all([
@@ -1031,7 +1054,7 @@ export class SoranHolder {
     let payment: PaymentDestination;
     try { payment = version === 2 ? destinationFromNative(raw) : paymentFromNative(raw); }
     catch (e) { throw new HolderError(`invalid payment result: ${String(e)}`, resolver, fn); }
-    if (StrKey.isValidMed25519PublicKey(payment.address)) throw new HolderError("this name has a muxed routing ID; use setPayment to explicitly update its destination");
+    if (isMuxedPaymentAddress(payment.address)) throw new HolderError("this name has a muxed routing ID; use setPayment to explicitly update its destination");
     if (payment.memo.type !== "none") throw new HolderError("this name requires a memo; use setPayment to update address and memo together");
     // Registrar-only write below cannot alter a Resolver's explicit addr/memo.
     // A concurrent set_payment installs its own addr, preserving its memo routing.
@@ -1057,7 +1080,7 @@ export class SoranHolder {
       .build();
     const sim = await this.server.simulateTransaction(tx);
     if (rpc.Api.isSimulationError(sim)) {
-      const errors = fn.startsWith("subname_") ? SUBNAME_REGISTRAR_ERRORS : ["chain_policy", "chain_address", "multichain_version"].includes(fn) ? RESOLVER_ERRORS : {};
+      const errors = ["quote_name_sale", "name_listing", "name_listing_for_holder"].includes(fn) ? REGISTRAR_ERRORS : fn.startsWith("subname_") ? SUBNAME_REGISTRAR_ERRORS : ["chain_policy", "chain_address", "multichain_version"].includes(fn) ? RESOLVER_ERRORS : {};
       throw typedError(contractId, fn, sim.error, errors);
     }
     if (rpc.Api.isSimulationRestore(sim)) {
@@ -1196,7 +1219,6 @@ export class SoranHolder {
     errNames: Record<number, string>,
   ): Promise<Invoked> {
     if (this.contractWallet && !NO_AUTH_WRITES.has(fn)) {
-      if (this.isMuxedIdentityWrite(fn)) throw new HolderError("muxed identity elections require the underlying G account");
       const context = this.nativeContext();
       const result = await sendNative(context, { ...await nativeWalletPlan(context), contract: contractId, method: fn, args,
         sourceInvocation: { contract: contractId, method: fn, args, children: [] }, maxFeeStroops: this.maxNativeFeeStroops });

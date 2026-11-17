@@ -108,6 +108,14 @@ export type NativeWriteOptions = {
   onPrepared?: (prepared: NativePrepared) => void | Promise<void>;
 };
 
+/** Protocol 29 can fold restoration into an otherwise successful simulation. */
+export function refuseNativeRestoration(tx:Transaction):void {
+ const envelope=tx.toEnvelope();
+ if(envelope.type!=="envelopeTypeTx"||envelope.value.tx.ext.type!=="sorobanData")return;
+ const ext=envelope.value.tx.ext.value.ext;
+ if(ext.type!=="v0"&&(ext.type!=="resourceExt"||ext.value.archivedSorobanEntries.length>0))throw new NativeClaimError("This operation would restore archived storage. Review restoration separately before continuing.","unavailable");
+}
+
 export async function prepareNative(context: NativeContext, plan: NativeAuthorizationPlan, options: NativeWriteOptions = {}, authorizeContract = false): Promise<{ transaction: Transaction; prepared: NativePrepared }> {
   const source = address(await context.signer.publicKey(), "account", "transaction signer");
   if (source !== plan.source) throw new NativeClaimError("wallet changed since the intent was reviewed", "authorization");
@@ -125,6 +133,7 @@ export async function prepareNative(context: NativeContext, plan: NativeAuthoriz
     return result;
   };
   let transaction = rpc.assembleTransaction(raw, await simulate(raw)).build();
+  refuseNativeRestoration(transaction);
   validateNativeTransaction(transaction, plan, false, false);
   if (options.eligibilityAuthorization) {
     if (options.eligibilityAuthorization.length > 32768) throw new NativeClaimError("eligibility authorization is too large", "authorization");
@@ -158,6 +167,7 @@ export async function prepareNative(context: NativeContext, plan: NativeAuthoriz
     const enforced = transaction.operations[0];
     if (enforced.type !== "invokeHostFunction" || JSON.stringify((enforced.auth ?? []).map(entry => entry.toXDR("base64"))) !== JSON.stringify(reviewedAuth))
       throw new NativeClaimError("simulation changed the reviewed authorizations", "authorization");
+    refuseNativeRestoration(transaction);
     validateNativeTransaction(transaction, plan);
   }
   const op = transaction.operations[0];

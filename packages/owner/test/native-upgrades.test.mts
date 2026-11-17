@@ -239,13 +239,14 @@ for (const role of ["registrar", "resolver"] as const) {
   });
 }
 
-test("the SDK release lineage equals exported public catalog and reviewed October 1 metadata", () => {
+test("the SDK release lineage equals the exported web catalog and reviewed individual-sale metadata", () => {
   const record = JSON.parse(readFileSync(new URL("../../../fixtures/release-catalog.json", import.meta.url), "utf8"));
-  assert.equal(record.sourceRevision, "cec2d29bd392c64ac3e7f8d1d20d626736c72ce5");
+  assert.equal(record.sourceRevision, "1673aa14168bc755abe5d4d714f8af3c52ab98d3");
   for (const role of ["registrar", "resolver"] as const) {
     assert.equal(RELEASES[role].latest, record.catalog[role].latest);
     assert.deepEqual([...RELEASES[role].superseded].sort(), [...record.catalog[role].superseded].sort());
     assert.equal(RELEASES[role].latest, record.artifacts[role].sha256);
+    assert.deepEqual([...RELEASES[role].superseded].sort(), [...record.reviewedPredecessors[role]].sort());
     assert.ok(!(RELEASES[role].superseded as readonly string[]).includes(RELEASES[role].latest));
   }
 });

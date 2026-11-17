@@ -131,3 +131,10 @@ hosted MCP rollout remains separate. See [release notes](RELEASE-2026-10-14.md).
 The verified MCP 0.10.1 archive was built from public merge `aa347f616fa31732ca174fded82415915d81f5ef`.
 Publication time, integrity and exact archive hash are recorded in
 `mcp-sync-manifest.json`. This documentation update changes no package files.
+
+
+## Individual-name marketplace SDKs
+
+Holder 0.12.0 adds XLM sale quoting, listing, cancellation and purchase for eligible individual names. Owner 0.13.1 recognizes the Registrar release that enables these calls. The exported source comes from `1673aa14168bc755abe5d4d714f8af3c52ab98d3`. The production TypeScript files and package manifests match the reviewed source byte for byte. The package READMEs link to the public deployment receipt, and the owner upgrade test compares the current web catalog and reviewed release hashes through the portable fixture.
+
+The marketplace scope in `sync-manifest.json` pins 30 changed package sources and two ABI test adaptations. The two package ABI tests read the marketplace revision’s public enum metadata. Lookup retains its historical fixture. Earlier package release entries remain historical. The corresponding source release passed its local package suites and audited installation checks. The public CI tests this exported repository. npm publication is a separate operation under its own release credentials.

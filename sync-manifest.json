@@ -119,11 +119,11 @@
     {
       "source": "sdk/holder/README.md",
       "destination": "packages/holder/README.md",
-      "sourceSha256": "0c50920d30c9416e87e3a1510164e5455fc0e31d36159d8bd83db90c5e535312",
-      "destinationSha256": "8570fd1b962a462a8a5d76ec2490b8f560ccc8da89e67715ea9a7dda58c9a6a7",
+      "sourceRevision": "1673aa14168bc755abe5d4d714f8af3c52ab98d3",
+      "sourceSha256": "4771a611d0214af613abefe6f282e8f4189a990e8a4c5cb06bd5dfe833568f78",
+      "destinationSha256": "8e65f96ddfcc22f623b85391c8894d54f485cac9586022b8d253683e8e6efa3d",
       "exact": false,
-      "sourceRevision": "e5788127c38f360f6bf97d91217f897441cf9bd1",
-      "adaptation": "Adjust only README and deployment-manifest links to the existing public mirror layout."
+      "adaptation": "Point release notes to the public repository root and the confirmed marketplace deployment receipt."
     },
     {
       "source": "sdk/holder/e2e.ts",
@@ -135,18 +135,18 @@
     {
       "source": "sdk/holder/package-lock.json",
       "destination": "packages/holder/package-lock.json",
-      "sourceSha256": "6f3ea6fe7e565beffffd2701335d9493f48fe464d6a9cac27df3fde6c14c0bf1",
-      "destinationSha256": "6f3ea6fe7e565beffffd2701335d9493f48fe464d6a9cac27df3fde6c14c0bf1",
-      "exact": true,
-      "sourceRevision": "e5788127c38f360f6bf97d91217f897441cf9bd1"
+      "sourceRevision": "1673aa14168bc755abe5d4d714f8af3c52ab98d3",
+      "sourceSha256": "f77b643cccce777640256df8759748b45e2b3bb10680bdf3e7e6f3fb2c3a3840",
+      "destinationSha256": "f77b643cccce777640256df8759748b45e2b3bb10680bdf3e7e6f3fb2c3a3840",
+      "exact": true
     },
     {
       "source": "sdk/holder/package.json",
       "destination": "packages/holder/package.json",
-      "sourceSha256": "eda6847bd64cc150ec1ffc9b4f8ca21c6e2075511d5d7199db951fbb6861078e",
-      "destinationSha256": "eda6847bd64cc150ec1ffc9b4f8ca21c6e2075511d5d7199db951fbb6861078e",
-      "exact": true,
-      "sourceRevision": "e5788127c38f360f6bf97d91217f897441cf9bd1"
+      "sourceRevision": "1673aa14168bc755abe5d4d714f8af3c52ab98d3",
+      "sourceSha256": "d033d8fee86724237ee1df48102bf5631aeeac920d50631a749757db373587f4",
+      "destinationSha256": "d033d8fee86724237ee1df48102bf5631aeeac920d50631a749757db373587f4",
+      "exact": true
     },
     {
       "source": "sdk/holder/src/contract-wallet.ts",
@@ -165,15 +165,17 @@
     {
       "source": "sdk/holder/src/funding-owner.ts",
       "destination": "packages/holder/src/funding-owner.ts",
-      "sourceSha256": "2a1c697177739eca37ae4fd2b34acbdd324d41c1f72ff4d693bc34d8202eb7c2",
-      "destinationSha256": "2a1c697177739eca37ae4fd2b34acbdd324d41c1f72ff4d693bc34d8202eb7c2",
+      "sourceRevision": "1673aa14168bc755abe5d4d714f8af3c52ab98d3",
+      "sourceSha256": "c260a70f4a1fc1da8130acc177e2c09edd73a7d1b89d22d45af28926157e8674",
+      "destinationSha256": "c260a70f4a1fc1da8130acc177e2c09edd73a7d1b89d22d45af28926157e8674",
       "exact": true
     },
     {
       "source": "sdk/holder/src/funding-reader.ts",
       "destination": "packages/holder/src/funding-reader.ts",
-      "sourceSha256": "81b32e4093c31bffa96f36c512521e63ee677997c4ff26fb94cbd03cdb55d9b4",
-      "destinationSha256": "81b32e4093c31bffa96f36c512521e63ee677997c4ff26fb94cbd03cdb55d9b4",
+      "sourceRevision": "1673aa14168bc755abe5d4d714f8af3c52ab98d3",
+      "sourceSha256": "f0ac402832c16aaea1398fddee8ad054a319c9903d0848e45bc3143ff78ba25f",
+      "destinationSha256": "f0ac402832c16aaea1398fddee8ad054a319c9903d0848e45bc3143ff78ba25f",
       "exact": true
     },
     {
@@ -186,8 +188,9 @@
     {
       "source": "sdk/holder/src/funding-types.ts",
       "destination": "packages/holder/src/funding-types.ts",
-      "sourceSha256": "b62e8d7323b6a18251fedb01916e7fb4de1a1920e31dca9c006e1f2f1bb47b01",
-      "destinationSha256": "b62e8d7323b6a18251fedb01916e7fb4de1a1920e31dca9c006e1f2f1bb47b01",
+      "sourceRevision": "1673aa14168bc755abe5d4d714f8af3c52ab98d3",
+      "sourceSha256": "da049a9184cc9f4b217971b7f3689716ab2e62f69e4f310466e03bc1885ad3c9",
+      "destinationSha256": "da049a9184cc9f4b217971b7f3689716ab2e62f69e4f310466e03bc1885ad3c9",
       "exact": true
     },
     {
@@ -200,16 +203,24 @@
     {
       "source": "sdk/holder/src/index.ts",
       "destination": "packages/holder/src/index.ts",
-      "sourceSha256": "67650f25f98263a9c023f6f03e49d3059ace0430a38f00e0c0dd69fabbcddfbe",
-      "destinationSha256": "67650f25f98263a9c023f6f03e49d3059ace0430a38f00e0c0dd69fabbcddfbe",
-      "exact": true,
-      "sourceRevision": "e5788127c38f360f6bf97d91217f897441cf9bd1"
+      "sourceRevision": "1673aa14168bc755abe5d4d714f8af3c52ab98d3",
+      "sourceSha256": "c2208a0f3d4c64e2e9b57146552e7d32b95d06baabe65e1ae87d1259041f98ca",
+      "destinationSha256": "c2208a0f3d4c64e2e9b57146552e7d32b95d06baabe65e1ae87d1259041f98ca",
+      "exact": true
     },
     {
       "source": "sdk/holder/src/multichain.ts",
       "destination": "packages/holder/src/multichain.ts",
       "sourceSha256": "c6ac42e0ec93220dec269a1190f92e4f748dde7b46677f24d48c988a4853ecd6",
       "destinationSha256": "c6ac42e0ec93220dec269a1190f92e4f748dde7b46677f24d48c988a4853ecd6",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/src/name-sales.ts",
+      "destination": "packages/holder/src/name-sales.ts",
+      "sourceRevision": "1673aa14168bc755abe5d4d714f8af3c52ab98d3",
+      "sourceSha256": "d4752c42e9c36e936b01c1db1a4ffb1c8cee2515f6d2e93c556b610e1777e393",
+      "destinationSha256": "d4752c42e9c36e936b01c1db1a4ffb1c8cee2515f6d2e93c556b610e1777e393",
       "exact": true
     },
     {
@@ -250,8 +261,9 @@
     {
       "source": "sdk/holder/src/native-codec.ts",
       "destination": "packages/holder/src/native-codec.ts",
-      "sourceSha256": "cd49a10d87befb4ada520082ba53008c6175e35eb0a4185b94ca51b2bf2ac6c5",
-      "destinationSha256": "cd49a10d87befb4ada520082ba53008c6175e35eb0a4185b94ca51b2bf2ac6c5",
+      "sourceRevision": "1673aa14168bc755abe5d4d714f8af3c52ab98d3",
+      "sourceSha256": "25c090ba5c5cf0624cc9976e34d9ae9657651b0b6d0055c88d0b4c81276753ef",
+      "destinationSha256": "25c090ba5c5cf0624cc9976e34d9ae9657651b0b6d0055c88d0b4c81276753ef",
       "exact": true
     },
     {
@@ -271,8 +283,9 @@
     {
       "source": "sdk/holder/src/native-transport.ts",
       "destination": "packages/holder/src/native-transport.ts",
-      "sourceSha256": "6de091ea95486d7dedca01ae6187d535d42e42a24cd8e0f857b0d8687ecffc28",
-      "destinationSha256": "6de091ea95486d7dedca01ae6187d535d42e42a24cd8e0f857b0d8687ecffc28",
+      "sourceRevision": "1673aa14168bc755abe5d4d714f8af3c52ab98d3",
+      "sourceSha256": "cc81fd8e3daa241a3c2482d8190cc6ce5621925b7fead3da87401a2e99d452b2",
+      "destinationSha256": "cc81fd8e3daa241a3c2482d8190cc6ce5621925b7fead3da87401a2e99d452b2",
       "exact": true
     },
     {
@@ -285,8 +298,9 @@
     {
       "source": "sdk/holder/src/payment.ts",
       "destination": "packages/holder/src/payment.ts",
-      "sourceSha256": "20494b8e99ae3d0de87d7aaaf738212947358ed162725a91dea90a616d78ad87",
-      "destinationSha256": "20494b8e99ae3d0de87d7aaaf738212947358ed162725a91dea90a616d78ad87",
+      "sourceRevision": "1673aa14168bc755abe5d4d714f8af3c52ab98d3",
+      "sourceSha256": "b1dce15a10e1a3cb261c8a08d25e57b91a16d53d6e43f563b9b8f73529997956",
+      "destinationSha256": "b1dce15a10e1a3cb261c8a08d25e57b91a16d53d6e43f563b9b8f73529997956",
       "exact": true
     },
     {
@@ -307,8 +321,10 @@
       "source": "sdk/holder/test/error-codes.test.mts",
       "destination": "packages/holder/test/error-codes.test.mts",
       "sourceSha256": "1297c7c7f347f56ebfcb7ff27efb9a54a57329a5ab85def4dd2b77aa70fdf278",
-      "destinationSha256": "1297c7c7f347f56ebfcb7ff27efb9a54a57329a5ab85def4dd2b77aa70fdf278",
-      "exact": true
+      "destinationSha256": "23c4116e536ead5fda432b511769a543961c46d07c66ec00489f0291c6748a03",
+      "exact": false,
+      "sourceRevision": "1673aa14168bc755abe5d4d714f8af3c52ab98d3",
+      "adaptation": "Compare the SDK's error tables with the public ABI snapshot for this release."
     },
     {
       "source": "sdk/holder/test/fixtures/funding-interop.json",
@@ -343,6 +359,30 @@
       "destination": "packages/holder/test/funding-history.test.mts",
       "sourceSha256": "38a8d3b7c86a623c5b95b5b8aa4776d2b852ccfad42954da878844f17915f10c",
       "destinationSha256": "38a8d3b7c86a623c5b95b5b8aa4776d2b852ccfad42954da878844f17915f10c",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/test/funding-prepaid.test.mts",
+      "destination": "packages/holder/test/funding-prepaid.test.mts",
+      "sourceRevision": "1673aa14168bc755abe5d4d714f8af3c52ab98d3",
+      "sourceSha256": "818f5a322dca9459328a9fa2d8d551a1373b7361ce2acad12c84c3ddf857917d",
+      "destinationSha256": "818f5a322dca9459328a9fa2d8d551a1373b7361ce2acad12c84c3ddf857917d",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/test/funding-transport.test.mts",
+      "destination": "packages/holder/test/funding-transport.test.mts",
+      "sourceRevision": "1673aa14168bc755abe5d4d714f8af3c52ab98d3",
+      "sourceSha256": "9b1d2e53caa74619a7c05a4f3e0b555a1e2a4a72c2ee163c0d26675a53a7f104",
+      "destinationSha256": "9b1d2e53caa74619a7c05a4f3e0b555a1e2a4a72c2ee163c0d26675a53a7f104",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/test/funding-upkeep.test.mts",
+      "destination": "packages/holder/test/funding-upkeep.test.mts",
+      "sourceRevision": "1673aa14168bc755abe5d4d714f8af3c52ab98d3",
+      "sourceSha256": "efa2b49d8535369bc090d943f732fd0e8547df96693b50b07fa94154fd180f06",
+      "destinationSha256": "efa2b49d8535369bc090d943f732fd0e8547df96693b50b07fa94154fd180f06",
       "exact": true
     },
     {
@@ -391,8 +431,9 @@
     {
       "source": "sdk/holder/test/muxed.test.mts",
       "destination": "packages/holder/test/muxed.test.mts",
-      "sourceSha256": "3131dd4c0598b50d83695e36ba7b140b1d2b88e73cf95aeef54637fa2ee0a111",
-      "destinationSha256": "3131dd4c0598b50d83695e36ba7b140b1d2b88e73cf95aeef54637fa2ee0a111",
+      "sourceRevision": "1673aa14168bc755abe5d4d714f8af3c52ab98d3",
+      "sourceSha256": "24f5cbaf56d2f6b21583579a98b5e9851b45002e703511671790e3cfd9e8c182",
+      "destinationSha256": "24f5cbaf56d2f6b21583579a98b5e9851b45002e703511671790e3cfd9e8c182",
       "exact": true
     },
     {
@@ -443,6 +484,14 @@
       "destination": "packages/holder/test/native-lifecycle.test.mts",
       "sourceSha256": "66b904834b8db62dd23a652e16ebca09e0083312f73d88de8986e05953f1ee30",
       "destinationSha256": "66b904834b8db62dd23a652e16ebca09e0083312f73d88de8986e05953f1ee30",
+      "exact": true
+    },
+    {
+      "source": "sdk/holder/test/native-name-sales.test.mts",
+      "destination": "packages/holder/test/native-name-sales.test.mts",
+      "sourceRevision": "1673aa14168bc755abe5d4d714f8af3c52ab98d3",
+      "sourceSha256": "cb9a7753d17a28179493f0d2c3ed2356ff81e0adbf6a9c496dc34e4ded5cd954",
+      "destinationSha256": "cb9a7753d17a28179493f0d2c3ed2356ff81e0adbf6a9c496dc34e4ded5cd954",
       "exact": true
     },
     {
@@ -745,11 +794,11 @@
     {
       "source": "sdk/owner/README.md",
       "destination": "packages/owner/README.md",
-      "sourceSha256": "468cf800162cff5ddf8a046d2777f713d8613f48ca91cf63b6f5258153bf48a9",
-      "destinationSha256": "2ab4b800ea4a44701787bd2b4a6573783e3b4365cc442c05a4453b8deee8941c",
+      "sourceRevision": "1673aa14168bc755abe5d4d714f8af3c52ab98d3",
+      "sourceSha256": "e10681d2896b773da60408dbac72c1e0fbedb764eb03ece74e1d40eb15119f03",
+      "destinationSha256": "3fcce9b5b267fc0ec7dab0612ff3f9a40d0bea4ca8e5b395b3416520be52c30f",
       "exact": false,
-      "sourceRevision": "e5788127c38f360f6bf97d91217f897441cf9bd1",
-      "adaptation": "Adjust only README and deployment-manifest links to the existing public mirror layout."
+      "adaptation": "Point release notes to the public repository root and the confirmed marketplace deployment receipt."
     },
     {
       "source": "sdk/owner/e2e.ts",
@@ -761,18 +810,18 @@
     {
       "source": "sdk/owner/package-lock.json",
       "destination": "packages/owner/package-lock.json",
-      "sourceSha256": "622b9e8f812a721939852f1ce00136c190c8412e2d61d622815af32395c498ee",
-      "destinationSha256": "622b9e8f812a721939852f1ce00136c190c8412e2d61d622815af32395c498ee",
-      "exact": true,
-      "sourceRevision": "e5788127c38f360f6bf97d91217f897441cf9bd1"
+      "sourceRevision": "1673aa14168bc755abe5d4d714f8af3c52ab98d3",
+      "sourceSha256": "a185bf1f86bf83fe4375f5cffcfae26463e1e689a6af39fe6ff2df414b53ef5f",
+      "destinationSha256": "a185bf1f86bf83fe4375f5cffcfae26463e1e689a6af39fe6ff2df414b53ef5f",
+      "exact": true
     },
     {
       "source": "sdk/owner/package.json",
       "destination": "packages/owner/package.json",
-      "sourceSha256": "2a5cf2b4a4cccb9d3c73d0547231d864db7a4718e2d42f8af38998b6889ff1bc",
-      "destinationSha256": "2a5cf2b4a4cccb9d3c73d0547231d864db7a4718e2d42f8af38998b6889ff1bc",
-      "exact": true,
-      "sourceRevision": "e5788127c38f360f6bf97d91217f897441cf9bd1"
+      "sourceRevision": "1673aa14168bc755abe5d4d714f8af3c52ab98d3",
+      "sourceSha256": "dcfa68effec5ab711fd8593438c8a5ee182364843df629947dba6e2d25c6bfc8",
+      "destinationSha256": "dcfa68effec5ab711fd8593438c8a5ee182364843df629947dba6e2d25c6bfc8",
+      "exact": true
     },
     {
       "source": "sdk/owner/src/contract-wallet.ts",
@@ -791,15 +840,17 @@
     {
       "source": "sdk/owner/src/funding-owner.ts",
       "destination": "packages/owner/src/funding-owner.ts",
-      "sourceSha256": "2a1c697177739eca37ae4fd2b34acbdd324d41c1f72ff4d693bc34d8202eb7c2",
-      "destinationSha256": "2a1c697177739eca37ae4fd2b34acbdd324d41c1f72ff4d693bc34d8202eb7c2",
+      "sourceRevision": "1673aa14168bc755abe5d4d714f8af3c52ab98d3",
+      "sourceSha256": "c260a70f4a1fc1da8130acc177e2c09edd73a7d1b89d22d45af28926157e8674",
+      "destinationSha256": "c260a70f4a1fc1da8130acc177e2c09edd73a7d1b89d22d45af28926157e8674",
       "exact": true
     },
     {
       "source": "sdk/owner/src/funding-reader.ts",
       "destination": "packages/owner/src/funding-reader.ts",
-      "sourceSha256": "81b32e4093c31bffa96f36c512521e63ee677997c4ff26fb94cbd03cdb55d9b4",
-      "destinationSha256": "81b32e4093c31bffa96f36c512521e63ee677997c4ff26fb94cbd03cdb55d9b4",
+      "sourceRevision": "1673aa14168bc755abe5d4d714f8af3c52ab98d3",
+      "sourceSha256": "f0ac402832c16aaea1398fddee8ad054a319c9903d0848e45bc3143ff78ba25f",
+      "destinationSha256": "f0ac402832c16aaea1398fddee8ad054a319c9903d0848e45bc3143ff78ba25f",
       "exact": true
     },
     {
@@ -812,8 +863,9 @@
     {
       "source": "sdk/owner/src/funding-types.ts",
       "destination": "packages/owner/src/funding-types.ts",
-      "sourceSha256": "b62e8d7323b6a18251fedb01916e7fb4de1a1920e31dca9c006e1f2f1bb47b01",
-      "destinationSha256": "b62e8d7323b6a18251fedb01916e7fb4de1a1920e31dca9c006e1f2f1bb47b01",
+      "sourceRevision": "1673aa14168bc755abe5d4d714f8af3c52ab98d3",
+      "sourceSha256": "da049a9184cc9f4b217971b7f3689716ab2e62f69e4f310466e03bc1885ad3c9",
+      "destinationSha256": "da049a9184cc9f4b217971b7f3689716ab2e62f69e4f310466e03bc1885ad3c9",
       "exact": true
     },
     {
@@ -826,10 +878,10 @@
     {
       "source": "sdk/owner/src/index.ts",
       "destination": "packages/owner/src/index.ts",
-      "sourceSha256": "9c746e4fc07db5856a0815a9bf52b7eb44d314a02c41d9ea4e8fa203100ff72b",
-      "destinationSha256": "9c746e4fc07db5856a0815a9bf52b7eb44d314a02c41d9ea4e8fa203100ff72b",
-      "exact": true,
-      "sourceRevision": "e5788127c38f360f6bf97d91217f897441cf9bd1"
+      "sourceRevision": "1673aa14168bc755abe5d4d714f8af3c52ab98d3",
+      "sourceSha256": "5cdc096ebdb634b46984d65091e2f7ccd181254afaa0ae4ddcba983ffd355e04",
+      "destinationSha256": "5cdc096ebdb634b46984d65091e2f7ccd181254afaa0ae4ddcba983ffd355e04",
+      "exact": true
     },
     {
       "source": "sdk/owner/src/multichain.ts",
@@ -869,8 +921,9 @@
     {
       "source": "sdk/owner/src/native-codec.ts",
       "destination": "packages/owner/src/native-codec.ts",
-      "sourceSha256": "cd49a10d87befb4ada520082ba53008c6175e35eb0a4185b94ca51b2bf2ac6c5",
-      "destinationSha256": "cd49a10d87befb4ada520082ba53008c6175e35eb0a4185b94ca51b2bf2ac6c5",
+      "sourceRevision": "1673aa14168bc755abe5d4d714f8af3c52ab98d3",
+      "sourceSha256": "25c090ba5c5cf0624cc9976e34d9ae9657651b0b6d0055c88d0b4c81276753ef",
+      "destinationSha256": "25c090ba5c5cf0624cc9976e34d9ae9657651b0b6d0055c88d0b4c81276753ef",
       "exact": true
     },
     {
@@ -883,8 +936,9 @@
     {
       "source": "sdk/owner/src/native-transport.ts",
       "destination": "packages/owner/src/native-transport.ts",
-      "sourceSha256": "1ba904b438120cb2802b9b80ff05b7f93bada819cd01c58a6b868efbc7bac1eb",
-      "destinationSha256": "1ba904b438120cb2802b9b80ff05b7f93bada819cd01c58a6b868efbc7bac1eb",
+      "sourceRevision": "1673aa14168bc755abe5d4d714f8af3c52ab98d3",
+      "sourceSha256": "8c11a66bdfd4426d6767eb9032a62418f4be85acdd401ac13da76a9b2c041aa4",
+      "destinationSha256": "8c11a66bdfd4426d6767eb9032a62418f4be85acdd401ac13da76a9b2c041aa4",
       "exact": true
     },
     {
@@ -897,15 +951,17 @@
     {
       "source": "sdk/owner/src/native-upgrades.ts",
       "destination": "packages/owner/src/native-upgrades.ts",
-      "sourceSha256": "137b09261917b57d60f1abbf6acc260066079575ec4430a5727b5dc42b28b0af",
-      "destinationSha256": "137b09261917b57d60f1abbf6acc260066079575ec4430a5727b5dc42b28b0af",
+      "sourceRevision": "1673aa14168bc755abe5d4d714f8af3c52ab98d3",
+      "sourceSha256": "9f604ae9d457cc7fca8cb39475533e4a8cb5fbdd31652e489d788ee75d613e0b",
+      "destinationSha256": "9f604ae9d457cc7fca8cb39475533e4a8cb5fbdd31652e489d788ee75d613e0b",
       "exact": true
     },
     {
       "source": "sdk/owner/src/payment.ts",
       "destination": "packages/owner/src/payment.ts",
-      "sourceSha256": "20494b8e99ae3d0de87d7aaaf738212947358ed162725a91dea90a616d78ad87",
-      "destinationSha256": "20494b8e99ae3d0de87d7aaaf738212947358ed162725a91dea90a616d78ad87",
+      "sourceRevision": "1673aa14168bc755abe5d4d714f8af3c52ab98d3",
+      "sourceSha256": "b1dce15a10e1a3cb261c8a08d25e57b91a16d53d6e43f563b9b8f73529997956",
+      "destinationSha256": "b1dce15a10e1a3cb261c8a08d25e57b91a16d53d6e43f563b9b8f73529997956",
       "exact": true
     },
     {
@@ -926,8 +982,10 @@
       "source": "sdk/owner/test/error-codes.test.mts",
       "destination": "packages/owner/test/error-codes.test.mts",
       "sourceSha256": "4a6b55d17d7d5fbcebd9a9553b56f597596d11a54d475863479978f17dbdda7c",
-      "destinationSha256": "4a6b55d17d7d5fbcebd9a9553b56f597596d11a54d475863479978f17dbdda7c",
-      "exact": true
+      "destinationSha256": "be519228e039d7a4a48773580989f00cf0ad75cf484ba467c8708117624cbeee",
+      "exact": false,
+      "sourceRevision": "1673aa14168bc755abe5d4d714f8af3c52ab98d3",
+      "adaptation": "Compare the SDK's error tables with the public ABI snapshot for this release."
     },
     {
       "source": "sdk/owner/test/fixtures/funding-interop.json",
@@ -948,6 +1006,22 @@
       "destination": "packages/owner/test/funding-history.test.mts",
       "sourceSha256": "38a8d3b7c86a623c5b95b5b8aa4776d2b852ccfad42954da878844f17915f10c",
       "destinationSha256": "38a8d3b7c86a623c5b95b5b8aa4776d2b852ccfad42954da878844f17915f10c",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/test/funding-prepaid.test.mts",
+      "destination": "packages/owner/test/funding-prepaid.test.mts",
+      "sourceRevision": "1673aa14168bc755abe5d4d714f8af3c52ab98d3",
+      "sourceSha256": "818f5a322dca9459328a9fa2d8d551a1373b7361ce2acad12c84c3ddf857917d",
+      "destinationSha256": "818f5a322dca9459328a9fa2d8d551a1373b7361ce2acad12c84c3ddf857917d",
+      "exact": true
+    },
+    {
+      "source": "sdk/owner/test/funding-upkeep.test.mts",
+      "destination": "packages/owner/test/funding-upkeep.test.mts",
+      "sourceRevision": "1673aa14168bc755abe5d4d714f8af3c52ab98d3",
+      "sourceSha256": "efa2b49d8535369bc090d943f732fd0e8547df96693b50b07fa94154fd180f06",
+      "destinationSha256": "efa2b49d8535369bc090d943f732fd0e8547df96693b50b07fa94154fd180f06",
       "exact": true
     },
     {
@@ -1024,9 +1098,11 @@
     {
       "source": "sdk/owner/test/native-upgrades.test.mts",
       "destination": "packages/owner/test/native-upgrades.test.mts",
-      "sourceSha256": "aa83ab48cd80aca676c1966dccde63cd6261a03b0039dd3a2006e7da8af296a7",
-      "destinationSha256": "4e0c216308a76641d8aa2448252de3f11d9b3dba14c5911b1de796ef780cedab",
-      "exact": false
+      "sourceRevision": "1673aa14168bc755abe5d4d714f8af3c52ab98d3",
+      "sourceSha256": "49988c1b9729ef390289656ea37c75df58b2ed024d32b6fe98690b1e4759b353",
+      "destinationSha256": "ce1c65d0c1db8e27c443d32f7ef302f944f42e2fd95122ecce4e083af474c860",
+      "exact": false,
+      "adaptation": "Read the exported contract hashes, web catalog and independently derived candidate predecessors from the public fixture."
     },
     {
       "source": "sdk/owner/test/nested-authorization.test.mts",
@@ -1059,7 +1135,13 @@
     },
     {
       "file": "fixtures/release-catalog.json",
-      "sha256": "8c612d7497b4e1ae175bbf04bc1d472365fb73283dd89d648d2cf173f12b64b2"
+      "sha256": "34af46821aa19339afce75cc7629ff8b5c47656d68512b86601eea6086d146ab",
+      "sourceRevision": "1673aa14168bc755abe5d4d714f8af3c52ab98d3"
+    },
+    {
+      "file": "fixtures/marketplace-abi-errors.json",
+      "sourceRevision": "1673aa14168bc755abe5d4d714f8af3c52ab98d3",
+      "sha256": "c0b2e7eec58371a966018386cbb57d95293ea1d8a0bea84faabe66fc7888e347"
     }
   ],
   "productionSourcesUnchanged": true,
@@ -1117,5 +1199,47 @@
         "registryArchiveMatchesReviewed": true
       }
     ]
+  },
+  "marketplaceRelease": {
+    "sourceRevision": "1673aa14168bc755abe5d4d714f8af3c52ab98d3",
+    "versions": {
+      "holder": "0.12.0",
+      "owner": "0.13.1"
+    },
+    "files": [
+      "packages/holder/README.md",
+      "packages/holder/package-lock.json",
+      "packages/holder/package.json",
+      "packages/holder/src/funding-owner.ts",
+      "packages/holder/src/funding-reader.ts",
+      "packages/holder/src/funding-types.ts",
+      "packages/holder/src/index.ts",
+      "packages/holder/src/name-sales.ts",
+      "packages/holder/src/native-codec.ts",
+      "packages/holder/src/native-transport.ts",
+      "packages/holder/src/payment.ts",
+      "packages/holder/test/error-codes.test.mts",
+      "packages/holder/test/funding-prepaid.test.mts",
+      "packages/holder/test/funding-transport.test.mts",
+      "packages/holder/test/funding-upkeep.test.mts",
+      "packages/holder/test/muxed.test.mts",
+      "packages/holder/test/native-name-sales.test.mts",
+      "packages/owner/README.md",
+      "packages/owner/package-lock.json",
+      "packages/owner/package.json",
+      "packages/owner/src/funding-owner.ts",
+      "packages/owner/src/funding-reader.ts",
+      "packages/owner/src/funding-types.ts",
+      "packages/owner/src/index.ts",
+      "packages/owner/src/native-codec.ts",
+      "packages/owner/src/native-transport.ts",
+      "packages/owner/src/native-upgrades.ts",
+      "packages/owner/src/payment.ts",
+      "packages/owner/test/error-codes.test.mts",
+      "packages/owner/test/funding-prepaid.test.mts",
+      "packages/owner/test/funding-upkeep.test.mts",
+      "packages/owner/test/native-upgrades.test.mts"
+    ],
+    "productionSourcesByteIdentical": true
   }
 }

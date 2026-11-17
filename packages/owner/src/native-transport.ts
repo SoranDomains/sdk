@@ -66,6 +66,14 @@ export type NativeWriteOptions = {
   onPrepared?: (prepared: NativePrepared) => void | Promise<void>;
 };
 
+/** Protocol 29 can fold restoration into an otherwise successful simulation. */
+export function refuseNativeRestoration(tx:Transaction):void {
+ const envelope=tx.toEnvelope();
+ if(envelope.type!=="envelopeTypeTx"||envelope.value.tx.ext.type!=="sorobanData")return;
+ const ext=envelope.value.tx.ext.value.ext;
+ if(ext.type!=="v0"&&(ext.type!=="resourceExt"||ext.value.archivedSorobanEntries.length>0))throw new NativeClaimError("This operation would restore archived storage. Review restoration separately before continuing.","unavailable");
+}
+
 export async function prepareNative(context: NativeContext, plan: NativeAuthorizationPlan, options: NativeWriteOptions = {}): Promise<{ transaction: Transaction; prepared: NativePrepared }> {
   const source = address(await context.signer.publicKey(), "account", "transaction signer");
   if (source !== plan.source) throw new NativeClaimError("wallet changed since the intent was reviewed", "authorization");
@@ -90,6 +98,7 @@ export async function prepareNative(context: NativeContext, plan: NativeAuthoriz
     const auth = (op.auth ?? []).map(entry => entry.credentials.type === "sorobanCredentialsSourceAccount" ? entry : signed);
     transaction = TransactionBuilder.cloneFrom(transaction, { networkPassphrase: context.passphrase }).clearOperations().addOperation(Operation.invokeHostFunction({ func: op.func, auth })).build();
     transaction = rpc.assembleTransaction(transaction, await simulate(transaction)).build();
+    refuseNativeRestoration(transaction);
     validateNativeTransaction(transaction, plan);
   }
   const op = transaction.operations[0];

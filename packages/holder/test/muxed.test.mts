@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { Account, Address, Keypair, Networks, Operation, SorobanDataBuilder, StrKey, TransactionBuilder, nativeToScVal, scValToNative, xdr } from "@stellar/stellar-sdk";
 import { SoranHolder, HolderError, DEPLOYMENTS, encodeMuxedAddress, decodeMuxedAddress, type PaymentDestination } from "../src/index.js";
-import { paymentMemoToScVal, encodePaymentRecord, parsePaymentRecord } from "../src/payment.js";
+import { isMuxedPaymentAddress, paymentMemoToScVal, encodePaymentRecord, parsePaymentRecord } from "../src/payment.js";
 const kp=Keypair.random(),G=kp.publicKey(),OTHER=Keypair.random().publicKey();
 const C=StrKey.encodeContract(new Uint8Array(32).fill(7)),REGISTRAR=StrKey.encodeContract(new Uint8Array(32).fill(8));
 const REGISTRY=DEPLOYMENTS.testnet.registryId;
@@ -10,14 +10,14 @@ const signer={publicKey:()=>G,signTransaction:async()=>{throw new Error("must no
 const matrix:Array<[string,PaymentDestination]>=[
  ["G-none",{address:G,memo:{type:"none"}}],["G-ID",{address:G,memo:{type:"id",value:"18446744073709551615"}}],
  ["G-text",{address:G,memo:{type:"text",value:"customer-420"}}],["G-hash",{address:G,memo:{type:"hash",value:"ab".repeat(32)}}],
- ["C-none",{address:C,memo:{type:"none"}}],...["0","9007199254740993","18446744073709551615"].map((id):[string,PaymentDestination]=>["M-"+id,{address:encodeMuxedAddress(G,id),memo:{type:"none"}}]),
+ ["C-none",{address:C,memo:{type:"none"}}],...["0","9007199254740993","18446744073709551615"].map((id):[string,PaymentDestination]=>["W-"+id,{address:encodeMuxedAddress(C,id),memo:{type:"none"}}]),...["0","9007199254740993","18446744073709551615"].map((id):[string,PaymentDestination]=>["M-"+id,{address:encodeMuxedAddress(G,id),memo:{type:"none"}}]),
 ];
 const readNative=(overrides:Record<string,unknown>={})=>async(id:string,fn:string,args:xdr.ScVal[])=>{
  if(Object.hasOwn(overrides,fn)){const v=overrides[fn];if(v instanceof Error)throw v;return v;}
  if(fn==="resolver_of")return C;if(fn==="registrar_of")return REGISTRAR;
  if(fn==="anchors"){assert.equal(id,REGISTRAR);return [REGISTRY,scValToNative(lastNamespaceArg!)];}
  if(fn==="registry")return REGISTRY;if(fn==="authority")return REGISTRAR;
- if(fn==="payment_version"||fn==="destination_version")return 2;
+ if(fn==="muxed_contract_version")return 1;if(fn==="payment_version"||fn==="destination_version")return 2;
  if(fn==="resolve_destination")return ["Direct",{address:G,memo:["None"]}];
  throw new Error("unexpected "+fn);
 };
@@ -31,7 +31,7 @@ for(const [label,payment] of matrix)test(`setPayment v2 matrix preserves exact f
  Object.assign(s,{invoke:async(id:string,fn:string,args:xdr.ScVal[],errors:Record<number,string>)=>{
   count++;assert.equal(id,C);assert.equal(errors[21],"MuxedDestination");
   const decoded=args.map(a=>scValToNative(a));assert.deepEqual(decoded.slice(0,2),["alice.nova",G]);
-  if(payment.address[0]==="M"){
+  if(isMuxedPaymentAddress(payment.address)){
    const m=decodeMuxedAddress(payment.address);assert.equal(fn,"set_muxed");assert.deepEqual(decoded.slice(2),[m.account,BigInt(m.id)]);
   }else{assert.equal(fn,"set_payment");assert.equal(decoded[2],payment.address);assert.deepEqual(decoded[3],scValToNative(paymentMemoToScVal(payment.memo)));}
   return {hash:"h",ledger:1};
@@ -54,7 +54,7 @@ test("account-only setters refuse implicit muxed rewrites",async()=>{
  await assert.rejects(s.setAddress("alice.nova",G),/muxed routing ID/);
  await assert.rejects(s.setRecord("alice.nova",M),/setPayment/);
 });
-function invokeArgs(payment:PaymentDestination){return payment.address[0]==="M"?[nativeToScVal("alice.nova",{type:"string"}),new Address(G).toScVal(),new Address(decodeMuxedAddress(payment.address).account).toScVal(),nativeToScVal(BigInt(decodeMuxedAddress(payment.address).id),{type:"u64"})]:[nativeToScVal("alice.nova",{type:"string"}),new Address(G).toScVal(),new Address(payment.address).toScVal(),paymentMemoToScVal(payment.memo)];}
+function invokeArgs(payment:PaymentDestination){return isMuxedPaymentAddress(payment.address)?[nativeToScVal("alice.nova",{type:"string"}),new Address(G).toScVal(),new Address(decodeMuxedAddress(payment.address).account).toScVal(),nativeToScVal(BigInt(decodeMuxedAddress(payment.address).id),{type:"u64"})]:[nativeToScVal("alice.nova",{type:"string"}),new Address(G).toScVal(),new Address(payment.address).toScVal(),paymentMemoToScVal(payment.memo)];}
 function auth(fn:string,args:xdr.ScVal[],nested=false){
  const call=new xdr.InvokeContractArgs({contractAddress:new Address(C).toScAddress(),functionName:fn,args});
  const root=new xdr.SorobanAuthorizedInvocation({function:xdr.SorobanAuthorizedFunction.sorobanAuthorizedFunctionTypeContractFn(call),subInvocations:[]});
@@ -62,7 +62,7 @@ function auth(fn:string,args:xdr.ScVal[],nested=false){
  return new xdr.SorobanAuthorizationEntry({credentials:xdr.SorobanCredentials.sorobanCredentialsSourceAccount(),rootInvocation:root});
 }
 for(const [label,payment] of matrix)for(const format of ["string","object"] as const)test(`actual wallet signing/transaction pipeline ${format}: ${label}`,async()=>{
- let signatures=0,submitted=0;const expectedFn=payment.address[0]==="M"?"set_muxed":"set_payment";
+ let signatures=0,submitted=0;const expectedFn=isMuxedPaymentAddress(payment.address)?"set_muxed":"set_payment";
  const expected=invokeArgs(payment);
  const s=new SoranHolder({signer:{publicKey:()=>G,signTransaction:async(encoded,{networkPassphrase})=>{
   signatures++;assert.equal(networkPassphrase,Networks.TESTNET);const tx=TransactionBuilder.fromXDR(encoded,networkPassphrase);

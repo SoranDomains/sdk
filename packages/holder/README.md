@@ -5,7 +5,7 @@
 > [release status](https://docs.soran.domains/reference/release-status) for package and service availability.
 
 
-Version 0.10.1 targets Stellar SDK17 (`>=17 <18`). ASCII names
+Version 0.12.0 adds individual name listing, cancellation and purchase in XLM. It targets Stellar SDK 17 (`>=17.4.0 <18`). ASCII names
 and labels are validated before lowercase normalization; Unicode lookalikes are
 rejected. Payment and ownership writes target the owning Registry/Registrar/Resolver.
 Complete-M display-name writes target Universal Lookup; Lookup 0.10.0 or later provides
@@ -224,7 +224,7 @@ Read the [native claim APIs, security boundaries and complete signup flow](https
 
 ## Verified testnet deployment
 
-See the [deployment manifest](../../deployments/testnet.json) for confirmed code hashes, transaction receipts and verification scope. Network passphrase: `Test SDF Network ; September 2015`.
+See the [deployment manifest](https://soran.domains/release-manifests/testnet-2026-11-16.json) for confirmed code hashes, transaction receipts and verification scope. Network passphrase: `Test SDF Network ; September 2015`.
 
 | Contract | Address |
 |---|---|
@@ -310,3 +310,46 @@ and bounded `subnames(parent, { offset, limit })` reads include removed and stal
 rows, and are not payment answers. Always resolve payment instructions again.
 A failed or archived read is an error, never a missing child. The maximum page
 size is 16; pages may change between reads and across a Registrar migration.
+
+
+### Protocol 30 / SDK 17.4 (unreleased local update)
+
+The source supports W payment destinations alongside M. `encodeMuxedAddress`
+accepts a G or C base and an exact decimal u64 string; W is the C base plus its
+routing ID. W permits memo `none` only and must never be shortened to C for a
+payment, used as a signer/holder, or converted into a separate transaction memo.
+The native destination remains `Muxed({ account: C, id: u64 })` and the stored
+record is `2|C_BASE|muxed|DECIMAL_ID`, preserving existing state and ABI tags.
+
+Writing W requires a Resolver with `muxed_contract_version() == 1`; the updated
+Universal Lookup understands the same C-base tuple. Existing deployed contracts
+need reviewed upgrades before W writes can be offered. Direct address-only
+contract reads still refuse muxed destinations. Native Stellar Asset Contract
+transfers to W also require Protocol 30 on the target network.
+
+This local work does not publish npm packages or update deployed contracts.
+Downstream npm integrations, including MCP and the separate Snap package, require
+a coordinated release before they can advertise W support.
+
+## Individual name sales in XLM
+
+The Registrar supports fixed-price sales for live, non-expiring direct names in namespaces that allow both transfers and sales and have disabled issuer reclaim. Check `nameSaleState(name)` to see support, eligibility, the current holder and the current listing. This read works without signing. Amounts are exact `bigint` stroops (10,000,000 per XLM), and deadlines are Unix seconds.
+
+```ts
+const terms = await seller.quoteNameSale("alice.nova", {
+  priceStroops: 100n * 10_000_000n,
+  deadline: BigInt(Math.floor(Date.now() / 1000)) + 7n * 86_400n,
+  payout: sellerWallet,
+});
+// Show terms.sellerNetStroops, soranFeeStroops, namespaceFeeStroops,
+// recipients and deadline to the seller before proceeding.
+await seller.listNameForSale(terms);
+
+const state = await buyer.nameSaleState("alice.nova");
+if (state.supported && state.listing) {
+  // Review the listing before buying. The buyer becomes the receiving address.
+  await buyer.buyName(state.listing);
+}
+```
+
+To specify the receiving account or routing memo during purchase, pass a `PaymentDestination` as the second argument to `buyName`. To cancel, the seller reads `await seller.nameListingForHolder(name)` and passes the returned terms to `cancelNameListing`. This holder-management read also returns an expired or retired revision, including after a page reload. Buyers use `nameSaleState(name).listing` for active offers. Relisting creates a new revision and requires a fresh quote. Configuration changes apply to new listings. Existing listings retain their signed fee split. All writes accept the native `onPrepared` callback to record the transaction hash before wallet signing.

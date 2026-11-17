@@ -66,6 +66,13 @@
       "required": true,
       "claimedAsPublicCi": false,
       "status": "Full monorepo CI must pass for this exact source or an identical Git tree before core publication."
+    },
+    {
+      "scope": "Holder and Owner tests of the release ABI, catalog and API-vendor sources",
+      "sourceRevision": "1673aa14168bc755abe5d4d714f8af3c52ab98d3",
+      "required": true,
+      "claimedAsPublicCi": false,
+      "status": "Tested in the reviewed local release checkout."
     }
   ],
   "newMirrorChecks": [
@@ -79,7 +86,7 @@
     "MCP build/typecheck and every portable test; native-signup typecheck and recovery tests"
   ],
   "publicationScope": [
-    "MCP 0.10.1 published 2026-10-14"
+    "Holder 0.12.0 and Owner 0.13.1 prepared for public npm release"
   ],
   "notClaimed": [
     "Private API integration executed in public mirror",
@@ -90,7 +97,8 @@
   "sourceRevisions": {
     "core": "cec2d29bd392c64ac3e7f8d1d20d626736c72ce5",
     "mcp": "60325a41ea2e7820272c8e8d3a9c827122ab5d62",
-    "signingCore": "e5788127c38f360f6bf97d91217f897441cf9bd1"
+    "signingCore": "e5788127c38f360f6bf97d91217f897441cf9bd1",
+    "marketplaceCore": "1673aa14168bc755abe5d4d714f8af3c52ab98d3"
   },
   "publicationState": {
     "core": "lookup0.11.0, owner0.12.0, holder0.10.0 published 2026-10-01",

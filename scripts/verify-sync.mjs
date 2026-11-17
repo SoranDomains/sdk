@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+export const MARKETPLACE_REVISION = '1673aa14168bc755abe5d4d714f8af3c52ab98d3';
 export const MCP_REVISION = '60325a41ea2e7820272c8e8d3a9c827122ab5d62';
 export const SIGNING_REVISION = 'e5788127c38f360f6bf97d91217f897441cf9bd1';
 export const SOURCE_REVISION = 'cec2d29bd392c64ac3e7f8d1d20d626736c72ce5';
@@ -30,10 +31,25 @@ export function verifySync(root) {
   assert.deepEqual(signing.versions, { holder: '0.10.1', owner: '0.12.1' });
   const signingFiles = new Set(signing.files);
   assert.deepEqual([...signingFiles].sort(), ["packages/holder/README.md", "packages/holder/package-lock.json", "packages/holder/package.json", "packages/holder/src/index.ts", "packages/holder/test/multichain.test.mts", "packages/holder/test/native-fee-limits.test.mts", "packages/holder/test/nested-authorization.test.mts", "packages/holder/test/subnames.test.mts", "packages/holder/tsconfig.json", "packages/owner/README.md", "packages/owner/package-lock.json", "packages/owner/package.json", "packages/owner/src/index.ts", "packages/owner/test/native-fee-limits.test.mts", "packages/owner/test/nested-authorization.test.mts", "packages/owner/tsconfig.json"]);
+  const release = manifest.marketplaceRelease;
+  assert.equal(release.sourceRevision, MARKETPLACE_REVISION);
+  assert.deepEqual(release.versions, { holder: '0.12.0', owner: '0.13.1' });
+  assert.equal(release.productionSourcesByteIdentical, true);
+  const marketplaceFiles = new Set(release.files);
+  // Pin both the upstream delta and the two portable ABI test mappings.
+  assert.equal(sha256([...marketplaceFiles].sort().join('\n')), 'c25cfab0a6f0ec916801390999b56229478de72137e21006e3e2920af8e541ad');
   const seen = new Set();
   for (const row of manifest.files) {
     assert(safe(row.source) && safe(row.destination), 'Unsafe mapping path');
-    if (signingFiles.has(row.destination)) {
+    if (marketplaceFiles.has(row.destination)) {
+      assert.equal(row.sourceRevision, MARKETPLACE_REVISION);
+      assert.match(row.destination, /^packages\/(holder|owner)\//);
+      assert.equal(row.source, row.destination.replace(/^packages\//, 'sdk/'));
+      const adapted = row.destination.endsWith('/README.md') || row.destination.endsWith('/test/error-codes.test.mts') || row.destination === 'packages/owner/test/native-upgrades.test.mts';
+      assert.equal(row.exact, !adapted, 'Unexpected marketplace source adaptation');
+      if (adapted) assert.equal(typeof row.adaptation, 'string');
+      else assert.equal(row.sourceSha256, row.destinationSha256);
+    } else if (signingFiles.has(row.destination)) {
       assert.equal(row.sourceRevision, SIGNING_REVISION, 'Signing source revision changed');
       if (row.destination.endsWith('/README.md')) {
         assert.equal(row.exact, false);
@@ -58,11 +74,14 @@ export function verifySync(root) {
       assert.equal(row.sourceSha256, row.destinationSha256);
     }
   }
+  for (const name of marketplaceFiles) assert(seen.has(name), `Missing marketplace export: ${name}`);
   for (const prefix of managed) for (const file of listedFiles(root, prefix)) assert(seen.has(file), `Unmapped managed file: ${file}`);
   for (const fixture of manifest.generatedFixtures) {
     assert(safe(fixture.file));
     assert.equal(sha256(fs.readFileSync(path.join(root, fixture.file))), fixture.sha256, `Fixture drift: ${fixture.file}`);
-    assert.equal(JSON.parse(fs.readFileSync(path.join(root, fixture.file))).sourceRevision, SOURCE_REVISION);
+    const revision = ['fixtures/release-catalog.json', 'fixtures/marketplace-abi-errors.json'].includes(fixture.file) ? MARKETPLACE_REVISION : SOURCE_REVISION;
+    assert.equal(fixture.sourceRevision ?? SOURCE_REVISION, revision);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(root, fixture.file))).sourceRevision, revision);
   }
   const abi = JSON.parse(fs.readFileSync(path.join(root, 'fixtures/public-abi-errors.json')));
   assert.deepEqual(Object.keys(abi.contracts).sort(), ['funding', 'lookup', 'primary', 'registrar', 'registry', 'resolver']);
@@ -72,7 +91,7 @@ export function verifySync(root) {
     assert(Object.keys(row.errors).length > 0);
     for (const [code, variant] of Object.entries(row.errors)) assert(/^[1-9][0-9]*$/.test(code) && /^[A-Za-z][A-Za-z0-9]*$/.test(variant));
   }
-  const versions = { lookup: '0.11.0', owner: '0.12.1', holder: '0.10.1' };
+  const versions = { lookup: '0.11.0', ...release.versions };
   for (const [pkg, version] of Object.entries(versions)) {
     const metadata = JSON.parse(fs.readFileSync(path.join(root, 'packages', pkg, 'package.json')));
     const lock = JSON.parse(fs.readFileSync(path.join(root, 'packages', pkg, 'package-lock.json')));
@@ -81,6 +100,6 @@ export function verifySync(root) {
     assert.equal(lock.packages[''].version, version);
     assert.deepEqual(metadata.repository, { type: 'git', url: 'git+https://github.com/SoranDomains/sdk.git', directory: `packages/${pkg}` });
   }
-  return { sourceRevision: SOURCE_REVISION, signingSourceRevision: SIGNING_REVISION, mappedFiles: seen.size, generatedFixtures: manifest.generatedFixtures.length, productionSourcesUnchanged: true };
+  return { sourceRevision: SOURCE_REVISION, signingSourceRevision: SIGNING_REVISION, marketplaceSourceRevision: MARKETPLACE_REVISION, mappedFiles: seen.size, generatedFixtures: manifest.generatedFixtures.length, productionSourcesUnchanged: true };
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) console.log(JSON.stringify(verifySync(path.resolve(fileURLToPath(new URL('../', import.meta.url)))), null, 2));

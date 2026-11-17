@@ -5,7 +5,7 @@
 > [release status](https://docs.soran.domains/reference/release-status) for package and service availability.
 
 
-Version 0.12.1 targets Stellar SDK17 (`>=17 <18`). ASCII names
+Version 0.13.1 recognizes the individual-name-sales Registrar for governed upgrades. It targets Stellar SDK 17 (`>=17.4.0 <18`). ASCII names
 and labels are validated before lowercase normalization; Unicode lookalikes are
 rejected. Writes continue to target the owning Registry/Registrar/Resolver. Universal
 Lookup is the read entry point in `@sorandomains/lookup` 0.10.0 or later.
@@ -119,7 +119,7 @@ Read the [native claim APIs, security boundaries and complete signup flow](https
 
 ## Verified testnet deployment
 
-See the [deployment manifest](../../deployments/testnet.json) for confirmed code hashes, transaction receipts and verification scope. Network passphrase: `Test SDF Network ; September 2015`.
+See the [deployment manifest](https://soran.domains/release-manifests/testnet-2026-11-16.json) for confirmed code hashes, transaction receipts and verification scope. Network passphrase: `Test SDF Network ; September 2015`.
 
 | Contract | Address |
 |---|---|

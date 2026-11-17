@@ -17,7 +17,7 @@ function modified(file, transform, run) {
   };
   try { run(); } finally { fs.readFileSync = original; }
 }
-test('reviewed export and public fixtures are complete and unchanged', () => assert.equal(verifySync(root).mappedFiles, 145));
+test('reviewed export and public fixtures are complete and unchanged', () => assert.equal(verifySync(root).mappedFiles, 152));
 test('production byte drift is rejected', () => modified('packages/lookup/src/index.ts', x => x + '\n', () => assert.throws(() => verifySync(root), /Export drift/)));
 test('ABI fixture drift is rejected', () => modified('fixtures/public-abi-errors.json', x => x.replace('"53"', '"999"'), () => assert.throws(() => verifySync(root), /Fixture drift/)));
 test('path traversal and source revision changes are rejected', () => {
@@ -27,3 +27,17 @@ test('path traversal and source revision changes are rejected', () => {
 test('signing release cannot relabel old source or omit its source-CI gate', () => {
   for (const change of [m => m.signingRelease.sourceRevision = m.sourceRevision, m => m.signingRelease.requiredMonorepoCi = false, m => m.signingRelease.files.pop()]) modified('sync-manifest.json', x => { const m = JSON.parse(x); change(m); return JSON.stringify(m); }, () => assert.throws(() => verifySync(root)));
 });
+
+test('marketplace release scope and exported source identity are pinned', () => {
+  for (const change of [
+    m => m.marketplaceRelease.files.pop(),
+    m => m.marketplaceRelease.sourceRevision = m.sourceRevision,
+    m => m.files.find(r => r.destination === 'packages/holder/src/name-sales.ts').source = 'sdk/owner/src/index.ts',
+  ]) modified('sync-manifest.json', x => {
+    const manifest = JSON.parse(x);
+    change(manifest);
+    return JSON.stringify(manifest);
+  }, () => assert.throws(() => verifySync(root)));
+});
+test('marketplace ABI fixture rejects changes to the new sale errors', () =>
+  modified('fixtures/marketplace-abi-errors.json', x => x.replace('NameNotSaleable', 'UnknownSale'), () => assert.throws(() => verifySync(root), /Fixture drift/)));

@@ -1,20 +1,28 @@
 {
   "format": "soran-public-release-catalog-v1",
-  "sourceRevision": "cec2d29bd392c64ac3e7f8d1d20d626736c72ce5",
+  "sourceRevision": "1673aa14168bc755abe5d4d714f8af3c52ab98d3",
   "sourceInputs": [
     {
       "path": "web/lib/contractUpdates.ts",
-      "sha256": "3c95b562c05446f0f873c632dba69ed6f12f079961966f561003aab9e25c91ba"
+      "sha256": "4ad6983d974ea9d096e6e046fd4be55a62dc80f9382803279eda8f0d50cca40a"
     },
     {
-      "path": "deploy/testnet/upgrades/2026-10-01-subnames-candidate.json",
-      "sha256": "fb479f4dba8653e6cf08364629a456ada6a771545e82055ca320cc33266f93a1"
+      "path": "deploy/testnet/upgrades/2026-11-06-protocol30-w-address-candidate.json",
+      "sha256": "235e21510e2b671b88fc7a88bd48b9111dd296e9ffde9f898d4f84977237e9f9"
+    },
+    {
+      "path": "deploy/testnet/upgrades/2026-11-16-individual-name-sales-v2-candidate.json",
+      "sha256": "b7fcca747ae03ebf622a6254c7e1a4be4e8a1f862dcdc594b6e60f1c20d06d04"
     }
   ],
   "catalog": {
     "registrar": {
-      "latest": "4d6d18625f4d890028acb794b24871c5c93f96dc15d94cf3d52cbf9713b07fb1",
+      "latest": "f3a5cf1ba9ec19872b783b4ec43e826ed9d67926645c60ae2b8274ae60e7356c",
       "superseded": [
+        "13195f1ed62cee15a30fab0d69da09f8537f2c5b62dfb9bbe70d9f3a5a90e498",
+        "a7b618ac95f5f0b76d4489a9e88d1ce4691611b0d7c53d2d2f8b74b7526e284a",
+        "8e84a35643c6e9c54d161c44102d229e18b50ad16394afea6d73031e21188ede",
+        "4d6d18625f4d890028acb794b24871c5c93f96dc15d94cf3d52cbf9713b07fb1",
         "42dc5f8b40932617d3f2667e1d26dad3e5e9a62c63de1fde7c016cb67a86c420",
         "5c8ae72ea7370ccf19af52b9bbc0007362be94464651ccdf68a2bb1f478b6f2c",
         "61ded153e6311075c1087c5639a5410222e23f7cade239ed2c946150af94b1c5",
@@ -22,8 +30,12 @@
       ]
     },
     "resolver": {
-      "latest": "941bf87f26cb817f3c6a52a326de855cca8a1dc4477e62a38ec4ffa5c7f43806",
+      "latest": "a77bb9ef08d383691092c71ce6291e2f5ab600320c5afd5686713cc54cbfd95c",
       "superseded": [
+        "4ab266de682a38208464e74d52692829ac344ece14f48c4249c3455e6b62a27b",
+        "743559d763d81bf2debe8b70650a2a6dc50d6f5da4cbc0aeccedd3f5559442a7",
+        "218cb1f7f90bd21f81ad4fe8b86f66478c3804b7355257cdc7e37d55d7edd5fb",
+        "941bf87f26cb817f3c6a52a326de855cca8a1dc4477e62a38ec4ffa5c7f43806",
         "cb927ffa19d6b1f3f0b0187048d885e200adb6de3fddd11ee3cfeb59df9c5c48",
         "351bf4e056b179b578fe2a4ea46f937bfafccc6538c7357ea70021b7038d91ea",
         "c6dfcd7bbf35943a13406888678334d0938d0fea54939906b00c2dc37b4a9a71",
@@ -33,10 +45,32 @@
   },
   "artifacts": {
     "registrar": {
-      "sha256": "4d6d18625f4d890028acb794b24871c5c93f96dc15d94cf3d52cbf9713b07fb1"
+      "sha256": "f3a5cf1ba9ec19872b783b4ec43e826ed9d67926645c60ae2b8274ae60e7356c"
     },
     "resolver": {
-      "sha256": "941bf87f26cb817f3c6a52a326de855cca8a1dc4477e62a38ec4ffa5c7f43806"
+      "sha256": "a77bb9ef08d383691092c71ce6291e2f5ab600320c5afd5686713cc54cbfd95c"
     }
+  },
+  "reviewedPredecessors": {
+    "registrar": [
+      "13195f1ed62cee15a30fab0d69da09f8537f2c5b62dfb9bbe70d9f3a5a90e498",
+      "a7b618ac95f5f0b76d4489a9e88d1ce4691611b0d7c53d2d2f8b74b7526e284a",
+      "8e84a35643c6e9c54d161c44102d229e18b50ad16394afea6d73031e21188ede",
+      "4d6d18625f4d890028acb794b24871c5c93f96dc15d94cf3d52cbf9713b07fb1",
+      "42dc5f8b40932617d3f2667e1d26dad3e5e9a62c63de1fde7c016cb67a86c420",
+      "5c8ae72ea7370ccf19af52b9bbc0007362be94464651ccdf68a2bb1f478b6f2c",
+      "61ded153e6311075c1087c5639a5410222e23f7cade239ed2c946150af94b1c5",
+      "26e03cd1d7fbfa46fe442406fb1b88022ec8cd8bd9123bed570f971fce596a14"
+    ],
+    "resolver": [
+      "4ab266de682a38208464e74d52692829ac344ece14f48c4249c3455e6b62a27b",
+      "743559d763d81bf2debe8b70650a2a6dc50d6f5da4cbc0aeccedd3f5559442a7",
+      "218cb1f7f90bd21f81ad4fe8b86f66478c3804b7355257cdc7e37d55d7edd5fb",
+      "941bf87f26cb817f3c6a52a326de855cca8a1dc4477e62a38ec4ffa5c7f43806",
+      "cb927ffa19d6b1f3f0b0187048d885e200adb6de3fddd11ee3cfeb59df9c5c48",
+      "351bf4e056b179b578fe2a4ea46f937bfafccc6538c7357ea70021b7038d91ea",
+      "c6dfcd7bbf35943a13406888678334d0938d0fea54939906b00c2dc37b4a9a71",
+      "5e7b4fb8d310d67ed6966a155e748d60be771422b3e8c34bbc14485f98525574"
+    ]
   }
 }
