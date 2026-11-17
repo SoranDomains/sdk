@@ -1,8 +1,8 @@
 /** Local successor-ABI helpers. No deployed defaults are changed by this module. */
 import { Address, StrKey, hash, nativeToScVal, xdr } from "@stellar/stellar-sdk";
-import { decodeMuxedAddress, paymentMemoToScVal, validatePaymentDestination, type PaymentDestination } from "./payment.js";
+import { isMuxedPaymentAddress, decodeMuxedAddress, paymentMemoToScVal, validatePaymentDestination, type PaymentDestination } from "./payment.js";
 
-export const NATIVE_REGISTRAR_ERRORS: Record<number,string> = {1:"AlreadyInitialized",2:"NotInitialized",3:"NameTaken",4:"NameNotFound",5:"NotReclaimable",6:"NotTransferable",7:"AlreadyPermanent",8:"BatchTooLarge",9:"NotNamespaceOwner",10:"BadLabel",11:"PermanentName",12:"FiniteTermPolicy",13:"PermanentlyLocked",14:"NameExpired",15:"NoPendingTransfer",16:"TransferExpired",17:"StaleTransfer",18:"InvalidPolicy",19:"ExpiryOverflow",20:"InvalidRegistry",21:"InvalidClaimConfig",22:"ClaimsNotConfigured",23:"ClaimsPaused",24:"StaleClaimPolicy",25:"ClaimIntentMismatch",26:"ClaimIntentExpired",27:"ReservedName",28:"NameNotReserved",29:"PublicIssuanceRequired",30:"WalletClaimLimit",31:"InvalidEligibility",32:"ApprovalAllowanceReached",33:"ApprovalRateReached",34:"RequestIdConflict",35:"CounterOverflow",36:"InvalidNativeBinding",37:"UnsupportedClaimant",38:"DuplicateLabel",39:"RenewalTooEarly",40:"RenewalLeaseLimit",41:"DestinationInitializationFailed",42:"FeeSettlementFailed",43:"MigrationInProgress",44:"MigrationAlreadyStarted",45:"MigrationNotActive",46:"MigrationMismatch",47:"MigrationDuplicate",48:"MigrationIncomplete",49:"MigrationUnavailable",50:"MigrationUnsupported",51:"PermanentLockDisabled",52:"InvalidRenewalGrace",53:"SubnameCreationDisabled",54:"SubnamesSuspended",55:"SubnameGenerationMismatch",56:"SubnameIndexUnavailable"};
+export const NATIVE_REGISTRAR_ERRORS: Record<number,string> = {1:"AlreadyInitialized",2:"NotInitialized",3:"NameTaken",4:"NameNotFound",5:"NotReclaimable",6:"NotTransferable",7:"AlreadyPermanent",8:"BatchTooLarge",9:"NotNamespaceOwner",10:"BadLabel",11:"PermanentName",12:"FiniteTermPolicy",13:"PermanentlyLocked",14:"NameExpired",15:"NoPendingTransfer",16:"TransferExpired",17:"StaleTransfer",18:"InvalidPolicy",19:"ExpiryOverflow",20:"InvalidRegistry",21:"InvalidClaimConfig",22:"ClaimsNotConfigured",23:"ClaimsPaused",24:"StaleClaimPolicy",25:"ClaimIntentMismatch",26:"ClaimIntentExpired",27:"ReservedName",28:"NameNotReserved",29:"PublicIssuanceRequired",30:"WalletClaimLimit",31:"InvalidEligibility",32:"ApprovalAllowanceReached",33:"ApprovalRateReached",34:"RequestIdConflict",35:"CounterOverflow",36:"InvalidNativeBinding",37:"UnsupportedClaimant",38:"DuplicateLabel",39:"RenewalTooEarly",40:"RenewalLeaseLimit",41:"DestinationInitializationFailed",42:"FeeSettlementFailed",43:"MigrationInProgress",44:"MigrationAlreadyStarted",45:"MigrationNotActive",46:"MigrationMismatch",47:"MigrationDuplicate",48:"MigrationIncomplete",49:"MigrationUnavailable",50:"MigrationUnsupported",51:"PermanentLockDisabled",52:"InvalidRenewalGrace",53:"SubnameCreationDisabled",54:"SubnamesSuspended",55:"SubnameGenerationMismatch",56:"SubnameIndexUnavailable",57:"NameNotSaleable",58:"InvalidSaleTerms",59:"SaleTermsChanged",60:"ListingUnavailable",61:"SaleFeesUnavailable"};
 export class NativeClaimError extends Error {
   readonly contractCode: number | null;
   readonly contractError: string | null;
@@ -72,7 +72,7 @@ export function struct(fields: Record<string, xdr.ScVal>): xdr.ScVal {
 }
 export function paymentDestinationToScVal(raw: PaymentDestination): xdr.ScVal {
   const payment = validatePaymentDestination(raw);
-  if (StrKey.isValidMed25519PublicKey(payment.address)) {
+  if (isMuxedPaymentAddress(payment.address)) {
     const value = decodeMuxedAddress(payment.address);
     return xdr.ScVal.scvVec([sc.symbol("Muxed"), struct({ account: sc.address(value.account), id: sc.u64(BigInt(value.id)) })]);
   }

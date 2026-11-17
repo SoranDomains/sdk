@@ -12,18 +12,23 @@ export type PaymentDestination = { address: string; memo: PaymentMemo };
 const MAX_U64 = 18446744073709551615n;
 const utf8 = (value: string) => new TextEncoder().encode(value);
 
+/** M and W are destinations, never standalone signing identities. */
+export function isMuxedPaymentAddress(address: string): boolean {
+  return StrKey.isValidMed25519PublicKey(address) || StrKey.isValidMuxedContract(address);
+}
+
 /** Reject invalid data without normalizing meaningful memo bytes. */
 export function validatePaymentDestination(value: unknown): PaymentDestination {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid payment destination");
   const p = value as Record<string, unknown>;
   if (Object.keys(p).sort().join(",") !== "address,memo") throw new Error("unexpected payment fields");
-  if (typeof p.address !== "string" || (!StrKey.isValidEd25519PublicKey(p.address) && !StrKey.isValidContract(p.address) && !StrKey.isValidMed25519PublicKey(p.address)))
-    throw new Error("payment address must be a valid G, C or M address");
+  if (typeof p.address !== "string" || (!StrKey.isValidEd25519PublicKey(p.address) && !StrKey.isValidContract(p.address) && !isMuxedPaymentAddress(p.address)))
+    throw new Error("payment address must be a valid G, C, M or W address");
   if (!p.memo || typeof p.memo !== "object" || Array.isArray(p.memo)) throw new Error("invalid memo");
   const m = p.memo as Record<string, unknown>;
   if (m.type === "none") {
     if (Object.keys(m).join(",") !== "type") throw new Error("none memo cannot have a value");
-    if (StrKey.isValidMed25519PublicKey(p.address)) decodeMuxedAddress(p.address);
+    if (isMuxedPaymentAddress(p.address)) decodeMuxedAddress(p.address);
     return { address: p.address, memo: { type: "none" } };
   }
   if (!StrKey.isValidEd25519PublicKey(p.address)) throw new Error("memos require a classic G address");
@@ -47,7 +52,7 @@ export function validatePaymentDestination(value: unknown): PaymentDestination {
 
 export function encodePaymentRecord(value: PaymentDestination): string {
   const p = validatePaymentDestination(value);
-  if (StrKey.isValidMed25519PublicKey(p.address)) {
+  if (isMuxedPaymentAddress(p.address)) {
     const muxed = decodeMuxedAddress(p.address);
     return `2|${muxed.account}|muxed|${muxed.id}`;
   }
@@ -103,23 +108,25 @@ export function paymentFromNative(raw: unknown): PaymentDestination {
 
 /** Decode a full muxed destination without treating its operation ID as a memo. */
 export function decodeMuxedAddress(address: string): { account: string; id: string } {
-  if (typeof address !== "string" || !StrKey.isValidMed25519PublicKey(address)) throw new Error("invalid muxed M address");
-  const raw = StrKey.decodeMed25519PublicKey(address);
-  if (raw.length !== 40 || StrKey.encodeMed25519PublicKey(raw) !== address) throw new Error("noncanonical muxed address");
+  if (typeof address !== "string" || !isMuxedPaymentAddress(address)) throw new Error("invalid muxed M or W address");
+  const contract = StrKey.isValidMuxedContract(address);
+  const raw = contract ? StrKey.decodeMuxedContract(address) : StrKey.decodeMed25519PublicKey(address);
+  if (raw.length !== 40 || (contract ? StrKey.encodeMuxedContract(raw) : StrKey.encodeMed25519PublicKey(raw)) !== address) throw new Error("noncanonical muxed address");
   let id = 0n;
   for (const byte of raw.subarray(32)) id = (id << 8n) | BigInt(byte);
-  return { account: StrKey.encodeEd25519PublicKey(raw.subarray(0, 32)), id: id.toString() };
+  return { account: contract ? StrKey.encodeContract(raw.subarray(0, 32)) : StrKey.encodeEd25519PublicKey(raw.subarray(0, 32)), id: id.toString() };
 }
 
-/** Encode only canonical G + exact decimal u64; numbers are never accepted. */
+/** Encode a G or C base and exact decimal u64; numbers are never accepted. */
 export function encodeMuxedAddress(account: string, id: string): string {
-  if (typeof account !== "string" || !StrKey.isValidEd25519PublicKey(account)) throw new Error("muxed base must be a G account");
+  if (typeof account !== "string" || (!StrKey.isValidEd25519PublicKey(account) && !StrKey.isValidContract(account))) throw new Error("muxed base must be a G account or C contract");
   if (typeof id !== "string" || !/^(0|[1-9][0-9]{0,19})$/.test(id) || BigInt(id) > MAX_U64) throw new Error("muxed ID must be canonical decimal u64");
   const raw = new Uint8Array(40);
-  raw.set(StrKey.decodeEd25519PublicKey(account));
+  const contract = StrKey.isValidContract(account);
+  raw.set(contract ? StrKey.decodeContract(account) : StrKey.decodeEd25519PublicKey(account));
   let value = BigInt(id);
   for (let i = 39; i >= 32; i--) { raw[i] = Number(value & 255n); value >>= 8n; }
-  return StrKey.encodeMed25519PublicKey(raw);
+  return contract ? StrKey.encodeMuxedContract(raw) : StrKey.encodeMed25519PublicKey(raw);
 }
 
 /** Strict additive on-chain destination enum; v1 payment structs stay separate. */

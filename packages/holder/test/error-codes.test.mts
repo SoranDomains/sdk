@@ -1,7 +1,12 @@
+import abi from "../../../fixtures/marketplace-abi-errors.json" with { type: "json" };
 import assert from "node:assert/strict";
 import test from "node:test";
 import { NATIVE_REGISTRAR_ERRORS } from "../src/native-codec.js";
-import { contractErrors, describeDrift, sourceErrorCodes, sourceErrorMap } from "../../lookup/test/helpers/contract-errors.mts";
+import { describeDrift, sourceErrorCodes, sourceErrorMap } from "../../lookup/test/helpers/contract-errors.mts";
+
+function contractErrors(name: string): Record<number, string> {
+  return abi.contracts[name as keyof typeof abi.contracts].errors;
+}
 
 // Numeric handling is safe for unknown codes, but an unnamed `contract error #N` hides what failed.
 const maps: Array<[string, string, () => Record<number, string>]> = [

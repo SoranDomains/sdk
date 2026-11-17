@@ -19,7 +19,10 @@ import { destinationFromNative, type PaymentDestination } from "./payment.js";
 import { claimIntentToScVal, type ClaimIntent } from "./native-types.js";
 
 /** Read a response body as text, refusing more than `limit` bytes, declared or streamed, so a hostile or broken endpoint cannot make the client buffer it all. Returns null over the limit. */
-export async function readBoundedText(response: Response, limit: number): Promise<string | null> {
+export async function readBoundedText(
+  response: Response,
+  limit: number,
+): Promise<string | null> {
   if (Number(response.headers.get("content-length") ?? 0) > limit) {
     await response.body?.cancel().catch(() => undefined);
     return null;
@@ -430,3 +433,231 @@ export const FUNDING_ERRORS: Record<number, string> = {
   30: "Name state changed",
   31: "Upgrade does not match",
 };
+
+/** Owner-funded namespace retention. Kept separate from registration coverage. */
+export type StoragePlan = {
+  registrar: string;
+  resolver: string;
+  registrarKeys: xdr.ScVal[];
+  resolverKeys: xdr.ScVal[];
+};
+export type UpkeepPolicy = {
+  relayer: string;
+  renewalCap: bigint;
+  dailyCap: bigint;
+  totalCap: bigint;
+  retention: number;
+  renewBefore: number;
+  quoteLifetime: number;
+  validUntil: bigint;
+};
+export type UpkeepReceipt = {
+  quoteHash: string;
+  quoteId: string;
+  nonce: bigint;
+  charge: bigint;
+  balance: bigint;
+  ledger: number;
+  coveredUntil: number;
+};
+export type UpkeepPosition = Omit<FundingPosition, "status"> & {
+  status: "paused" | "active" | "closed";
+  nonce: bigint;
+  lastReceipt: UpkeepReceipt | null;
+};
+export type UpkeepQuote = {
+  network: string;
+  funding: string;
+  configRevision: bigint;
+  fundId: string;
+  policyRevision: bigint;
+  nonce: bigint;
+  quoteId: string;
+  plan: StoragePlan;
+  charge: bigint;
+  issuedLedger: number;
+  expiresLedger: number;
+};
+const UPKEEP_POLICY = model({
+  relayer: G,
+  renewalCap: MONEY,
+  dailyCap: MONEY,
+  totalCap: MONEY,
+  retention: U32,
+  renewBefore: U32,
+  quoteLifetime: U32,
+  validUntil: U64,
+});
+export type ExecutionPolicy = { wallet: string; limits: UpkeepPolicy; serviceFeeCap: bigint;
+  termsVersion: 2; serviceFeeBps: 500; payFailedFees: true };
+export type ExecutionApproval = { policy: ExecutionPolicy; depositedTotal: bigint; depositNonce: bigint };
+export type ExecutionQuote = Omit<UpkeepQuote, "charge"> & { maxNetworkFee: bigint };
+export type ExecutionReceipt = { quoteHash: string; quoteId: string; nonce: bigint; ledger: number; coveredUntil: number };
+export type ExecutionWithdrawal = { controller: string; recipient: string; amount: bigint; maxNetworkFee: bigint; nonce: bigint };
+const EXECUTION_POLICY = model({wallet:G,limits:UPKEEP_POLICY,serviceFeeCap:MONEY,termsVersion:U32,serviceFeeBps:U32,payFailedFees:BOOL});
+const EXECUTION_APPROVAL = model({policy:EXECUTION_POLICY,depositedTotal:MONEY,depositNonce:U64});
+const EXECUTION_RECEIPT = model({quoteHash:HEX,quoteId:HEX,nonce:U64,ledger:U32,coveredUntil:U32});
+const EXECUTION_WITHDRAWAL = model({controller:ID,recipient:G,amount:MONEY,maxNetworkFee:MONEY,nonce:U64});
+function validateExecutionPolicy(p: ExecutionPolicy) {
+  upkeepPolicyToScVal(p.limits);
+  if (p.termsVersion!==2||p.serviceFeeBps!==500||p.payFailedFees!==true||p.wallet!==p.limits.relayer||
+    p.serviceFeeCap<0n||p.serviceFeeCap>p.limits.renewalCap)
+    throw new FundingError("Explicit prepaid custody, failed fees and capped 5% approval are required");
+}
+export function executionPolicyToScVal(p: ExecutionPolicy): xdr.ScVal {
+  const encoded=EXECUTION_POLICY.encode(p);validateExecutionPolicy(p);return encoded;
+}
+export function executionApprovalFromNative(value:unknown):ExecutionApproval {
+  const a=EXECUTION_APPROVAL.decode(value) as ExecutionApproval;validateExecutionPolicy(a.policy);return a;
+}
+export const executionReceiptFromNative=(value:unknown)=>EXECUTION_RECEIPT.decode(value) as ExecutionReceipt;
+export const executionReceiptToScVal=(value:ExecutionReceipt)=>EXECUTION_RECEIPT.encode(value);
+export const executionWithdrawalFromNative=(value:unknown)=>EXECUTION_WITHDRAWAL.decode(value) as ExecutionWithdrawal;
+const UPKEEP_RECEIPT = model({
+  quoteHash: HEX,
+  quoteId: HEX,
+  nonce: U64,
+  charge: MONEY,
+  balance: MONEY,
+  ledger: U32,
+  coveredUntil: U32,
+});
+const UPKEEP_LAST: Codec = {
+  encode(v) {
+    return xdr.ScVal.scvVec(
+      v === null
+        ? [sc.symbol("Empty")]
+        : [sc.symbol("Recorded"), UPKEEP_RECEIPT.encode(v)],
+    );
+  },
+  decode(v) {
+    if (Array.isArray(v) && v.length === 1 && v[0] === "Empty") return null;
+    if (Array.isArray(v) && v.length === 2 && v[0] === "Recorded")
+      return UPKEEP_RECEIPT.decode(v[1]);
+    throw new FundingError("Malformed upkeep receipt");
+  },
+};
+const UPKEEP_POSITION = model({
+  namespace: HEX,
+  ownerEpoch: U64,
+  controller: ID,
+  balance: MONEY,
+  spentTotal: MONEY,
+  utcDay: U64,
+  spentToday: MONEY,
+  policyRevision: U64,
+  status: enumeration({ paused: "Paused", active: "Active", closed: "Closed" }),
+  nonce: U64,
+  lastReceipt: UPKEEP_LAST,
+});
+export const upkeepPositionFromNative = (v: unknown) =>
+  UPKEEP_POSITION.decode(v) as UpkeepPosition;
+export const upkeepPolicyFromNative = (v: unknown) =>
+  UPKEEP_POLICY.decode(v) as UpkeepPolicy;
+export const upkeepReceiptToScVal = (v: UpkeepReceipt) =>
+  UPKEEP_RECEIPT.encode(v);
+export const upkeepReceiptFromNative = (v: unknown) =>
+  UPKEEP_RECEIPT.decode(v) as UpkeepReceipt;
+export function upkeepPositionId(namespace: string, epoch: bigint): string {
+  return hex(
+    hash(
+      xdr.ScVal.scvVec([
+        sc.symbol("upkeep_v1"),
+        HEX.encode(namespace),
+        U64.encode(epoch),
+      ]).toXDR(),
+    ),
+  );
+}
+export function upkeepPolicyToScVal(p: UpkeepPolicy): xdr.ScVal {
+  const encoded = UPKEEP_POLICY.encode(p);
+  if (
+    p.renewalCap <= 0n ||
+    p.dailyCap < p.renewalCap ||
+    p.totalCap < p.dailyCap ||
+    p.retention < 1 ||
+    p.renewBefore < 1 ||
+    p.renewBefore >= p.retention ||
+    p.quoteLifetime < 1 ||
+    p.quoteLifetime > 120 ||
+    p.validUntil <= 0n
+  )
+    throw new FundingError("Invalid upkeep spending limits or retention");
+  return encoded;
+}
+export function storagePlanToScVal(p: StoragePlan): xdr.ScVal {
+  exactObject(
+    p,
+    ["registrar", "resolver", "registrarKeys", "resolverKeys"],
+    "storage plan",
+  );
+  const keys = (v: xdr.ScVal[]) => {
+    if (!Array.isArray(v) || v.length > 32)
+      throw new FundingError("At most 32 storage keys per contract");
+    const seen = new Set<string>();
+    for (const key of v) {
+      if (!(key instanceof xdr.ScVal))
+        throw new FundingError("Storage keys must be canonical ScVal values");
+      const raw = key.toXDR("base64");
+      if (seen.has(raw)) throw new FundingError("Duplicate storage key");
+      seen.add(raw);
+    }
+    return xdr.ScVal.scvVec(v);
+  };
+  const encoded = struct({
+    registrar: C.encode(p.registrar),
+    resolver: C.encode(p.resolver),
+    registrar_keys: keys(p.registrarKeys),
+    resolver_keys: keys(p.resolverKeys),
+  });
+  if (p.registrar === p.resolver || encoded.toXDR().length > 16384)
+    throw new FundingError("Invalid storage plan routes or size");
+  return encoded;
+}
+export function upkeepQuoteToScVal(q: UpkeepQuote): xdr.ScVal {
+  exactObject(
+    q,
+    [
+      "network",
+      "funding",
+      "configRevision",
+      "fundId",
+      "policyRevision",
+      "nonce",
+      "quoteId",
+      "plan",
+      "charge",
+      "issuedLedger",
+      "expiresLedger",
+    ],
+    "upkeep quote",
+  );
+  if (
+    q.charge <= 0n ||
+    q.expiresLedger <= q.issuedLedger ||
+    q.expiresLedger - q.issuedLedger > 120
+  )
+    throw new FundingError("Invalid upkeep quote charge or lifetime");
+  return struct({
+    network: HEX.encode(q.network),
+    funding: C.encode(q.funding),
+    config_revision: U64.encode(q.configRevision),
+    fund_id: HEX.encode(q.fundId),
+    policy_revision: U64.encode(q.policyRevision),
+    nonce: U64.encode(q.nonce),
+    quote_id: HEX.encode(q.quoteId),
+    plan: storagePlanToScVal(q.plan),
+    charge: MONEY.encode(q.charge),
+    issued_ledger: U32.encode(q.issuedLedger),
+    expires_ledger: U32.encode(q.expiresLedger),
+  });
+}
+export function executionQuoteToScVal(q: ExecutionQuote): xdr.ScVal {
+  exactObject(q,["network","funding","configRevision","fundId","policyRevision","nonce","quoteId","plan","maxNetworkFee","issuedLedger","expiresLedger"],"prepaid execution quote");
+  if(q.maxNetworkFee<=0n||q.expiresLedger<=q.issuedLedger||q.expiresLedger-q.issuedLedger>120)
+    throw new FundingError("Invalid prepaid execution budget or lifetime");
+  return struct({network:HEX.encode(q.network),funding:C.encode(q.funding),config_revision:U64.encode(q.configRevision),
+    fund_id:HEX.encode(q.fundId),policy_revision:U64.encode(q.policyRevision),nonce:U64.encode(q.nonce),
+    quote_id:HEX.encode(q.quoteId),plan:storagePlanToScVal(q.plan),max_network_fee:MONEY.encode(q.maxNetworkFee),
+    issued_ledger:U32.encode(q.issuedLedger),expires_ledger:U32.encode(q.expiresLedger)});
+}

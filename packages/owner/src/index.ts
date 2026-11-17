@@ -245,6 +245,8 @@ const REGISTRAR_ERRORS: Record<number, string> = {
   52: "InvalidRenewalGrace",
   53: "SubnameCreationDisabled", 54: "SubnamesSuspended",
   55: "SubnameGenerationMismatch", 56: "SubnameIndexUnavailable",
+  57: "NameNotSaleable", 58: "InvalidSaleTerms", 59: "SaleTermsChanged",
+  60: "ListingUnavailable", 61: "SaleFeesUnavailable",
 };
 
 /** Error names shared by native multichain Resolver reads and writes. */
@@ -298,6 +300,8 @@ const REGISTRY_ERRORS: Record<number, string> = {
   40: "UpgradeNotApproved",
   41: "PermanentLockDisabled",
   42: "BatchTooLarge",
+  43: "SaleFeeUnset",
+  44: "InvalidSaleFee",
 };
 
 /** Errors for a submit the network REJECTED as a stale sequence: nothing was included, so one retry with a fresh sequence is safe. */
