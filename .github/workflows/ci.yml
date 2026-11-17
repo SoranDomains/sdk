@@ -36,10 +36,18 @@ jobs:
           cache-dependency-path: packages/${{ matrix.pkg }}/package-lock.json
       - name: Install from lockfile
         run: npm ci
+      - name: Install peer environments for cross-version payment compatibility
+        if: matrix.pkg == 'lookup'
+        run: |
+          npm ci --prefix ../holder
+          npm ci --prefix ../owner
       - name: Audit releases (high and critical)
         run: npm audit --audit-level=high
       - name: Build
         run: npm run build
+      - name: Compare the payment codec with published Lookup 0.12.0
+        if: matrix.pkg == 'holder' || matrix.pkg == 'owner'
+        run: node ../../scripts/verify-marketplace-codec.mjs
       - name: Typecheck
         run: npm run typecheck
       - name: Portable package tests

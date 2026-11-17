@@ -739,8 +739,9 @@
       "source": "sdk/lookup/test/payment-copies.test.mts",
       "destination": "packages/lookup/test/payment-copies.test.mts",
       "sourceSha256": "ca0704460f98338fd216ecc8bd920b99796616cb49fd7643ae24a5d87b8b5758",
-      "destinationSha256": "ca0704460f98338fd216ecc8bd920b99796616cb49fd7643ae24a5d87b8b5758",
-      "exact": true
+      "destinationSha256": "8009d51ab656b5cf1b0ff8e037f0eb9612688447da32ef7673102cfbddd6aceb",
+      "exact": false,
+      "adaptation": "Keep historical Lookup and current Holder/Owner codec hashes pinned and exercise all three versions against their shared destination wire formats."
     },
     {
       "source": "sdk/lookup/test/payment.test.mts",

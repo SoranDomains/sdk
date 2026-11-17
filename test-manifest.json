@@ -39,6 +39,15 @@
       "change": "Use fixtures/release-catalog.json containing exported catalog latest/superseded hashes and exact reviewed release artifact hashes.",
       "preserved": "SDK latest, prior-lineage and artifact consistency checks still run.",
       "monorepoGate": "Original test compares actual web catalog and candidate record in source CI."
+    },
+    {
+      "file": "packages/lookup/test/payment-copies.test.mts",
+      "change": "Compare each released codec against its reviewed source snapshot and round-trip common G, C and M destinations across all three packages.",
+      "preserved": "Byte-identical Holder and Owner payment codecs. Lookup 0.11.0 retains its historical codec in this public tree.",
+      "sourceRevisions": [
+        "cec2d29bd392c64ac3e7f8d1d20d626736c72ce5",
+        "1673aa14168bc755abe5d4d714f8af3c52ab98d3"
+      ]
     }
   ],
   "monorepoOnly": [
