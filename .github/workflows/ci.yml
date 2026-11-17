@@ -52,6 +52,9 @@ jobs:
         run: npm run typecheck
       - name: Portable package tests
         run: npm test
+      - name: Test the Holder funding transport deadline
+        if: matrix.pkg == 'holder'
+        run: node --import tsx --test test/funding-transport.test.mts
       - name: Browser compatibility
         if: matrix.pkg != 'mcp'
         run: npm run check:browser
